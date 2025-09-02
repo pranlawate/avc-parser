@@ -11,7 +11,7 @@ def parse_audit_log(log_block: str) -> dict:
     """
     parsed_data = {}
     patterns = {
-        "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
+            "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
         "PATH": {"path": r"name=\"([^\"]+)\"",},
         "SYSCALL": {"syscall": r"syscall=([\w\d]+)", "exe": r"exe=\"([^\"]+)\"",},
@@ -29,18 +29,17 @@ def parse_audit_log(log_block: str) -> dict:
         # Apply the patterns for the detected log type
         if log_type in patterns:
             for key, pattern in patterns[log_type].items():
-                # Avoid overwriting already found data (e.g., path from AVC)
-                if key not in parsed_data:
-                    field_match = re.search(pattern, line)
-                    if field_match:
-                        value = field_match.group(1)
-                        if key == 'proctitle':
-                            try:
-                                parsed_data[key] = bytes.fromhex(value).decode()
-                            except ValueError:
-                                parsed_data[key] = value.strip('"')
-                        else:
-                            parsed_data[key] = value.strip()
+                field_match = re.search(pattern, line)
+                if field_match:
+                    value = field_match.group(1)
+                    if key == 'proctitle':
+                        try:
+                            parsed_data[key] = bytes.fromhex(value).decode()
+                        except ValueError:
+                            parsed_data[key] = value.strip('"')
+                    else:
+                        parsed_data[key] = value.strip()
+#    print(f" [DEBUG] Final parsed data for this block: {parsed_data}") #DEBUG
     return parsed_data
 
 def print_summary(console: Console, parsed_log: dict):
@@ -48,7 +47,6 @@ def print_summary(console: Console, parsed_log: dict):
     if not parsed_log:
         console.print("Could not parse the provided log string.", style="bold red")
         return
-    console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
 
     # Define the fields and their labels for cleaner printing
     process_fields = [
@@ -118,12 +116,45 @@ def main():
 #        print("📋 Please paste your SELinux AVC denial log below and press Ctrl+D when done:")
         log_string = sys.stdin.read()
 
-        if not log_string:
-            console.print("Error: No log provided. Exiting.", style="bold red")
-            sys.exit(1)
+#   --- NEW LOGIC: Split, De-duplicate, and Process ---
+    log_blocks = [block.strip() for block in log_string.split('----') if block.strip()]
 
-    parsed_log = parse_audit_log(log_string)
-    print_summary(console, parsed_log)
+    if not log_blocks:
+        console.print("Error: No valid log blocks found.", style="bold red")
+        sys.exit(1)
+
+    unique_denials = set()
+    unique_logs= []
+
+
+    for block in log_blocks:
+        parsed_log = parse_audit_log(block)
+        # We only care about blocks that contain an AVC denial
+        if "permission" in parsed_log:
+            #Create a unique signature for the denial
+            signature = (
+                    parsed_log.get('scontext'),
+                    parsed_log.get('tcontext'),
+                    parsed_log.get('tclass'),
+                    parsed_log.get('permission')
+                    )
+            if signature not in unique_denials:
+                unique_denials.add(signature)
+                unique_logs.append(parsed_log)
+            else:
+                console.print(Rule("[yellow]Skipping duplicate[/yellow]"))
+
+    console.print(f"\nFound {len(log_blocks)} log blocks(s). Displaying unique denials...")
+
+    # Now, print the summaries for only the unique_logs:
+    if unique_logs:
+        console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
+
+    for i, parsed_log in enumerate(unique_logs):
+        console.print(Rule(f"[bold green]Unique Denial #{i+1}[/bold green]"))
+        print_summary(console, parsed_log)
+
+    console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_logs)} unique denials.")
 
 
 if __name__ == "__main__":
