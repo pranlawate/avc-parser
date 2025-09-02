@@ -18,9 +18,13 @@ A simple, standalone Python script to parse raw SELinux audit logs into a clean,
 ## Usage
 
 1.  **Clone the Repository**:
+    * Using HTTPS
     ```shell
-    git clone [https://github.com/pranlawate/avc_parser.git](https://github.com/pranlawate/avc_parser.git)
-    cd avc_parser
+    git clone https://github.com/pranlawate/avc_parser.git
+    ```
+    * Using SSH 
+    ```shell
+    git clone git@github.com:pranlawate/avc-parser.git
     ```
 
 2.  **Install Dependencies**:
