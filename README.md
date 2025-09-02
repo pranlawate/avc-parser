@@ -1,19 +1,21 @@
 # SELinux AVC Log Parser
 
-A simple, standalone Python script to parse SELinux AVC denials logs into a clean, human-readable format using the `rich` library for beautiful terminal output.
+A simple, standalone Python script to parse raw or pre-processed SELinux audit logs into a clean, human-readable format.
 
 ## Features
 
--   Parses multi-line audit log blocks containing `AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records.
+-   Parses multi-line audit log blocks pre-processed by ausearch separated by '----', containing `AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records.
+-   Can directrly process raw `audit.log` files by internally using `ausearch`.
 -   Extracts key information like process name, PID, contexts, permissions, and paths.
--   Handles both hex-encoded and plain-text `proctitle` fields.
--   Accepts input from either a file or an interactive prompt.
+-   De-duplicates denials to show only unique issues from a large log file.
+-   Accepts input from raw log file, a pre-processed log file, or an interactive prompt.
 -   Outputs a clean, formatted, and color-coded summary to the terminal.
 
 ## Prerequisites
 
 -   Python 3.6+
--   Rich library: `pip install rich`
+-   Python Rich library
+-   `audit` package (for `ausearch`): Usually is preinstalled.
 
 ## Usage
 
@@ -30,22 +32,30 @@ A simple, standalone Python script to parse SELinux AVC denials logs into a clea
 2.  **Install Dependencies**:
     ```shell
     pip install rich
+    sudo dnf install audit (If needed)
     ```
 
-3.  **Prepare the AVC log from RAW Audit log**
+3.  **You can run the script in one of the three ways:**
+    ### **Option A: From a RAW Audit File**
+    This would be most used option for parsing the system audit logs as it is. The script will run `ausearch` internally for you.
     ```shell
-    ausearch -m AVC -if /path/to/file/audit.log > AVC.log
+    python parse_avc.py --raw-file /path/to/file/audit.log
     ```
-4.  **Run the script in one of two ways**:
+    (Short argument -rf)
 
-    **Option A: From a File**
-    Provide the path to a log file using the `-f` or `--file` argument.
+    ### **Option B: From a Pre-processed AVC File**
+    If you have already created a log file using ausearch. 
     ```shell
-    python parse_avc.py --file AVC.log
-    ```
+    # First, create the file:
+    ausearch -m AVC -ts recent > AVC.log
 
-    **Option B: Interactively**
-    Run the script with no arguments to be prompted to paste the log directly into the terminal.
+    # Then, run the parser on it:
+    python parse_avc.py --avc-file[-af] AVC.log
+    ```
+    (Short arugment -af)
+ 
+    ### Option C: Interactively
+    Run the script with no arguments to be prompted to paste pre-formatted(---- delimited) log directly into the terminal. Useful for a checking a few logs on the go.
     ```shell
     python parse_avc.py
     ```
@@ -56,7 +66,7 @@ A simple, standalone Python script to parse SELinux AVC denials logs into a clea
 For the provided log, the script will produce a detailed summary like this:
 1. A standard AVC log directly pasted into prompt:
 ```shell
-$ ../selinux-ai-tool/venv/bin/python parse_avc.py
+$ python parse_avc.py
 📋 Please paste your SELinux AVC denial log below and press Ctrl+D (or Ctrl+Z on Windows) when done:
 type=SYSCALL msg=audit(08/31/2025 22:56:00.345:403): arch=x86_64 syscall=listen success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=unconfined_u:unconfined_r:unconfined_t:s0 key=(null)
 type=AVC msg=audit(08/31/2025 22:56:00.345:403): avc: denied  { name_bind } for  pid=8765 comm="httpd" src=80 scontext=unconfined_u:unconfined_r:unconfined_t:s0 tcontext=system_u:object_r:http_port_t:s0 tclass=tcp_socket permissive=0
@@ -89,7 +99,7 @@ type=PATH msg=audit(09/01/2025 00:41:00.123:501): item=0 name="/var/www/html/tes
 type=AVC msg=audit(09/01/2025 00:41:00.123:501): avc: denied  { read } for  pid=2345 comm="httpd" path="/var/www/html/test.html" dev=vda1 ino=56789 scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
 ----
 
-$ python parse_avc.py -f  standard_AVC.log 
+$ python parse_avc.py -af  standard_AVC.log 
 
 Found 1 log blocks(s). Displaying unique denials...
 ────────────────────────────────────────────────────────── Parsed Log Summary ──────────────────────────────────────────────────────────
@@ -120,7 +130,7 @@ type=SOCKADDR msg=audit(07/29/2025 09:52:29.237:87712186) : saddr={ saddr_fam=in
 type=SYSCALL msg=audit(07/29/2025 09:52:29.237:87712186) : arch=x86_64 syscall=connect success=no exit=EACCES comm=httpd exe=/usr/sbin/httpd subj=system_u:system_r:httpd_t:s0
 type=AVC msg=audit(07/29/2025 09:52:29.237:87712186) : avc:  denied  { name_connect } for  pid=4182412 comm=httpd dest=9999 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:jboss_management_port_t:s0 tclass=tcp_socket
 
-$ python parse_avc.py -f network_AVC.log 
+$ python parse_avc.py -rf network_AVC.log 
 
 Found 1 log blocks(s). Displaying unique denials...
 ────────────────────────────────────────────────────────── Parsed Log Summary ──────────────────────────────────────────────────────────
@@ -154,7 +164,7 @@ type=AVC msg=audit(...): avc: denied  { name_connect } for  pid=1235 comm="httpd
 type=SYSCALL msg=audit(...): arch=x86_64 syscall=openat comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
 type=AVC msg=audit(...): avc: denied  { read } for  pid=1236 comm="httpd" path="/var/www/html/file2.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file
 
-$ python parse_avc.py -f ../testfiles/multi_AVC.log
+$ python parse_avc.py -af ../testfiles/multi_AVC.log
 ────────────────────────────────────────────────────────── Skipping duplicate ──────────────────────────────────────────────────────────
 
 Found 3 log blocks(s). Displaying unique denials...
