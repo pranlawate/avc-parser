@@ -10,6 +10,7 @@ def parse_avc_log(log_block: str) -> dict:
     Parses a multi-line AVC log block containing various record types.
     """
     parsed_data = {}
+    unparsed_types = set()     # To store unparsed types
     patterns = {
             "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
@@ -39,8 +40,12 @@ def parse_avc_log(log_block: str) -> dict:
                             parsed_data[key] = value.strip('"')
                     else:
                         parsed_data[key] = value.strip()
+        else:
+            # --- Track unparsed types ---
+            unparsed_types.add(log_type)
+
 #    print(f" [DEBUG] Final parsed data for this block: {parsed_data}") #DEBUG
-    return parsed_data
+    return parsed_data,unparsed_types
 
 def print_summary(console: Console, parsed_log: dict):
     """Prints a formatted summary, skipping any fields that were not found."""
@@ -125,10 +130,11 @@ def main():
 
     unique_denials = set()
     unique_logs= []
-
+    all_unparsed_types = set()
 
     for block in log_blocks:
-        parsed_log = parse_avc_log(block)
+        parsed_log, unparsed = parse_avc_log(block)
+        all_unparsed_types.update(unparsed)
         # We only care about blocks that contain an AVC denial
         if "permission" in parsed_log:
             #Create a unique signature for the denial
@@ -155,6 +161,11 @@ def main():
         print_summary(console, parsed_log)
 
     console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_logs)} unique denials.")
+
+    # --- Added: Print the list of unparsed types found ---
+    if all_unparsed_types:
+        console.print("\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
+        console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
 
 if __name__ == "__main__":
