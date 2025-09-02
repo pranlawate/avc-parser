@@ -5,9 +5,9 @@ from rich.console import Console
 from rich.rule import Rule
 
 
-def parse_audit_log(log_block: str) -> dict:
+def parse_avc_log(log_block: str) -> dict:
     """
-    Parses a multi-line audit log block containing various record types.
+    Parses a multi-line AVC log block containing various record types.
     """
     parsed_data = {}
     patterns = {
@@ -93,7 +93,7 @@ def main():
     parser.add_argument(
         "-f", "--file", 
         type=str, 
-        help="Path to a file containing the raw AVC log string."
+        help="Path to a file containing the AVC log string. Use command `ausearch -m AVC -if /path/to/audit.log > AVC.log` to generate this file"
     )
     
     args = parser.parse_args()
@@ -128,7 +128,7 @@ def main():
 
 
     for block in log_blocks:
-        parsed_log = parse_audit_log(block)
+        parsed_log = parse_avc_log(block)
         # We only care about blocks that contain an AVC denial
         if "permission" in parsed_log:
             #Create a unique signature for the denial
