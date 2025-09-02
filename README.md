@@ -1,6 +1,6 @@
 # SELinux AVC Log Parser
 
-A simple, standalone Python script to parse raw SELinux audit logs into a clean, human-readable format using the `rich` library for beautiful terminal output.
+A simple, standalone Python script to parse SELinux AVC denials logs into a clean, human-readable format using the `rich` library for beautiful terminal output.
 
 ## Features
 
@@ -32,12 +32,16 @@ A simple, standalone Python script to parse raw SELinux audit logs into a clean,
     pip install rich
     ```
 
-3.  **Run the script in one of two ways**:
+3.  **Prepare the AVC log from RAW Audit log**
+    ```shell
+    ausearch -m AVC -if var/log/audit/audit.log > AVC.log
+    ```
+4.  **Run the script in one of two ways**:
 
     **Option A: From a File**
     Provide the path to a log file using the `-f` or `--file` argument.
     ```shell
-    python parse_avc.py --file /path/to/your/audit.log
+    python parse_avc.py --file AVC.log
     ```
 
     **Option B: Interactively**
