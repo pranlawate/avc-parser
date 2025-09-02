@@ -34,7 +34,7 @@ A simple, standalone Python script to parse SELinux AVC denials logs into a clea
 
 3.  **Prepare the AVC log from RAW Audit log**
     ```shell
-    ausearch -m AVC -if var/log/audit/audit.log > AVC.log
+    ausearch -m AVC -if /path/to/file/audit.log > AVC.log
     ```
 4.  **Run the script in one of two ways**:
 
