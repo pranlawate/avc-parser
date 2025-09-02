@@ -1,6 +1,7 @@
 import argparse
 import re
 import sys
+import subprocess
 from rich.console import Console
 from rich.rule import Rule
 
@@ -96,9 +97,15 @@ def main():
         description="A tool to parse an SELinux AVC denial log from a file or user prompt."
     )
     parser.add_argument(
-        "-f", "--file", 
+        "-rf", "--raw-file", 
         type=str, 
-        help="Path to a file containing the AVC log string. Use command `ausearch -m AVC -if /path/to/audit.log > AVC.log` to generate this file"
+        help="Path to a raw audit.log file containing the AVC log string."
+    )
+
+    parser.add_argument(
+        "-af", "--avc-file",
+        type=str,
+        help="Path to a pre-procesed file containing ausearch output."
     )
     
     args = parser.parse_args()
@@ -106,11 +113,24 @@ def main():
     # Create a Rich Console instance
     console = Console()
 
-
     log_string = ""
-    if args.file:
+
+    if args.raw_file:
+        console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
         try:
-            with open(args.file, 'r') as f:
+            ausearch_cmd = ["ausearch", "-m", "AVC", "-if", args.raw_file]
+            result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
+            log_string = result.stdout
+        except FileNotFoundError:
+            console.print("Error: The 'ausearch' command was not found. Is audit installed?", style="bold red")
+            sys.exit(1)
+        except subprocess.CalledProcessError as e:
+            console.print(f"Error running ausearch: {e.stderr}", style="bold red")
+            sys.exit(1)
+    elif args.avc_file:
+        console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
+        try:
+            with open(args.avc_file, 'r') as f:
                 log_string = f.read()
         except FileNotFoundError:
             console.print("Error: File not found at '{args.file}'", style="bold red")
