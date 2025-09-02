@@ -2,6 +2,7 @@ import argparse
 import re
 import sys
 import subprocess
+from datetime import datetime
 from rich.console import Console
 from rich.rule import Rule
 
@@ -12,6 +13,10 @@ def parse_avc_log(log_block: str) -> dict:
     """
     parsed_data = {}
     unparsed_types = set()     # To store unparsed types
+    timestamp_pattern = re.search(r'msg=audit\((\d+\.\d+):\d+\)', log_block)
+    if timestamp_pattern:
+        parsed_data['timestamp'] = float(timestamp_pattern.group(1))
+
     patterns = {
             "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
@@ -48,14 +53,37 @@ def parse_avc_log(log_block: str) -> dict:
 #    print(f" [DEBUG] Final parsed data for this block: {parsed_data}") #DEBUG
     return parsed_data,unparsed_types
 
-def print_summary(console: Console, parsed_log: dict):
-    """Prints a formatted summary, skipping any fields that were not found."""
+def human_time_ago(timestamp: float) -> str:
+    """Converts a unix timestamp into a human-readable 'time ago' string."""
+    if not timestamp: return "an unknown time"
+    now = datetime.now()
+    dt_object = datetime.fromtimestamp(timestamp)
+    delta = now - dt_object
+    
+    if delta.days > 365: return f"{delta.days // 365} year(s) ago"
+    elif delta.days > 30: return f"{delta.days // 30} month(s) ago"
+    elif delta.days > 7: return f"{delta.days // 7} week(s) ago"
+    elif delta.days > 0: return f"{delta.days} day(s) ago"
+    elif delta.seconds > 3600: return f"{delta.seconds // 3600} hour(s) ago"
+    else: return f"{max(0, delta.seconds // 60)} minute(s) ago"
+
+def print_summary(console: Console, denial_info: dict, denial_num: int):
+    """Prints a formatted summary. Skips any fields that were not found. Has a counter of occurances that match signature. Shows human time of last occurence"""
+    parsed_log = denial_info['log']
+    count = denial_info['count']
+    last_seen_ts = denial_info['last_seen']
+    last_seen_ago = human_time_ago(last_seen_ts)
+
+    header = f"[bold green]Unique Denial #{denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago})"
+    console.print(Rule(header))
+
     if not parsed_log:
         console.print("Could not parse the provided log string.", style="bold red")
         return
 
     # Define the fields and their labels for cleaner printing
     process_fields = [
+        ("Timestamp", datetime.fromtimestamp(last_seen_ts).strftime('%Y-%m-%d %H:%M:%S') if last_seen_ts else "N/A"),
         ("Process Title", "proctitle"), ("Executable", "exe"),
         ("Process Name", "comm"), ("Process ID (PID)", "pid"),
         ("Working Dir (CWD)", "cwd"), ("Source Context", "scontext")
@@ -141,15 +169,14 @@ def main():
 #        print("📋 Please paste your SELinux AVC denial log below and press Ctrl+D when done:")
         log_string = sys.stdin.read()
 
-#   --- NEW LOGIC: Split, De-duplicate, and Process ---
+#   --- Split, De-duplicate, and Process Logic ---
     log_blocks = [block.strip() for block in log_string.split('----') if block.strip()]
 
     if not log_blocks:
         console.print("Error: No valid log blocks found.", style="bold red")
         sys.exit(1)
 
-    unique_denials = set()
-    unique_logs= []
+    unique_denials = {} 
     all_unparsed_types = set()
 
     for block in log_blocks:
@@ -159,28 +186,25 @@ def main():
         if "permission" in parsed_log:
             #Create a unique signature for the denial
             signature = (
-                    parsed_log.get('scontext'),
-                    parsed_log.get('tcontext'),
-                    parsed_log.get('tclass'),
-                    parsed_log.get('permission')
+                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                    parsed_log.get('tclass'), parsed_log.get('permission')
                     )
-            if signature not in unique_denials:
-                unique_denials.add(signature)
-                unique_logs.append(parsed_log)
+            timestamp = parsed_log.get('timestamp')
+            if signature in unique_denials:
+                unique_denials[signature]['count'] += 1
+                unique_denials[signature]['last_seen'] = timestamp
             else:
-                console.print(Rule("[yellow]Skipping duplicate[/yellow]"))
+                unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen': timestamp, 'last_seen': timestamp}
 
-    console.print(f"\nFound {len(log_blocks)} log blocks(s). Displaying unique denials...")
+    console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
 
-    # Now, print the summaries for only the unique_logs:
-    if unique_logs:
-        console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
+    sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen'] or 0)
 
-    for i, parsed_log in enumerate(unique_logs):
-        console.print(Rule(f"[bold green]Unique Denial #{i+1}[/bold green]"))
-        print_summary(console, parsed_log)
+    for i, denial_info in enumerate(sorted_denials):
+        if i > 0: console.print(Rule(style="dim"))
+        print_summary(console, denial_info, i + 1)
 
-    console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_logs)} unique denials.")
+    console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials.")
 
     # --- Added: Print the list of unparsed types found ---
     if all_unparsed_types:
