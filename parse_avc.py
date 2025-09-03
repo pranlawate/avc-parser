@@ -83,7 +83,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
 
     # Define the fields and their labels for cleaner printing
     process_fields = [
-        ("Timestamp", parsed_log.get('datetime_str')),
+        ("Timestamp", "datetime_str"),
         ("Process Title", "proctitle"), ("Executable", "exe"),
         ("Process Name", "comm"), ("Process ID (PID)", "pid"),
         ("Working Dir (CWD)", "cwd"), ("Source Context", "scontext")
