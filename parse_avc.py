@@ -16,7 +16,11 @@ def parse_avc_log(log_block: str) -> dict:
     unparsed_types = set()     # To store unparsed types
     timestamp_pattern = re.search(r'msg=audit\((\d+\.\d+):\d+\)', log_block)
     if timestamp_pattern:
-        parsed_data['timestamp'] = float(timestamp_pattern.group(1))
+        timestamp_float = float(timestamp_pattern.group(1))
+        dt_object = datetime.fromtimestamp(timestamp_float)
+        parsed_data['timestamp'] = timestamp_float
+        parsed_data['datetime_obj'] = dt_object
+        parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
 
     patterns = {
             "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
@@ -54,11 +58,10 @@ def parse_avc_log(log_block: str) -> dict:
 #    print(f" [DEBUG] Final parsed data for this block: {parsed_data}") #DEBUG
     return parsed_data,unparsed_types
 
-def human_time_ago(timestamp: float) -> str:
+def human_time_ago(dt_object: datetime) -> str:
     """Converts a unix timestamp into a human-readable 'time ago' string."""
-    if not timestamp: return "an unknown time"
+    if not dt_object: return "an unknown time"
     now = datetime.now()
-    dt_object = datetime.fromtimestamp(timestamp)
     delta = now - dt_object
     
     if delta.days > 365: return f"{delta.days // 365} year(s) ago"
@@ -195,30 +198,37 @@ def main():
                     parsed_log.get('scontext'), parsed_log.get('tcontext'),
                     parsed_log.get('tclass'), parsed_log.get('permission')
                     )
-            timestamp = parsed_log.get('timestamp')
+            dt_obj = parsed_log.get('datetime_obj')
             if signature in unique_denials:
                 unique_denials[signature]['count'] += 1
-                unique_denials[signature]['last_seen'] = timestamp
+                unique_denials[signature]['last_seen'] = dt_obj
             else:
-                unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen': timestamp, 'last_seen': timestamp}
+                unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen_obj': dt_obj, 'last_seen_obj': dt_obj}
     if args.json:
         # Convert the dictionary of unique denials to a list for JSON output
-        output_list = [info['log'] for info in unique_denials.values()]
+        output_list = []
+        for denial_info in unique_denials.values():
+            json_log = denial_info['log'].copy()
+            json_log.pop('datetime_obj',None)
+            output_list.append(json_log)
         print(json.dumps(output_list, indent=2))
 
     else:
         # Non JSON default output
         console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
         sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen'] or 0)
+        if sorted_denials:
+            console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
+
         for i, denial_info in enumerate(sorted_denials):
             if i > 0: console.print(Rule(style="dim"))
             print_summary(console, denial_info, i + 1)
         console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials.")
 
-    # --- Added: Print the list of unparsed types found ---
-    if all_unparsed_types:
-        console.print("\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
-        console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
+        # --- Added: Print the list of unparsed types found ---
+        if all_unparsed_types:
+            console.print("\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
+            console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
 
 if __name__ == "__main__":
