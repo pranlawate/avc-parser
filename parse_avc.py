@@ -2,6 +2,7 @@ import argparse
 import re
 import sys
 import subprocess
+import json
 from datetime import datetime
 from rich.console import Console
 from rich.rule import Rule
@@ -136,6 +137,11 @@ def main():
         help="Path to a pre-procesed file containing ausearch output."
     )
     
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output the parsed data in JSON format."
+    )
     args = parser.parse_args()
 
     # Create a Rich Console instance
@@ -195,16 +201,19 @@ def main():
                 unique_denials[signature]['last_seen'] = timestamp
             else:
                 unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen': timestamp, 'last_seen': timestamp}
+    if args.json:
+        # Convert the dictionary of unique denials to a list for JSON output
+        output_list = [info['log'] for info in unique_denials.values()]
+        print(json.dumps(output_list, indent=2))
 
-    console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
-
-    sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen'] or 0)
-
-    for i, denial_info in enumerate(sorted_denials):
-        if i > 0: console.print(Rule(style="dim"))
-        print_summary(console, denial_info, i + 1)
-
-    console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials.")
+    else:
+        # Non JSON default output
+        console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
+        sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen'] or 0)
+        for i, denial_info in enumerate(sorted_denials):
+            if i > 0: console.print(Rule(style="dim"))
+            print_summary(console, denial_info, i + 1)
+        console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials.")
 
     # --- Added: Print the list of unparsed types found ---
     if all_unparsed_types:
