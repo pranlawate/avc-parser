@@ -7,10 +7,10 @@ from datetime import datetime
 from rich.console import Console
 from rich.rule import Rule
 
-
-def parse_avc_log(log_block: str) -> dict:
+def parse_avc_log(log_block: str) -> (dict, set):
     """
-    Parses a multi-line AVC log block containing various record types.
+    Parses a multi-line AVC log block,returning both the parsed data
+    and a set of any unparsed record types that were found.
     """
     parsed_data = {}
     unparsed_types = set()     # To store unparsed types
@@ -23,7 +23,7 @@ def parse_avc_log(log_block: str) -> dict:
         parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
 
     patterns = {
-            "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
+        "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
         "PATH": {"path": r"name=\"([^\"]+)\"",},
         "SYSCALL": {"syscall": r"syscall=([\w\d]+)", "exe": r"exe=\"([^\"]+)\"",},
@@ -35,8 +35,7 @@ def parse_avc_log(log_block: str) -> dict:
     for line in log_block.strip().split('\n'):
         line = line.strip()
         match = re.search(r"type=(\w+)", line)
-        if not match:
-            continue
+        if not match: continue
         log_type = match.group(1)
         # Apply the patterns for the detected log type
         if log_type in patterns:
@@ -45,12 +44,9 @@ def parse_avc_log(log_block: str) -> dict:
                 if field_match:
                     value = field_match.group(1)
                     if key == 'proctitle':
-                        try:
-                            parsed_data[key] = bytes.fromhex(value).decode()
-                        except ValueError:
-                            parsed_data[key] = value.strip('"')
-                    else:
-                        parsed_data[key] = value.strip()
+                        try: parsed_data[key] = bytes.fromhex(value).decode()
+                        except ValueError: parsed_data[key] = value.strip('"')
+                    else: parsed_data[key] = value.strip()
         else:
             # --- Track unparsed types ---
             unparsed_types.add(log_type)
@@ -59,11 +55,11 @@ def parse_avc_log(log_block: str) -> dict:
     return parsed_data,unparsed_types
 
 def human_time_ago(dt_object: datetime) -> str:
-    """Converts a unix timestamp into a human-readable 'time ago' string."""
+    """Converts a datetime timestamp object into a human-readable 'time ago' string."""
     if not dt_object: return "an unknown time"
     now = datetime.now()
     delta = now - dt_object
-    
+
     if delta.days > 365: return f"{delta.days // 365} year(s) ago"
     elif delta.days > 30: return f"{delta.days // 30} month(s) ago"
     elif delta.days > 7: return f"{delta.days // 7} week(s) ago"
@@ -75,8 +71,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
     """Prints a formatted summary. Skips any fields that were not found. Has a counter of occurances that match signature. Shows human time of last occurence"""
     parsed_log = denial_info['log']
     count = denial_info['count']
-    last_seen_ts = denial_info['last_seen']
-    last_seen_ago = human_time_ago(last_seen_ts)
+    last_seen_dt = denial_info['last_seen_obj']
+    last_seen_ago = human_time_ago(last_seen_dt)
 
     header = f"[bold green]Unique Denial #{denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago})"
     console.print(Rule(header))
@@ -87,14 +83,12 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
 
     # Define the fields and their labels for cleaner printing
     process_fields = [
-        ("Timestamp", datetime.fromtimestamp(last_seen_ts).strftime('%Y-%m-%d %H:%M:%S') if last_seen_ts else "N/A"),
+        ("Timestamp", parsed_log.get('datetime_str')),
         ("Process Title", "proctitle"), ("Executable", "exe"),
         ("Process Name", "comm"), ("Process ID (PID)", "pid"),
         ("Working Dir (CWD)", "cwd"), ("Source Context", "scontext")
     ]
-    action_fields = [
-        ("Syscall", "syscall"), ("Permission", "permission")
-    ]
+    action_fields = [("Syscall", "syscall"), ("Permission", "permission")]
     target_fields = [
         ("Target Path", "path"), ("Target Port", "dest_port"),
         ("Socket Address", "saddr"), ("Target Class", "tclass"),
@@ -125,31 +119,14 @@ def main():
     """
     Main function to handle command-line arguments and print the parsed output.
     """
-    parser = argparse.ArgumentParser(
-        description="A tool to parse an SELinux AVC denial log from a file or user prompt."
-    )
-    parser.add_argument(
-        "-rf", "--raw-file", 
-        type=str, 
-        help="Path to a raw audit.log file containing the AVC log string."
-    )
-
-    parser.add_argument(
-        "-af", "--avc-file",
-        type=str,
-        help="Path to a pre-procesed file containing ausearch output."
-    )
-    
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output the parsed data in JSON format."
-    )
+    parser = argparse.ArgumentParser(description="A tool to parse an SELinux AVC denial log from a file or user prompt.")
+    parser.add_argument("-rf", "--raw-file", type=str, help="Path to a raw audit.log file containing the AVC log string.")
+    parser.add_argument("-af", "--avc-file", type=str, help="Path to a pre-processed file containing ausearch output.")
+    parser.add_argument("--json", action="store_true", help="Output the parsed data in JSON format.")
     args = parser.parse_args()
 
     # Create a Rich Console instance
     console = Console()
-
     log_string = ""
 
     if args.raw_file:
@@ -170,7 +147,7 @@ def main():
             with open(args.avc_file, 'r') as f:
                 log_string = f.read()
         except FileNotFoundError:
-            console.print("Error: File not found at '{args.file}'", style="bold red")
+            console.print(f"Error: File not found at '{args.avc_file}'", style="bold red")
 #           print(f"Error: File not found at '{args.file}'")
             sys.exit(1)
     else:
@@ -180,12 +157,12 @@ def main():
 
 #   --- Split, De-duplicate, and Process Logic ---
     log_blocks = [block.strip() for block in log_string.split('----') if block.strip()]
-
     if not log_blocks:
-        console.print("Error: No valid log blocks found.", style="bold red")
+        if not args.json:
+            console.print("Error: No valid log blocks found.", style="bold red")
         sys.exit(1)
 
-    unique_denials = {} 
+    unique_denials = {}
     all_unparsed_types = set()
 
     for block in log_blocks:
@@ -195,13 +172,13 @@ def main():
         if "permission" in parsed_log:
             #Create a unique signature for the denial
             signature = (
-                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
-                    parsed_log.get('tclass'), parsed_log.get('permission')
-                    )
+                parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                parsed_log.get('tclass'), parsed_log.get('permission')
+            )
             dt_obj = parsed_log.get('datetime_obj')
             if signature in unique_denials:
                 unique_denials[signature]['count'] += 1
-                unique_denials[signature]['last_seen'] = dt_obj
+                unique_denials[signature]['last_seen_obj'] = dt_obj
             else:
                 unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen_obj': dt_obj, 'last_seen_obj': dt_obj}
     if args.json:
@@ -209,17 +186,16 @@ def main():
         output_list = []
         for denial_info in unique_denials.values():
             json_log = denial_info['log'].copy()
-            json_log.pop('datetime_obj',None)
+            json_log.pop('datetime_obj', None)
             output_list.append(json_log)
         print(json.dumps(output_list, indent=2))
 
     else:
         # Non JSON default output
         console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
-        sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen'] or 0)
+        sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen_obj'] or datetime.fromtimestamp(0))
         if sorted_denials:
             console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
-
         for i, denial_info in enumerate(sorted_denials):
             if i > 0: console.print(Rule(style="dim"))
             print_summary(console, denial_info, i + 1)
