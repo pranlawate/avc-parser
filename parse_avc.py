@@ -167,7 +167,7 @@ def main():
 #           print(f"Error: File not found at '{args.file}'")
             sys.exit(1)
     else:
-        console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] (or Ctrl+Z on Windows) when done:")
+        console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:")
 #        print("📋 Please paste your SELinux AVC denial log below and press Ctrl+D when done:")
         log_string = sys.stdin.read()
 
