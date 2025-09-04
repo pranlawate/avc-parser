@@ -14,13 +14,29 @@ def parse_avc_log(log_block: str) -> (dict, set):
     """
     parsed_data = {}
     unparsed_types = set()     # To store unparsed types
-    timestamp_pattern = re.search(r'msg=audit\((\d+\.\d+):\d+\)', log_block)
+
+#    print(f"\n--- DEBUG: New Log Block Received ---\n'{log_block}'\n--------------------------")
+    timestamp_pattern = re.search(r'msg=audit\(([^)]+)\)', log_block)
+#     print(f"\n--- DEBUG: The timestamp_pattern is'{timestamp_pattern}'\n")
     if timestamp_pattern:
-        timestamp_float = float(timestamp_pattern.group(1))
-        dt_object = datetime.fromtimestamp(timestamp_float)
-        parsed_data['timestamp'] = timestamp_float
-        parsed_data['datetime_obj'] = dt_object
-        parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+        timestamp_str = timestamp_pattern.group(1).rsplit(':',1)[0]
+
+        try:
+            # Try to parse as a human-readable or unix timestamps ---
+            dt_object = datetime.strptime(timestamp_str, '%m/%d/%Y %H:%M:%S.%f')
+        except ValueError:
+            try:
+                # Fallback to parsing as a unix timestamp
+#                print(f"\nDEBUG: Extracted timestamp to parse as unix timestamp: '{timestamp_str}'")
+                dt_object = datetime.fromtimestamp(float(timestamp_str))
+            except ValueError:
+                dt_object = None # Could not parse timestamp
+                print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
+
+        if dt_object:
+            parsed_data['datetime_obj'] = dt_object
+            parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+            parsed_data['timestamp'] = dt_object.timestamp()
 
     patterns = {
         "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
@@ -132,7 +148,7 @@ def main():
     if args.raw_file:
         console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
         try:
-            ausearch_cmd = ["ausearch", "-m", "AVC", "-if", args.raw_file]
+            ausearch_cmd = ["ausearch", "-m", "AVC", "-i", "-if", args.raw_file]
             result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
             log_string = result.stdout
         except FileNotFoundError:
@@ -156,7 +172,17 @@ def main():
         log_string = sys.stdin.read()
 
 #   --- Split, De-duplicate, and Process Logic ---
+# Old logic commented as it didn't look inside the block to remove time-> added by ausearch
     log_blocks = [block.strip() for block in log_string.split('----') if block.strip()]
+
+# New logic trying to find and remove 'time->' if present in the log
+#    log_blocks_raw = log_string.split('----')
+
+#    log_blocks = []
+#    for block in log_blocks_raw:
+#        clean_lines = [line for line in block.strip().split('\n') if not line.strip().startswith('time->')]
+#        if clean_lines:
+#            log_blocks.append("\n".join(clean_lines))
     if not log_blocks:
         if not args.json:
             console.print("Error: No valid log blocks found.", style="bold red")
