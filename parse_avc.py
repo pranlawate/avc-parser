@@ -169,7 +169,11 @@ def main():
     else:
         console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:")
 #        print("📋 Please paste your SELinux AVC denial log below and press Ctrl+D when done:")
-        log_string = sys.stdin.read()
+        try:
+            log_string = sys.stdin.read()
+        except KeyboardInterrupt:
+            console.print(f"[red] Key Board Interrupted [/red]")
+            sys.exit(0)
 
 #   --- Split, De-duplicate, and Process Logic ---
 # Old logic commented as it didn't look inside the block to remove time-> added by ausearch
