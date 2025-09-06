@@ -146,7 +146,8 @@ def main():
     log_string = ""
 
     if args.raw_file:
-        console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
+        if not args.json:
+            console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
         try:
             ausearch_cmd = ["ausearch", "-m", "AVC", "-i", "-if", args.raw_file]
             result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
@@ -158,7 +159,8 @@ def main():
             console.print(f"Error running ausearch: {e.stderr}", style="bold red")
             sys.exit(1)
     elif args.avc_file:
-        console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
+        if not args.json:
+            console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
         try:
             with open(args.avc_file, 'r') as f:
                 log_string = f.read()
@@ -167,7 +169,8 @@ def main():
 #           print(f"Error: File not found at '{args.file}'")
             sys.exit(1)
     else:
-        console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:")
+        if not args.json:
+            console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:")
 #        print("📋 Please paste your SELinux AVC denial log below and press Ctrl+D when done:")
         try:
             log_string = sys.stdin.read()
@@ -215,10 +218,38 @@ def main():
         # Convert the dictionary of unique denials to a list for JSON output
         output_list = []
         for denial_info in unique_denials.values():
-            json_log = denial_info['log'].copy()
-            json_log.pop('datetime_obj', None)
-            output_list.append(json_log)
-        print(json.dumps(output_list, indent=2))
+            # Create a JSON-safe copy of the denial info
+            json_denial = {
+                'log': denial_info['log'].copy(),
+                'count': denial_info['count'],
+                'first_seen': denial_info['first_seen_obj'].isoformat() if denial_info['first_seen_obj'] else None,
+                'last_seen': denial_info['last_seen_obj'].isoformat() if denial_info['last_seen_obj'] else None
+            }
+            
+            # Remove datetime_obj from the log data and convert any remaining datetime objects to strings
+            json_denial['log'].pop('datetime_obj', None)
+            for key, value in json_denial['log'].items():
+                if isinstance(value, datetime):
+                    json_denial['log'][key] = value.isoformat()
+                elif key == 'timestamp' and isinstance(value, (int, float)):
+                    # Convert timestamp to string to ensure it's quoted in JSON
+                    json_denial['log'][key] = str(value)
+                elif isinstance(value, str):
+                    # Clean up any problematic characters in string values
+                    json_denial['log'][key] = value.replace('\x00', '').replace('\r', '').replace('\n', '\\n')
+            
+            output_list.append(json_denial)
+        
+        try:
+            json_output = json.dumps(output_list, indent=2, ensure_ascii=False)
+            print(json_output)
+        except (TypeError, ValueError) as e:
+            console.print(f"Error generating JSON: {e}", style="bold red")
+            # Fallback: print raw data for debugging
+            console.print("Raw data that caused the error:", style="bold yellow")
+            for i, item in enumerate(output_list):
+                console.print(f"Item {i}: {item}")
+            sys.exit(1)
 
     else:
         # Non JSON default output
