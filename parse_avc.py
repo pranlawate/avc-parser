@@ -145,13 +145,59 @@ def print_summary(console: Console, denial_info: DenialInfo, denial_num: int) ->
 
     console.print("-" * 35)
 
+def detect_file_type(file_path: str) -> str:
+    """
+    Detect whether a file is a raw audit log or pre-processed AVC log.
+    Returns 'raw' or 'avc' based on file content analysis.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # Read first 20 lines to analyze
+            lines = [f.readline().strip() for _ in range(20)]
+            lines = [line for line in lines if line]  # Remove empty lines
+        
+        if not lines:
+            return 'unknown'
+        
+        # Check for raw audit log characteristics
+        raw_indicators = 0
+        avc_indicators = 0
+        
+        for line in lines:
+            # Raw audit log indicators
+            if any(event_type in line for event_type in ['CRED_DISP', 'SERVICE_STOP', 'SERVICE_START', 
+                                                        'USER_LOGIN', 'USER_LOGOUT', 'SYSTEM_BOOT', 
+                                                        'CONFIG_CHANGE', 'KERNEL', 'DAEMON_START']):
+                raw_indicators += 1
+            
+            # Pre-processed AVC log indicators
+            if '----' in line:
+                avc_indicators += 1
+            if line.startswith('type=PROCTITLE') or line.startswith('type=SYSCALL') or line.startswith('type=AVC'):
+                avc_indicators += 1
+        
+        # Decision logic
+        if raw_indicators > avc_indicators:
+            return 'raw'
+        elif avc_indicators > 0:
+            return 'avc'
+        else:
+            # Fallback: check if file contains AVC events
+            for line in lines:
+                if 'type=AVC' in line:
+                    return 'avc'
+            return 'raw'  # Default to raw if uncertain
+            
+    except Exception as e:
+        logger.warning(f"Could not detect file type for {file_path}: {e}")
+        return 'unknown'
+
 def main() -> None:
     """
     Main function to handle command-line arguments and print the parsed output.
     """
     parser = argparse.ArgumentParser(description="A tool to parse an SELinux AVC denial log from a file or user prompt.")
-    parser.add_argument("-rf", "--raw-file", type=str, help="Path to a raw audit.log file containing the AVC log string.")
-    parser.add_argument("-af", "--avc-file", type=str, help="Path to a pre-processed file containing ausearch output.")
+    parser.add_argument("-f", "--file", type=str, help="Path to an audit log file (auto-detect type).")
     parser.add_argument("--json", action="store_true", help="Output the parsed data in JSON format.")
     parser.add_argument("--validate", action="store_true", help="Enable validation reporting for parsed data.")
     args = parser.parse_args()
@@ -160,38 +206,49 @@ def main() -> None:
     console: Console = Console()
     log_string: str = ""
 
-    if args.raw_file:
+    if args.file:
+        # Auto-detect file type
+        detected_type = detect_file_type(args.file)
         if not args.json:
-            console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
-        logger.info(f"Processing raw file: {args.raw_file}")
-        try:
-            ausearch_cmd = ["ausearch", "-m", "AVC", "-i", "-if", args.raw_file]
-            logger.debug(f"Running command: {' '.join(ausearch_cmd)}")
-            result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
-            log_string = result.stdout
-            logger.info(f"Successfully processed raw file, got {len(log_string)} characters")
-        except FileNotFoundError:
-            error_msg = "The 'ausearch' command was not found. Is audit installed?"
-            logger.error(error_msg)
-            console.print(f"Error: {error_msg}", style="bold red")
-            sys.exit(1)
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Error running ausearch: {e.stderr}"
-            logger.error(error_msg)
-            console.print(f"Error: {error_msg}", style="bold red")
-            sys.exit(1)
-    elif args.avc_file:
-        if not args.json:
-            console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
-        logger.info(f"Processing AVC file: {args.avc_file}")
-        try:
-            with open(args.avc_file, 'r', encoding='utf-8') as f:
-                log_string = f.read()
-            logger.info(f"Successfully read AVC file, got {len(log_string)} characters")
-        except FileNotFoundError:
-            error_msg = f"File not found at '{args.avc_file}'"
-            logger.error(error_msg)
-            console.print(f"Error: {error_msg}", style="bold red")
+            console.print(f"Auto-detected file type: {detected_type}")
+        
+        if detected_type == 'raw':
+            # Process as raw audit log
+            if not args.json:
+                console.print(f"Raw file input provided. Running ausearch on '{args.file}'...")
+            logger.info(f"Processing raw file: {args.file}")
+            try:
+                ausearch_cmd = ["ausearch", "-m", "AVC", "-i", "-if", args.file]
+                logger.debug(f"Running command: {' '.join(ausearch_cmd)}")
+                result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
+                log_string = result.stdout
+                logger.info(f"Successfully processed raw file, got {len(log_string)} characters")
+            except FileNotFoundError:
+                error_msg = "The 'ausearch' command was not found. Is audit installed?"
+                logger.error(error_msg)
+                console.print(f"Error: {error_msg}", style="bold red")
+                sys.exit(1)
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Error running ausearch: {e.stderr}"
+                logger.error(error_msg)
+                console.print(f"Error: {error_msg}", style="bold red")
+                sys.exit(1)
+        elif detected_type == 'avc':
+            # Process as pre-processed AVC file
+            if not args.json:
+                console.print(f"Pre-processed AVC file provided: '{args.file}'")
+            logger.info(f"Processing AVC file: {args.file}")
+            try:
+                with open(args.file, 'r', encoding='utf-8') as f:
+                    log_string = f.read()
+                logger.info(f"Successfully read AVC file, got {len(log_string)} characters")
+            except FileNotFoundError:
+                error_msg = f"File not found at '{args.file}'"
+                logger.error(error_msg)
+                console.print(f"Error: {error_msg}", style="bold red")
+                sys.exit(1)
+        else:
+            console.print(f"Could not determine file type for '{args.file}'. Please check the file format.", style="bold red")
             sys.exit(1)
     else:
         if not args.json:
