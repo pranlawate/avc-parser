@@ -1,107 +1,172 @@
 import argparse
-import re
-import sys
-import subprocess
 import json
 import logging
+import re
+import subprocess
+import sys
 from datetime import datetime
-from typing import Dict, Set, Tuple, Optional, List, Any
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
+
 from rich.console import Console
 from rich.rule import Rule
+
 from config import (
-    PARSING_PATTERNS, PROCESS_FIELDS, ACTION_FIELDS, TARGET_FIELDS,
-    TIMESTAMP_FORMATS, LOG_BLOCK_SEPARATOR, SPECIAL_FIELD_PROCESSORS,
-    JSON_OUTPUT_CONFIG, STRING_CLEAN_PATTERNS
+    ACTION_FIELDS,
+    JSON_OUTPUT_CONFIG,
+    LOG_BLOCK_SEPARATOR,
+    PARSING_PATTERNS,
+    PROCESS_FIELDS,
+    SPECIAL_FIELD_PROCESSORS,
+    STRING_CLEAN_PATTERNS,
+    TARGET_FIELDS,
+    TIMESTAMP_FORMATS,
 )
-from models import ParsedLog, DenialInfo, ProcessingStats
+from models import DenialInfo, ParsedLog, ProcessingStats
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
+# Pre-compile regex patterns
+TIMESTAMP_PATTERN = re.compile(r"msg=audit\(([^)]+)\)")
+LOG_TYPE_PATTERN = re.compile(r"type=(\w+)")
+PERMISSIVE_PATTERN = re.compile(r"permissive=(\d)")
+
+# Pre-compile all parsing patterns
+COMPILED_PATTERNS = {
+    log_type: {key: re.compile(pattern) for key, pattern in type_patterns.items()}
+    for log_type, type_patterns in PARSING_PATTERNS.items()
+}
+
+# Specific pattern for permissive mode
+PERMISSIVE_PATTERN = re.compile(r"permissive=(\d)")
+
+
 def parse_avc_log(log_block: str) -> Tuple[ParsedLog, Set[str]]:
     """
-    Parses a multi-line AVC log block,returning both the parsed data
+    Parses a multi-line AVC log block, returning both the parsed data
     and a set of any unparsed record types that were found.
+    
+    Args:
+        log_block: The string containing the AVC log to parse
+        
+    Returns:
+        A tuple containing:
+        - ParsedLog object with the parsed information
+        - Set of unparsed record types
     """
     parsed_data = {}
-    unparsed_types = set()     # To store unparsed types
+    unparsed_types = set()  # To store unparsed types
+    
+    # Early validation
+    if not log_block or not isinstance(log_block, str):
+        unparsed_types.add("INVALID_INPUT")
+        return ParsedLog(), unparsed_types
+        
+    # Check for AVC type
+    if "type=AVC" not in log_block:
+        unparsed_types.add("NOT_AVC_LOG")
+        return ParsedLog(), unparsed_types
 
-#    print(f"\n--- DEBUG: New Log Block Received ---\n'{log_block}'\n--------------------------")
-    timestamp_pattern = re.search(r'msg=audit\(([^)]+)\)', log_block)
-#     print(f"\n--- DEBUG: The timestamp_pattern is'{timestamp_pattern}'\n")
-    if timestamp_pattern:
-        timestamp_str = timestamp_pattern.group(1).rsplit(':',1)[0]
+    #    print(f"\n--- DEBUG: New Log Block Received ---\n'{log_block}'\n--------------------------")
+    timestamp_match = TIMESTAMP_PATTERN.search(log_block)
+    dt_object = None
+    if timestamp_match:
+        timestamp_str = timestamp_match.group(1).rsplit(":", 1)[0]
 
-        try:
-            # Try to parse as a human-readable timestamp
-            dt_object = datetime.strptime(timestamp_str, TIMESTAMP_FORMATS[0])
-        except ValueError:
+        # Try all configured timestamp formats
+        for format_str in TIMESTAMP_FORMATS:
             try:
-                # Fallback to parsing as a unix timestamp
-#                print(f"\nDEBUG: Extracted timestamp to parse as unix timestamp: '{timestamp_str}'")
+                dt_object = datetime.strptime(timestamp_str, format_str)
+                break
+            except ValueError:
+                continue
+
+        # If no format matched, try as Unix timestamp
+        if not dt_object:
+            try:
                 dt_object = datetime.fromtimestamp(float(timestamp_str))
             except ValueError:
-                dt_object = None # Could not parse timestamp
-                logger.debug(f"Extracted timestamp could not be parsed: '{timestamp_str}'")
+                logger.debug(f"Could not parse timestamp: '{timestamp_str}'")
 
         if dt_object:
-            parsed_data['datetime_obj'] = dt_object
-            parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
-            parsed_data['timestamp'] = dt_object.timestamp()
+            parsed_data["datetime_obj"] = dt_object
+            parsed_data["datetime_str"] = dt_object.strftime("%Y-%m-%d %H:%M:%S")
+            parsed_data["timestamp"] = dt_object.timestamp()
 
     patterns = PARSING_PATTERNS
-    
+
     # Split the log block into individual lines
-    for line in log_block.strip().split('\n'):
+    for line in log_block.strip().split("\n"):
         line = line.strip()
-        match = re.search(r"type=(\w+)", line)
-        if not match: continue
+        match = LOG_TYPE_PATTERN.search(line)
+        if not match:
+            continue
         log_type = match.group(1)
         # Apply the patterns for the detected log type
-        if log_type in patterns:
-            for key, pattern in patterns[log_type].items():
-                field_match = re.search(pattern, line)
+        if log_type in COMPILED_PATTERNS:
+            for key, pattern in COMPILED_PATTERNS[log_type].items():
+                field_match = pattern.search(line)
                 if field_match:
                     value = field_match.group(1)
-                    if key in SPECIAL_FIELD_PROCESSORS and SPECIAL_FIELD_PROCESSORS[key] == 'hex_decode':
-                        try: 
+                    if (
+                        key in SPECIAL_FIELD_PROCESSORS
+                        and SPECIAL_FIELD_PROCESSORS[key] == "hex_decode"
+                    ):
+                        try:
                             parsed_data[key] = bytes.fromhex(value).decode()
-                        except ValueError: 
+                        except ValueError:
                             parsed_data[key] = value.strip('"')
-                    else: 
-                        parsed_data[key] = value.strip()
+                    else:
+                        parsed_data[key] = value.strip('"')
         else:
-            # --- Track unparsed types ---
+            # Track unparsed types
             unparsed_types.add(log_type)
 
+    # Parse permissive mode
+    permissive_match = PERMISSIVE_PATTERN.search(log_block)
+    if permissive_match:
+        parsed_data["permissive"] = permissive_match.group(1)
+        
+    # If no data was parsed, mark as unparsed
+    if not parsed_data:
+        unparsed_types.add("NO_PARSED_DATA")
+
     logger.debug(f"Final parsed data for this block: {parsed_data}")
-    
+
     # Create ParsedLog object from parsed data
     parsed_log = ParsedLog.from_dict(parsed_data)
-    
+
     # Validate the parsed log data
     validation_errors = parsed_log.validate()
     if validation_errors:
         logger.warning(f"Validation errors in parsed log: {validation_errors}")
-    
+
     return parsed_log, unparsed_types
+
 
 def human_time_ago(dt_object: Optional[datetime]) -> str:
     """Converts a datetime timestamp object into a human-readable 'time ago' string."""
-    if not dt_object: return "an unknown time"
+    if not dt_object:
+        return "an unknown time"
     now = datetime.now()
     delta = now - dt_object
 
-    if delta.days > 365: return f"{delta.days // 365} year(s) ago"
-    elif delta.days > 30: return f"{delta.days // 30} month(s) ago"
-    elif delta.days > 7: return f"{delta.days // 7} week(s) ago"
-    elif delta.days > 0: return f"{delta.days} day(s) ago"
-    elif delta.seconds > 3600: return f"{delta.seconds // 3600} hour(s) ago"
-    else: return f"{max(0, delta.seconds // 60)} minute(s) ago"
+    if delta.days > 365:
+        return f"{delta.days // 365} year(s) ago"
+    elif delta.days > 30:
+        return f"{delta.days // 30} month(s) ago"
+    elif delta.days > 7:
+        return f"{delta.days // 7} week(s) ago"
+    elif delta.days > 0:
+        return f"{delta.days} day(s) ago"
+    elif delta.seconds > 3600:
+        return f"{delta.seconds // 3600} hour(s) ago"
+    else:
+        return f"{max(0, delta.seconds // 60)} minute(s) ago"
+
 
 def print_summary(console: Console, denial_info: DenialInfo, denial_num: int) -> None:
     """Prints a formatted summary. Skips any fields that were not found. Has a counter of occurances that match signature. Shows human time of last occurence"""
@@ -145,61 +210,107 @@ def print_summary(console: Console, denial_info: DenialInfo, denial_num: int) ->
 
     console.print("-" * 35)
 
+
 def detect_file_type(file_path: str) -> str:
     """
     Detect whether a file is a raw audit log or pre-processed AVC log.
     Returns 'raw' or 'avc' based on file content analysis.
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             # Read first 20 lines to analyze
             lines = [f.readline().strip() for _ in range(20)]
             lines = [line for line in lines if line]  # Remove empty lines
-        
+
         if not lines:
-            return 'unknown'
-        
+            return "unknown"
+
         # Check for raw audit log characteristics
         raw_indicators = 0
         avc_indicators = 0
-        
+
         for line in lines:
             # Raw audit log indicators
-            if any(event_type in line for event_type in ['CRED_DISP', 'SERVICE_STOP', 'SERVICE_START', 
-                                                        'USER_LOGIN', 'USER_LOGOUT', 'SYSTEM_BOOT', 
-                                                        'CONFIG_CHANGE', 'KERNEL', 'DAEMON_START']):
+            if any(
+                event_type in line
+                for event_type in [
+                    "CRED_DISP",
+                    "SERVICE_STOP",
+                    "SERVICE_START",
+                    "USER_LOGIN",
+                    "USER_LOGOUT",
+                    "SYSTEM_BOOT",
+                    "CONFIG_CHANGE",
+                    "KERNEL",
+                    "DAEMON_START",
+                ]
+            ):
                 raw_indicators += 1
-            
+
             # Pre-processed AVC log indicators
-            if '----' in line:
+            if "----" in line:
                 avc_indicators += 1
-            if line.startswith('type=PROCTITLE') or line.startswith('type=SYSCALL') or line.startswith('type=AVC'):
+            if (
+                line.startswith("type=PROCTITLE")
+                or line.startswith("type=SYSCALL")
+                or line.startswith("type=AVC")
+            ):
                 avc_indicators += 1
-        
+
         # Decision logic
         if raw_indicators > avc_indicators:
-            return 'raw'
+            return "raw"
         elif avc_indicators > 0:
-            return 'avc'
+            return "avc"
         else:
             # Fallback: check if file contains AVC events
             for line in lines:
-                if 'type=AVC' in line:
-                    return 'avc'
-            return 'raw'  # Default to raw if uncertain
-            
+                if "type=AVC" in line:
+                    return "avc"
+            return "raw"  # Default to raw if uncertain
+
     except Exception as e:
         logger.warning(f"Could not detect file type for {file_path}: {e}")
-        return 'unknown'
+        return "unknown"
+
+
+def stream_log_blocks(file_obj) -> Iterator[str]:
+    """
+    Generator function to stream log blocks from a file object.
+    Yields blocks one at a time instead of loading entire file into memory.
+    """
+    current_block = []
+    for line in file_obj:
+        if line.strip() == LOG_BLOCK_SEPARATOR:
+            if current_block:
+                yield "\n".join(current_block)
+                current_block = []
+        else:
+            # Skip time-> lines added by ausearch
+            if not line.strip().startswith("time->"):
+                current_block.append(line.strip())
+
+    # Don't forget the last block
+    if current_block:
+        yield "\n".join(current_block)
+
 
 def main() -> None:
     """
     Main function to handle command-line arguments and print the parsed output.
     """
-    parser = argparse.ArgumentParser(description="A tool to parse an SELinux AVC denial log from a file or user prompt.")
-    parser.add_argument("-f", "--file", type=str, help="Path to an audit log file (auto-detect type).")
-    parser.add_argument("--json", action="store_true", help="Output the parsed data in JSON format.")
-    parser.add_argument("--validate", action="store_true", help="Enable validation reporting for parsed data.")
+    parser = argparse.ArgumentParser(
+        description="A tool to parse an SELinux AVC denial log from a file or user prompt."
+    )
+    parser.add_argument(
+        "-f", "--file", type=str, help="Path to an audit log file (auto-detect type)."
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Output the parsed data in JSON format."
+    )
+    parser.add_argument(
+        "--validate", action="store_true", help="Enable validation reporting for parsed data."
+    )
     args = parser.parse_args()
 
     # Create a Rich Console instance
@@ -211,8 +322,8 @@ def main() -> None:
         detected_type = detect_file_type(args.file)
         if not args.json:
             console.print(f"Auto-detected file type: {detected_type}")
-        
-        if detected_type == 'raw':
+
+        if detected_type == "raw":
             # Process as raw audit log
             if not args.json:
                 console.print(f"Raw file input provided. Running ausearch on '{args.file}'...")
@@ -233,26 +344,70 @@ def main() -> None:
                 logger.error(error_msg)
                 console.print(f"Error: {error_msg}", style="bold red")
                 sys.exit(1)
-        elif detected_type == 'avc':
+        elif detected_type == "avc":
             # Process as pre-processed AVC file
             if not args.json:
                 console.print(f"Pre-processed AVC file provided: '{args.file}'")
             logger.info(f"Processing AVC file: {args.file}")
             try:
-                with open(args.file, 'r', encoding='utf-8') as f:
-                    log_string = f.read()
-                logger.info(f"Successfully read AVC file, got {len(log_string)} characters")
+                with open(args.file, "r", encoding="utf-8") as f:
+                    unique_denials = {}
+                    all_unparsed_types = set()
+                    block_count = 0
+
+                    # Process blocks as we read them
+                    for block in stream_log_blocks(f):
+                        block_count += 1
+                        if block_count % 100 == 0:
+                            logger.info(f"Processed {block_count} blocks...")
+
+                        parsed_log, unparsed = parse_avc_log(block)
+                        all_unparsed_types.update(unparsed)
+
+                        if parsed_log.permission:
+                            signature = (
+                                parsed_log.scontext,
+                                parsed_log.tcontext,
+                                parsed_log.tclass,
+                                parsed_log.permission,
+                            )
+                            dt_obj = parsed_log.datetime_obj
+
+                            if signature in unique_denials:
+                                unique_denials[signature].count += 1
+                                unique_denials[signature].last_seen_obj = dt_obj
+                            else:
+                                unique_denials[signature] = DenialInfo(
+                                    log=parsed_log,
+                                    count=1,
+                                    first_seen_obj=dt_obj,
+                                    last_seen_obj=dt_obj,
+                                )
+
+                    logger.info(f"Successfully processed {block_count} blocks")
+
+                    # Skip the main processing loop since we've already done it
+                    if not unique_denials:
+                        logger.warning("No valid AVC denials found in the file")
+                        if not args.json:
+                            console.print("No valid AVC denials found in the file", style="yellow")
+                            return
             except FileNotFoundError:
                 error_msg = f"File not found at '{args.file}'"
                 logger.error(error_msg)
                 console.print(f"Error: {error_msg}", style="bold red")
                 sys.exit(1)
         else:
-            console.print(f"Could not determine file type for '{args.file}'. Please check the file format.", style="bold red")
+            console.print(
+                f"Could not determine file type for '{args.file}'. Please check the file format.",
+                style="bold red",
+            )
             sys.exit(1)
     else:
         if not args.json:
-            console.print("📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:")
+            console.print(
+                "📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:"
+            )
         logger.info("Reading input from stdin")
         try:
             log_string = sys.stdin.read()
@@ -262,18 +417,20 @@ def main() -> None:
             console.print("[red] Key Board Interrupted [/red]")
             sys.exit(0)
 
-#   --- Split, De-duplicate, and Process Logic ---
-# Old logic commented as it didn't look inside the block to remove time-> added by ausearch
-    log_blocks: List[str] = [block.strip() for block in log_string.split(LOG_BLOCK_SEPARATOR) if block.strip()]
+    #   --- Split, De-duplicate, and Process Logic ---
+    # Old logic commented as it didn't look inside the block to remove time-> added by ausearch
+    log_blocks: List[str] = [
+        block.strip() for block in log_string.split(LOG_BLOCK_SEPARATOR) if block.strip()
+    ]
 
-# New logic trying to find and remove 'time->' if present in the log
-#    log_blocks_raw = log_string.split('----')
+    # New logic trying to find and remove 'time->' if present in the log
+    #    log_blocks_raw = log_string.split('----')
 
-#    log_blocks = []
-#    for block in log_blocks_raw:
-#        clean_lines = [line for line in block.strip().split('\n') if not line.strip().startswith('time->')]
-#        if clean_lines:
-#            log_blocks.append("\n".join(clean_lines))
+    #    log_blocks = []
+    #    for block in log_blocks_raw:
+    #        clean_lines = [line for line in block.strip().split('\n') if not line.strip().startswith('time->')]
+    #        if clean_lines:
+    #            log_blocks.append("\n".join(clean_lines))
     if not log_blocks:
         error_msg = "No valid log blocks found"
         logger.error(error_msg)
@@ -282,7 +439,9 @@ def main() -> None:
         sys.exit(1)
 
     logger.info(f"Found {len(log_blocks)} log blocks to process")
-    unique_denials: Dict[Tuple[Optional[str], Optional[str], Optional[str], Optional[str]], DenialInfo] = {}
+    unique_denials: Dict[
+        Tuple[Optional[str], Optional[str], Optional[str], Optional[str]], DenialInfo
+    ] = {}
     all_unparsed_types: Set[str] = set()
 
     for block in log_blocks:
@@ -292,11 +451,15 @@ def main() -> None:
         all_unparsed_types.update(unparsed)
         # We only care about blocks that contain an AVC denial
         if parsed_log.permission:
-            logger.debug(f"Found AVC denial: {parsed_log.permission} for {parsed_log.comm or 'unknown'}")
-            #Create a unique signature for the denial
+            logger.debug(
+                f"Found AVC denial: {parsed_log.permission} for {parsed_log.comm or 'unknown'}"
+            )
+            # Create a unique signature for the denial
             signature: Tuple[Optional[str], Optional[str], Optional[str], Optional[str]] = (
-                parsed_log.scontext, parsed_log.tcontext,
-                parsed_log.tclass, parsed_log.permission
+                parsed_log.scontext,
+                parsed_log.tcontext,
+                parsed_log.tclass,
+                parsed_log.permission,
             )
             dt_obj: Optional[datetime] = parsed_log.datetime_obj
             if signature in unique_denials:
@@ -304,24 +467,25 @@ def main() -> None:
                 unique_denials[signature].last_seen_obj = dt_obj
             else:
                 unique_denials[signature] = DenialInfo(
-                    log=parsed_log, 
-                    count=1, 
-                    first_seen_obj=dt_obj, 
-                    last_seen_obj=dt_obj
+                    log=parsed_log, count=1, first_seen_obj=dt_obj, last_seen_obj=dt_obj
                 )
-    
-    logger.info(f"Processing complete: {len(unique_denials)} unique denials found from {len(log_blocks)} log blocks")
+
+    logger.info(
+        f"Processing complete: {len(unique_denials)} unique denials found from {len(log_blocks)} log blocks"
+    )
     if all_unparsed_types:
         logger.warning(f"Unparsed record types found: {sorted(list(all_unparsed_types))}")
-    
+
     # Validation reporting
     if args.validate:
         validation_issues = []
         for denial_info in unique_denials.values():
             errors = denial_info.log.validate()
             if errors:
-                validation_issues.extend([f"Denial {denial_info.log.comm or 'unknown'}: {error}" for error in errors])
-        
+                validation_issues.extend(
+                    [f"Denial {denial_info.log.comm or 'unknown'}: {error}" for error in errors]
+                )
+
         if validation_issues:
             if not args.json:
                 console.print("\n[yellow]Validation Issues Found:[/yellow]")
@@ -334,25 +498,25 @@ def main() -> None:
                 console.print("\n[green]✓ All parsed data passed validation[/green]")
             else:
                 logger.info("All parsed data passed validation")
-    
+
     if args.json:
         # Convert the dictionary of unique denials to a list for JSON output
         output_list: List[Dict[str, Any]] = []
         for denial_info in unique_denials.values():
             # Use the DenialInfo.to_dict() method for clean JSON output
             json_denial = denial_info.to_dict()
-            
+
             # Clean up any problematic characters in string values
-            if 'log' in json_denial:
-                for key, value in json_denial['log'].items():
+            if "log" in json_denial:
+                for key, value in json_denial["log"].items():
                     if isinstance(value, str):
                         cleaned_value = value
                         for pattern, replacement in STRING_CLEAN_PATTERNS.items():
                             cleaned_value = cleaned_value.replace(pattern, replacement)
-                        json_denial['log'][key] = cleaned_value
-            
+                        json_denial["log"][key] = cleaned_value
+
             output_list.append(json_denial)
-        
+
         try:
             json_output = json.dumps(output_list, **JSON_OUTPUT_CONFIG)
             print(json_output)
@@ -366,18 +530,27 @@ def main() -> None:
 
     else:
         # Non JSON default output
-        console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
-        sorted_denials: List[DenialInfo] = sorted(unique_denials.values(), key=lambda x: x.first_seen_obj or datetime.fromtimestamp(0))
+        console.print(
+            f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials..."
+        )
+        sorted_denials: List[DenialInfo] = sorted(
+            unique_denials.values(), key=lambda x: x.first_seen_obj or datetime.fromtimestamp(0)
+        )
         if sorted_denials:
             console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
         for i, denial_info in enumerate(sorted_denials):
-            if i > 0: console.print(Rule(style="dim"))
+            if i > 0:
+                console.print(Rule(style="dim"))
             print_summary(console, denial_info, i + 1)
-        console.print(f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials.")
+        console.print(
+            f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials."
+        )
 
         # --- Added: Print the list of unparsed types found ---
         if all_unparsed_types:
-            console.print("\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
+            console.print(
+                "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:"
+            )
             console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
 

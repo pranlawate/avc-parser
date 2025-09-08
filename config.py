@@ -32,7 +32,7 @@ PARSING_PATTERNS: Dict[str, Dict[str, str]] = {
     },
     "SOCKADDR": {
         "saddr": r"saddr=\{([^\}]+)\}",
-    }
+    },
 }
 
 # Field display configuration for console output
@@ -43,44 +43,41 @@ PROCESS_FIELDS: List[Tuple[str, str]] = [
     ("Process Name", "comm"),
     ("Process ID (PID)", "pid"),
     ("Working Dir (CWD)", "cwd"),
-    ("Source Context", "scontext")
+    ("Source Context", "scontext"),
 ]
 
-ACTION_FIELDS: List[Tuple[str, str]] = [
-    ("Syscall", "syscall"),
-    ("Permission", "permission")
-]
+ACTION_FIELDS: List[Tuple[str, str]] = [("Syscall", "syscall"), ("Permission", "permission")]
 
 TARGET_FIELDS: List[Tuple[str, str]] = [
     ("Target Path", "path"),
     ("Target Port", "dest_port"),
     ("Socket Address", "saddr"),
     ("Target Class", "tclass"),
-    ("Target Context", "tcontext")
+    ("Target Context", "tcontext"),
 ]
 
 # Timestamp parsing configuration
 TIMESTAMP_FORMATS: List[str] = [
-    '%m/%d/%Y %H:%M:%S.%f',  # Human-readable format
+    "%m/%d/%Y %H:%M:%S.%f",  # Human-readable format
 ]
 
 # Log block separator
-LOG_BLOCK_SEPARATOR: str = '----'
+LOG_BLOCK_SEPARATOR: str = "----"
 
 # Special field processing rules
 SPECIAL_FIELD_PROCESSORS: Dict[str, str] = {
-    'proctitle': 'hex_decode',  # Process title needs hex decoding
+    "proctitle": "hex_decode",  # Process title needs hex decoding
 }
 
 # JSON output configuration
 JSON_OUTPUT_CONFIG = {
-    'indent': 2,
-    'ensure_ascii': False,
+    "indent": 2,
+    "ensure_ascii": False,
 }
 
 # String cleaning patterns for JSON output
 STRING_CLEAN_PATTERNS: Dict[str, str] = {
-    '\x00': '',  # Remove null bytes
-    '\r': '',    # Remove carriage returns
-    '\n': '\\n', # Escape newlines
+    "\x00": "",  # Remove null bytes
+    "\r": "",  # Remove carriage returns
+    "\n": "\\n",  # Escape newlines
 }
