@@ -44,7 +44,12 @@ def parse_avc_log(log_block: str) -> (list, set):
     # Extract other shared context (CWD, PATH, SYSCALL, PROCTITLE, SOCKADDR)
     patterns = {
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
-        "PATH": {"path": r"name=\"([^\"]+)\"",},
+        "PATH": {
+            "path": r"name=\"([^\"]+)\"",
+            "path_unquoted": r"name=([^\s]+)",  # For unquoted paths
+            "inode": r"inode=(\d+)",
+            "dev": r"dev=([^\s]+)",
+        },
         "SYSCALL": {"syscall": r"syscall=([\w\d]+)", "exe": r"exe=\"([^\"]+)\"",},
         "PROCTITLE": {"proctitle": r"proctitle=(.+)",},
         "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}",}
@@ -74,6 +79,10 @@ def parse_avc_log(log_block: str) -> (list, set):
                             except ValueError: 
                                 # If not hex, use as-is (plain text)
                                 shared_context[key] = value
+                    elif key == 'path_unquoted':
+                        # Only use unquoted path if we don't already have a quoted path
+                        if 'path' not in shared_context:
+                            shared_context['path'] = value.strip()
                     else: 
                         shared_context[key] = value.strip()
         elif log_type not in ["AVC", "USER_AVC"]:  # Track unparsed types (excluding AVC and USER_AVC)
@@ -119,6 +128,10 @@ def parse_avc_log(log_block: str) -> (list, set):
                 "pid": r"pid=(\S+)", 
                 "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))", 
                 "path": r"path=\"([^\"]+)\"",
+                "path_unquoted": r"path=([^\s]+)",  # For unquoted paths in AVC
+                "name": r"name=([^\s]+)",  # name field in AVC (often just filename)
+                "dev": r"dev=\"?([^\"\\s]+)\"?",  # Device, may or may not be quoted
+                "ino": r"ino=(\d+)",  # Inode number
                 "scontext": r"scontext=(\S+)", 
                 "tcontext": r"tcontext=(\S+)", 
                 "tclass": r"tclass=(\S+)", 
@@ -136,10 +149,32 @@ def parse_avc_log(log_block: str) -> (list, set):
                     if key == "comm" and len(field_match.groups()) > 1:
                         # Handle comm field which can be quoted or unquoted
                         avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
+                    elif key == 'path_unquoted':
+                        # Only use unquoted path if we don't already have a quoted path
+                        if 'path' not in avc_data:
+                            avc_data['path'] = field_match.group(1).strip()
                     else:
                         avc_data[key] = field_match.group(1).strip()
             
             if "permission" in avc_data:  # Only add if it's a valid AVC
+                # Enhanced path resolution logic
+                # Priority: 1) PATH record name field, 2) AVC path field, 3) dev+inode combination
+                if 'path' not in avc_data or not avc_data['path']:
+                    # No path in AVC, try to use PATH record data or create dev+inode identifier
+                    if shared_context.get('path'):
+                        avc_data['path'] = shared_context['path']
+                    elif avc_data.get('dev') and avc_data.get('ino'):
+                        # Create a dev+inode identifier when path is missing
+                        avc_data['path'] = f"dev:{avc_data['dev']},inode:{avc_data['ino']}"
+                        avc_data['path_type'] = 'dev_inode'
+                    elif shared_context.get('dev') and shared_context.get('inode'):
+                        # Use PATH record dev+inode if available
+                        avc_data['path'] = f"dev:{shared_context['dev']},inode:{shared_context['inode']}"
+                        avc_data['path_type'] = 'dev_inode'
+                else:
+                    # We have a path, mark it as a regular path
+                    avc_data['path_type'] = 'file_path'
+                
                 # Use comm as fallback for proctitle if proctitle is null or missing
                 if avc_data.get('proctitle') in ["(null)", "null", "", None] and avc_data.get('comm'):
                     avc_data['proctitle'] = avc_data['comm']
@@ -214,9 +249,39 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
         multi_key = f"{key}s"
         if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
             values = ", ".join(sorted(denial_info[multi_key]))
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{values}")
+            console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
+            # Apply professional color scheme based on field type
+            if key == "datetime_str":
+                console.print(f"[dim white]{values}[/dim white]")
+            elif key in ["proctitle", "exe"]:
+                console.print(f"[green]{values}[/green]")
+            elif key == "comm":
+                console.print(f"[bright_green]{values}[/bright_green]")
+            elif key == "pid":
+                console.print(f"[cyan]{values}[/cyan]")
+            elif key == "cwd":
+                console.print(f"[dim green]{values}[/dim green]")
+            elif key == "scontext":
+                console.print(f"[bright_cyan]{values}[/bright_cyan]")
+            else:
+                console.print(values)
         elif parsed_log.get(key) and parsed_log[key] not in ["(null)", "null", ""]:
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{parsed_log[key]}")
+            console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
+            # Apply professional color scheme based on field type
+            if key == "datetime_str":
+                console.print(f"[dim white]{parsed_log[key]}[/dim white]")
+            elif key in ["proctitle", "exe"]:
+                console.print(f"[green]{parsed_log[key]}[/green]")
+            elif key == "comm":
+                console.print(f"[bright_green]{parsed_log[key]}[/bright_green]")
+            elif key == "pid":
+                console.print(f"[cyan]{parsed_log[key]}[/cyan]")
+            elif key == "cwd":
+                console.print(f"[dim green]{parsed_log[key]}[/dim green]")
+            elif key == "scontext":
+                console.print(f"[bright_cyan]{parsed_log[key]}[/bright_cyan]")
+            else:
+                console.print(str(parsed_log[key]))
 
     console.print("-" * 35)
     # --- Action Details ---
@@ -225,7 +290,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
     # Show denial type (AVC vs USER_AVC)
     if parsed_log.get("denial_type"):
         denial_type_display = "Kernel AVC" if parsed_log["denial_type"] == "AVC" else "Userspace AVC"
-        console.print(f"  [bold]Denial Type:[/bold]".ljust(22) + f"{denial_type_display}")
+        console.print(f"  [bold]Denial Type:[/bold]".ljust(22), end="")
+        console.print(f"[bright_green bold]{denial_type_display}[/bright_green bold]")
     
     for label, key in action_fields:
         if key in parsed_log or (label == "Permission" and 'permissions' in denial_info) or (label == "SELinux Mode"):
@@ -235,7 +301,16 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
                 value = key  # key already contains the computed value
             else:
                 value = parsed_log.get(key, key)
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{value}")
+            console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
+            # Apply professional color scheme for action fields
+            if label == "Permission":
+                console.print(f"[bright_cyan]{value}[/bright_cyan]")
+            elif label == "Syscall":
+                console.print(f"[green]{value}[/green]")
+            elif label == "SELinux Mode":
+                console.print(f"[cyan bold]{value}[/cyan bold]")
+            else:
+                console.print(str(value))
 
     console.print("-" * 35)
     # --- Target Information ---
@@ -244,9 +319,37 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
         multi_key = f"{key}s"
         if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
             values = ", ".join(sorted(denial_info[multi_key]))
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{values}")
+            console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
+            if key == "path":
+                # No highlighting for Target Path due to color bleeding
+                console.print(values, highlight=False)
+            elif key == "tclass":
+                # Special highlighting for Target Class
+                console.print(f"[green bold]{values}[/green bold]")
+            elif key == "tcontext":
+                # Target SELinux context
+                console.print(f"[cyan]{values}[/cyan]")
+            elif key == "saddr":
+                # Socket address information
+                console.print(f"[dim white]{values}[/dim white]")
+            else:
+                console.print(values)
         elif parsed_log.get(key) and parsed_log[key] not in ["(null)", "null", ""]:
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{parsed_log[key]}")
+            console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
+            if key == "path":
+                # No highlighting for Target Path due to color bleeding
+                console.print(str(parsed_log[key]), highlight=False)
+            elif key == "tclass":
+                # Special highlighting for Target Class
+                console.print(f"[green bold]{parsed_log[key]}[/green bold]")
+            elif key == "tcontext":
+                # Target SELinux context
+                console.print(f"[cyan]{parsed_log[key]}[/cyan]")
+            elif key == "saddr":
+                # Socket address information
+                console.print(f"[dim white]{parsed_log[key]}[/dim white]")
+            else:
+                console.print(str(parsed_log[key]))
 
     # Handle dest_port separately with dynamic labeling
     if parsed_log.get("dest_port") and parsed_log["dest_port"] not in ["(null)", "null", ""]:
@@ -259,9 +362,11 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
         # Check if we have multiple dest_port values
         if "dest_ports" in denial_info and denial_info["dest_ports"] and len(denial_info["dest_ports"]) > 0:
             values = ", ".join(sorted(denial_info["dest_ports"]))
-            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22) + f"{values}")
+            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22), end="")
+            console.print(f"[green]{values}[/green]")
         else:
-            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22) + f"{parsed_log['dest_port']}")
+            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22), end="")
+            console.print(f"[green]{parsed_log['dest_port']}[/green]")
 
     console.print("-" * 35)
 

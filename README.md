@@ -9,6 +9,7 @@ A simple, standalone Python script to parse raw or pre-processed SELinux audit l
 - **Raw Audit Log Support**: Can directly process raw `audit.log` files by internally using `ausearch` with comprehensive message types
 - **Intelligent Deduplication**: Groups identical denials and tracks occurrence counts with first/last seen timestamps
 - **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicate denials and displays them comma-separated
+- **Enhanced Path Resolution**: Uses PATH record `name` field for complete paths, falls back to `dev+inode` identifiers when paths are missing
 - **Comprehensive Data Extraction**: Extracts process information, security contexts, permissions, paths, and network details
 - **Denial Type Detection**: Distinguishes between Kernel AVC and Userspace AVC denials
 - **Dynamic Labeling**: Correctly labels D-Bus destinations vs network ports based on target class
@@ -281,6 +282,7 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 The following enhancements are planned for future releases, prioritized by implementation complexity and user impact:
 
 ### High Priority Improvements (Quick Wins)
+- **Extended Message Type Parsing**: Add parsing support for `FANOTIFY`, `SELINUX_ERR`, and `USER_SELINUX_ERR` message types (currently collected but not parsed)
 - **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files
 - **Structured Logging**: Replace print statements with configurable logging framework
 - **Type Safety**: Full type hints throughout the codebase for better development experience
