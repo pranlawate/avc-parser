@@ -4,10 +4,15 @@ A simple, standalone Python script to parse raw or pre-processed SELinux audit l
 
 ## Features
 
-- **Multi-line AVC Parsing**: Parses complex AVC audit log blocks containing `AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records
-- **Raw Audit Log Support**: Can directly process raw `audit.log` files by internally using `ausearch`
+- **Multi-line AVC Parsing**: Parses complex AVC audit log blocks containing `AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records
+- **USER_AVC Support**: Handles userspace AVC denials (e.g., D-Bus, systemd) with proper message extraction
+- **Raw Audit Log Support**: Can directly process raw `audit.log` files by internally using `ausearch` with comprehensive message types
 - **Intelligent Deduplication**: Groups identical denials and tracks occurrence counts with first/last seen timestamps
+- **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicate denials and displays them comma-separated
 - **Comprehensive Data Extraction**: Extracts process information, security contexts, permissions, paths, and network details
+- **Denial Type Detection**: Distinguishes between Kernel AVC and Userspace AVC denials
+- **Dynamic Labeling**: Correctly labels D-Bus destinations vs network ports based on target class
+- **SELinux Mode Display**: Shows Enforcing/Permissive mode for each denial
 - **Unparsed Type Tracking**: Identifies and reports unparsed record types for development guidance
 - **Multiple Input Methods**: Supports raw log files, pre-processed files, or interactive input
 - **Rich Output**: Clean, formatted, color-coded summaries using the Rich library
@@ -75,17 +80,23 @@ python parse_avc.py --raw-file /var/log/audit/audit.log --json
 $ python parse_avc.py --avc-file example.log
 
 Found 1 AVC events. Displaying 1 unique denials...
-────────────────────────────── Parsed Log Summary ──────────────────────────────
-────────── Unique Denial #1 (1 occurrences, last seen 1 year(s) ago) ───────────
-  Timestamp:2024-09-02 23:30:00
+──────────────── Parsed Log Summary ────────────────
+── Unique Denial #1 (1 occurrences, last seen 1 year(s) ago) ──
+  Timestamp:2024-09-05 02:18:01
+  Process Title:httpd
+  Executable:/usr/sbin/httpd
   Process Name:httpd
   Process ID (PID):1234
+  Working Dir (CWD):/
   Source Context:system_u:system_r:httpd_t:s0
 -----------------------------------
   Action:Denied
+  Denial Type:Kernel AVC
+  Syscall:openat
   Permission:read
+  SELinux Mode:Enforcing
 -----------------------------------
-  Target Path:/var/www/html/file1.html
+  Target Path:/var/www/html/index.html
   Target Class:file
   Target Context:unconfined_u:object_r:default_t:s0
 -----------------------------------
@@ -99,19 +110,25 @@ $ python parse_avc.py --json --avc-file example.log
 [
   {
     "log": {
-      "datetime_str": "2024-09-02 23:30:00",
-      "timestamp": "1725300000.101",
+      "datetime_str": "2024-09-05 02:18:01",
+      "timestamp": "1725482881.101",
       "pid": "1234",
       "comm": "httpd",
       "scontext": "system_u:system_r:httpd_t:s0",
       "tcontext": "unconfined_u:object_r:default_t:s0",
       "permission": "read",
       "tclass": "file",
-      "path": "/var/www/html/file1.html"
+      "path": "/var/www/html/index.html",
+      "syscall": "openat",
+      "exe": "/usr/sbin/httpd",
+      "cwd": "/",
+      "permissive": "0",
+      "proctitle": "httpd",
+      "denial_type": "AVC"
     },
     "count": 1,
-    "first_seen": "2024-09-02T23:30:00.101000",
-    "last_seen": "2024-09-02T23:30:00.101000"
+    "first_seen": "2024-09-05T02:18:01.101000",
+    "last_seen": "2024-09-05T02:18:01.101000"
   }
 ]
 ```
@@ -123,59 +140,54 @@ $ python parse_avc.py --json --avc-file example.log
 $ python parse_avc.py --avc-file network_denial.log
 
 Found 1 AVC events. Displaying 1 unique denials...
-────────────────────────────── Parsed Log Summary ──────────────────────────────
-────────── Unique Denial #1 (1 occurrences, last seen 1 month(s) ago) ───────────
+──────────────── Parsed Log Summary ────────────────
+── Unique Denial #1 (1 occurrences, last seen 1 month(s) ago) ──
   Timestamp:2025-07-29 09:52:29
   Process Title:/usr/sbin/httpd -DFOREGROUND
+  Process Name:httpd
   Process ID (PID):4182412
   Source Context:system_u:system_r:httpd_t:s0
 -----------------------------------
   Action:Denied
+  Denial Type:Kernel AVC
   Syscall:connect
   Permission:name_connect
 -----------------------------------
-  Target Port:9999
   Socket Address:saddr_fam=inet laddr=10.233.237.96 lport=9999
   Target Class:tcp_socket
   Target Context:system_u:object_r:jboss_management_port_t:s0
+  Target Port:9999
 -----------------------------------
+
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
-### Multiple Denials with Deduplication
+### Multiple Denials with Field Aggregation
 ```bash
-$ python parse_avc.py --raw-file /var/log/audit/audit.log
+$ python parse_avc.py --avc-file test_multiple_pids.log
 
-Found 74 AVC events. Displaying 2 unique denials...
-────────────────────────────── Parsed Log Summary ──────────────────────────────
-───────── Unique Denial #1 (37 occurrences, last seen 1 month(s) ago) ──────────
-  Timestamp:2025-07-14 02:30:53
-  Process Title:/usr/bin/python3.11
-  Process ID (PID):1020588
-  Source Context:system_u:system_r:pulpcore_t:s0
+Found 2 AVC events. Displaying 1 unique denials...
+──────────────── Parsed Log Summary ────────────────
+─── Unique Denial #1 (2 occurrences, last seen 5 day(s) ago) ───
+  Timestamp:2025-09-04 18:19:00
+  Process Title:/usr/sbin/httpd -DFOREGROUND
+  Executable:/usr/sbin/httpd
+  Process Name:httpd, httpd-worker
+  Process ID (PID):1234, 5678
+  Source Context:system_u:system_r:httpd_t:s0
 -----------------------------------
   Action:Denied
-  Syscall:keyctl
-  Permission:read
+  Denial Type:Kernel AVC
+  Syscall:openat
+  Permission:read, write
+  SELinux Mode:Enforcing, Permissive
 -----------------------------------
-  Target Class:key
-  Target Context:system_u:system_r:unconfined_service_t:s0
------------------------------------
-────────────────────────────────────────────────────────────────────────────────
-───────── Unique Denial #2 (37 occurrences, last seen 1 month(s) ago) ──────────
-  Timestamp:2025-07-14 02:30:53
-  Process Title:/usr/bin/python3.11
-  Process ID (PID):1020588
-  Source Context:system_u:system_r:pulpcore_t:s0
------------------------------------
-  Action:Denied
-  Syscall:keyctl
-  Permission:view
------------------------------------
-  Target Class:key
-  Target Context:system_u:system_r:unconfined_service_t:s0
+  Target Path:/var/www/html/file1.html, /var/www/html/file2.html
+  Target Class:file
+  Target Context:unconfined_u:object_r:default_t:s0
 -----------------------------------
 
-Analysis Complete: Processed 74 log blocks and found 2 unique denials.
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
 ## Command Line Options
@@ -192,7 +204,7 @@ Analysis Complete: Processed 74 log blocks and found 2 unique denials.
 ### Process Information
 - **Timestamp**: When the denial occurred
 - **Process Name**: Command name (comm)
-- **Process ID**: Process identifier
+- **Process ID**: Process identifier  
 - **Process Title**: Full command line (if available)
 - **Executable**: Path to executable
 - **Working Directory**: Current working directory
@@ -202,41 +214,56 @@ Analysis Complete: Processed 74 log blocks and found 2 unique denials.
 - **Target Context**: Security context of the target object
 
 ### Action Details
+- **Denial Type**: Kernel AVC or Userspace AVC
 - **Syscall**: System call that triggered the denial
 - **Permission**: Specific permission that was denied
+- **SELinux Mode**: Enforcing or Permissive mode
 
 ### Target Information
 - **Target Path**: File or directory path
 - **Target Port**: Network port (for socket denials)
+- **D-Bus Destination**: D-Bus connection identifier (for D-Bus denials)
 - **Socket Address**: Network address information
-- **Target Class**: Object class (file, socket, etc.)
+- **Target Class**: Object class (file, socket, dbus, etc.)
 
 ## Future Scope
 
-The following enhancements are planned for future releases:
+The following enhancements are planned for future releases, prioritized by implementation complexity and user impact:
 
-### Code Quality Improvements
-- **Type Hints**: Comprehensive type annotations throughout the codebase
-- **Configuration Management**: Centralized configuration module for parsing patterns
-- **Structured Logging**: Replace print statements with proper logging framework
-- **Data Classes**: Use dataclasses for structured data representation
-- **Data Validation**: Built-in validation for parsed fields with `--validate` flag
+### High Priority Improvements (Quick Wins)
+- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files
+- **Structured Logging**: Replace print statements with configurable logging framework
+- **Type Safety**: Full type hints throughout the codebase for better development experience
+- **Performance Optimization**: Pre-compiled regex patterns and memory-efficient stream processing
+- **Enhanced CLI**: Unified command-line interface consolidating multiple file input options
 
-### Interface Enhancements
-- **Auto-Detection**: Intelligent file type detection with single `--file` option
-- **Simplified Interface**: Unified command-line interface for all file types
+### Medium Priority Enhancements
+- **Data Validation**: Optional `--validate` flag for comprehensive parsed data validation
+- **Code Organization**: Centralized configuration module with parsing patterns and field definitions
+- **Structured Data Models**: Proper data classes (ParsedLog, DenialInfo, ProcessingStats) for better data handling
+- **Enhanced JSON Output**: Improved serialization with better string cleaning and error handling
+- **Better Error Handling**: More informative error messages and graceful failure recovery
 
-### Advanced Features
-- **Unit Testing**: Comprehensive pytest test suite
-- **Packaging**: pip-installable package with setuptools
+### Development Quality Improvements
+- **Pre-commit Hooks**: Automated code quality checks with black, isort, flake8, and mypy
+- **Code Quality Tools**: Automatic fixes for unused imports, missing docstrings, and type annotations
+- **Package Structure**: Proper Python packaging with requirements.txt and setup.py
+- **Unit Testing**: Comprehensive test suite with pytest framework
+- **Quality Automation**: Automated code quality validation scripts
+
+### Advanced Features (Future Releases)
+- **Audit2allow Integration**: Direct integration with audit2allow tool for policy generation
 - **Live Monitoring**: Real-time log monitoring with `--follow` flag
 - **Context Translation**: Human-readable SELinux context descriptions
-- **Event Correlation**: Detection of denial bursts and patterns
-- **Process Tracking**: Cross-denial process analysis
-- **Additional Output Formats**: CSV and HTML report generation
-- **Configuration Management**: Custom parsing patterns and rules
-- **Performance Optimization**: Parallel processing and streaming support
-- **Interactive Mode**: TUI interface for complex analysis workflows
+- **Event Correlation**: Detection of denial bursts and patterns over time
+- **Process Tracking**: Cross-denial process analysis and behavior patterns
+- **Multiple Output Formats**: CSV, HTML, and XML report generation options
+- **Custom Parsing Rules**: User-configurable parsing patterns and field extraction
+- **Interactive Analysis**: Terminal UI interface for complex analysis workflows
+- **Performance Scaling**: Parallel processing and distributed analysis support
+- **Machine Learning Integration**: Anomaly detection and pattern recognition
+- **Policy Recommendation**: AI-powered SELinux policy suggestions
+- **Dashboard Integration**: Web-based visualization and monitoring interface
 
 ## Contributing
 
