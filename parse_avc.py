@@ -7,13 +7,16 @@ from datetime import datetime
 from rich.console import Console
 from rich.rule import Rule
 
-def parse_avc_log(log_block: str) -> (dict, set):
+def parse_avc_log(log_block: str) -> (list, set):
     """
-    Parses a multi-line AVC log block,returning both the parsed data
+    Parses a multi-line AVC log block, returning a list of parsed AVC denials
     and a set of any unparsed record types that were found.
     """
-    parsed_data = {}
-    unparsed_types = set()     # To store unparsed types
+    avc_denials = []  # Changed from single dict to list
+    unparsed_types = set()
+    
+    # Extract shared context (timestamp, process info, etc.)
+    shared_context = {}
 
 #    print(f"\n--- DEBUG: New Log Block Received ---\n'{log_block}'\n--------------------------")
     timestamp_pattern = re.search(r'msg=audit\(([^)]+)\)', log_block)
@@ -34,12 +37,12 @@ def parse_avc_log(log_block: str) -> (dict, set):
                 print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
 
         if dt_object:
-            parsed_data['datetime_obj'] = dt_object
-            parsed_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
-            parsed_data['timestamp'] = dt_object.timestamp()
+            shared_context['datetime_obj'] = dt_object
+            shared_context['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+            shared_context['timestamp'] = dt_object.timestamp()
 
+    # Extract other shared context (CWD, PATH, SYSCALL, PROCTITLE, SOCKADDR)
     patterns = {
-        "AVC": {"permission": r"denied\s+\{ ([^}]+) \}", "pid": r"pid=(\S+)", "comm": r"comm=\"([^\"]+)\"", "path": r"path=\"([^\"]+)\"","scontext": r"scontext=(\S+)", "tcontext": r"tcontext=(\S+)", "tclass": r"tclass=(\S+)", "dest_port": r"dest=(\S+)",},
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
         "PATH": {"path": r"name=\"([^\"]+)\"",},
         "SYSCALL": {"syscall": r"syscall=([\w\d]+)", "exe": r"exe=\"([^\"]+)\"",},
@@ -47,28 +50,58 @@ def parse_avc_log(log_block: str) -> (dict, set):
         "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}",}
     }
     
-    # Split the log block into individual lines
+    # Process non-AVC lines for shared context
     for line in log_block.strip().split('\n'):
         line = line.strip()
         match = re.search(r"type=(\w+)", line)
         if not match: continue
         log_type = match.group(1)
-        # Apply the patterns for the detected log type
+        
         if log_type in patterns:
             for key, pattern in patterns[log_type].items():
                 field_match = re.search(pattern, line)
                 if field_match:
                     value = field_match.group(1)
                     if key == 'proctitle':
-                        try: parsed_data[key] = bytes.fromhex(value).decode()
-                        except ValueError: parsed_data[key] = value.strip('"')
-                    else: parsed_data[key] = value.strip()
-        else:
-            # --- Track unparsed types ---
+                        try: 
+                            shared_context[key] = bytes.fromhex(value).decode()
+                        except ValueError: 
+                            shared_context[key] = value.strip('"')
+                    else: 
+                        shared_context[key] = value.strip()
+        elif log_type != "AVC":  # Track unparsed types (excluding AVC)
             unparsed_types.add(log_type)
 
-#    print(f" [DEBUG] Final parsed data for this block: {parsed_data}") #DEBUG
-    return parsed_data,unparsed_types
+    # Now process each AVC line separately
+    for line in log_block.strip().split('\n'):
+        line = line.strip()
+        if 'type=AVC' in line:
+            # Parse this specific AVC line
+            avc_data = shared_context.copy()  # Start with shared context
+            
+            # Extract AVC-specific fields
+            avc_patterns = {
+                "permission": r"denied\s+\{ ([^}]+) \}",
+                "pid": r"pid=(\S+)", 
+                "comm": r"comm=\"([^\"]+)\"", 
+                "path": r"path=\"([^\"]+)\"",
+                "scontext": r"scontext=(\S+)", 
+                "tcontext": r"tcontext=(\S+)", 
+                "tclass": r"tclass=(\S+)", 
+                "dest_port": r"dest=(\S+)",
+            }
+            
+            for key, pattern in avc_patterns.items():
+                field_match = re.search(pattern, line)
+                if field_match:
+                    avc_data[key] = field_match.group(1).strip()
+            
+            if "permission" in avc_data:  # Only add if it's a valid AVC
+                avc_denials.append(avc_data)
+                print(f" [DEBUG] Parsed AVC: {avc_data}")  # DEBUG
+
+    print(f" [DEBUG] Found {len(avc_denials)} AVC denials in this block")  # DEBUG
+    return avc_denials, unparsed_types
 
 def human_time_ago(dt_object: datetime) -> str:
     """Converts a datetime timestamp object into a human-readable 'time ago' string."""
@@ -104,7 +137,14 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
         ("Process Name", "comm"), ("Process ID (PID)", "pid"),
         ("Working Dir (CWD)", "cwd"), ("Source Context", "scontext")
     ]
-    action_fields = [("Syscall", "syscall"), ("Permission", "permission")]
+    action_fields = [("Syscall", "syscall")]
+    
+    # Handle permissions - either single permission or comma-separated list
+    if 'permissions' in denial_info and denial_info['permissions']:
+        permissions_str = ", ".join(sorted(denial_info['permissions']))
+        action_fields.append(("Permission", permissions_str))
+    elif parsed_log.get("permission"):
+        action_fields.append(("Permission", parsed_log["permission"]))
     target_fields = [
         ("Target Path", "path"), ("Target Port", "dest_port"),
         ("Socket Address", "saddr"), ("Target Class", "tclass"),
@@ -120,8 +160,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
     # --- Action Details ---
     console.print(f"  [bold]Action:[/bold]".ljust(22) + "Denied")
     for label, key in action_fields:
-        if parsed_log.get(key):
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{parsed_log[key]}")
+        if key in parsed_log or (label == "Permission" and 'permissions' in denial_info):
+            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{key}")
 
     console.print("-" * 35)
     # --- Target Information ---
@@ -198,22 +238,36 @@ def main():
     unique_denials = {}
     all_unparsed_types = set()
 
-    for block in log_blocks:
-        parsed_log, unparsed = parse_avc_log(block)
+    for block_idx, block in enumerate(log_blocks):
+        avc_denials, unparsed = parse_avc_log(block)  # Now returns list
         all_unparsed_types.update(unparsed)
-        # We only care about blocks that contain an AVC denial
-        if "permission" in parsed_log:
-            #Create a unique signature for the denial
-            signature = (
-                parsed_log.get('scontext'), parsed_log.get('tcontext'),
-                parsed_log.get('tclass'), parsed_log.get('permission')
-            )
-            dt_obj = parsed_log.get('datetime_obj')
-            if signature in unique_denials:
-                unique_denials[signature]['count'] += 1
-                unique_denials[signature]['last_seen_obj'] = dt_obj
-            else:
-                unique_denials[signature] = {'log': parsed_log, 'count': 1, 'first_seen_obj': dt_obj, 'last_seen_obj': dt_obj}
+        
+        # Process each AVC denial separately
+        for parsed_log in avc_denials:
+            if "permission" in parsed_log:
+                #Create a unique signature for the denial (include block index)
+                signature = (
+                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                    parsed_log.get('tclass'), block_idx
+                )
+                permission = parsed_log.get('permission')
+                dt_obj = parsed_log.get('datetime_obj')
+                
+                if signature in unique_denials:
+                    # Add permission to the set if not already present
+                    if 'permissions' not in unique_denials[signature]:
+                        unique_denials[signature]['permissions'] = set()
+                    unique_denials[signature]['permissions'].add(permission)
+                    unique_denials[signature]['count'] += 1
+                    unique_denials[signature]['last_seen_obj'] = dt_obj
+                else:
+                    unique_denials[signature] = {
+                        'log': parsed_log, 
+                        'count': 1, 
+                        'first_seen_obj': dt_obj, 
+                        'last_seen_obj': dt_obj,
+                        'permissions': {permission}
+                    }
     if args.json:
         # Convert the dictionary of unique denials to a list for JSON output
         output_list = []
@@ -225,6 +279,10 @@ def main():
                 'first_seen': denial_info['first_seen_obj'].isoformat() if denial_info['first_seen_obj'] else None,
                 'last_seen': denial_info['last_seen_obj'].isoformat() if denial_info['last_seen_obj'] else None
             }
+            
+            # Add permissions set if it exists
+            if 'permissions' in denial_info:
+                json_denial['permissions'] = sorted(list(denial_info['permissions']))
             
             # Remove datetime_obj from the log data and convert any remaining datetime objects to strings
             json_denial['log'].pop('datetime_obj', None)
@@ -253,7 +311,8 @@ def main():
 
     else:
         # Non JSON default output
-        console.print(f"\nFound {len(log_blocks)} AVC events. Displaying {len(unique_denials)} unique denials...")
+        total_events = sum(denial['count'] for denial in unique_denials.values())
+        console.print(f"\nFound {total_events} AVC events. Displaying {len(unique_denials)} unique denials...")
         sorted_denials = sorted(unique_denials.values(), key=lambda x: x['first_seen_obj'] or datetime.fromtimestamp(0))
         if sorted_denials:
             console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
