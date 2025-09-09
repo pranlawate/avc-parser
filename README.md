@@ -49,7 +49,7 @@ python parse_avc.py --raw-file /var/log/audit/audit.log
 Process AVC logs already filtered with `ausearch`:
 ```bash
 # First, create the AVC file:
-ausearch -m AVC -ts recent > avc_denials.log
+ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR -ts recent > avc_denials.log
 
 # Then, parse it:
 python parse_avc.py --avc-file avc_denials.log

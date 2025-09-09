@@ -189,7 +189,7 @@ def main():
         if not args.json:
             console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
         try:
-            ausearch_cmd = ["ausearch", "-m", "AVC", "-i", "-if", args.raw_file]
+            ausearch_cmd = ["ausearch", "-m", "AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR", "-i", "-if", args.raw_file]
             result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
             log_string = result.stdout
         except FileNotFoundError:
