@@ -46,7 +46,7 @@ def parse_avc_log(log_block: str) -> (list, set):
         "CWD": {"cwd": r"cwd=\"([^\"]+)\"",},
         "PATH": {"path": r"name=\"([^\"]+)\"",},
         "SYSCALL": {"syscall": r"syscall=([\w\d]+)", "exe": r"exe=\"([^\"]+)\"",},
-        "PROCTITLE": {"proctitle": r"proctitle=(\S+)",},
+        "PROCTITLE": {"proctitle": r"proctitle=(.+)",},
         "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}",}
     }
     
@@ -63,40 +63,87 @@ def parse_avc_log(log_block: str) -> (list, set):
                 if field_match:
                     value = field_match.group(1)
                     if key == 'proctitle':
-                        try: 
-                            shared_context[key] = bytes.fromhex(value).decode()
-                        except ValueError: 
-                            shared_context[key] = value.strip('"')
+                        value = value.strip()  # Remove any trailing whitespace
+                        # Check if it's quoted
+                        if value.startswith('"') and value.endswith('"'):
+                            shared_context[key] = value[1:-1]  # Remove quotes
+                        else:
+                            try: 
+                                # Try hex decode first
+                                shared_context[key] = bytes.fromhex(value).decode()
+                            except ValueError: 
+                                # If not hex, use as-is (plain text)
+                                shared_context[key] = value
                     else: 
                         shared_context[key] = value.strip()
-        elif log_type != "AVC":  # Track unparsed types (excluding AVC)
+        elif log_type not in ["AVC", "USER_AVC"]:  # Track unparsed types (excluding AVC and USER_AVC)
             unparsed_types.add(log_type)
 
-    # Now process each AVC line separately
+    # Now process each AVC and USER_AVC line separately
     for line in log_block.strip().split('\n'):
         line = line.strip()
-        if 'type=AVC' in line:
-            # Parse this specific AVC line
+        if 'type=AVC' in line or 'type=USER_AVC' in line:
+            # Parse this specific AVC or USER_AVC line
             avc_data = shared_context.copy()  # Start with shared context
             
-            # Extract AVC-specific fields
+            # For USER_AVC, we need to extract from the msg field
+            if 'type=USER_AVC' in line:
+                # Extract the msg content from USER_AVC
+                msg_match = re.search(r"msg='([^']+)'", line)
+                if msg_match:
+                    avc_content = msg_match.group(1)
+                    # Also extract basic USER_AVC fields from the outer message
+                    user_avc_patterns = {
+                        "pid": r"pid=(\S+)",
+                        "uid": r"uid=(\S+)",
+                    }
+                    for key, pattern in user_avc_patterns.items():
+                        field_match = re.search(pattern, line)
+                        if field_match:
+                            avc_data[key] = field_match.group(1).strip()
+                else:
+                    # Skip if no msg content (like policyload notices)
+                    continue
+            else:
+                avc_content = line
+            
+            # Set the denial type based on the line type
+            if 'type=USER_AVC' in line:
+                avc_data['denial_type'] = 'USER_AVC'
+            else:
+                avc_data['denial_type'] = 'AVC'
+            
+            # Extract AVC-specific fields (works for both AVC and USER_AVC msg content)
             avc_patterns = {
                 "permission": r"denied\s+\{ ([^}]+) \}",
                 "pid": r"pid=(\S+)", 
-                "comm": r"comm=\"([^\"]+)\"", 
+                "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))", 
                 "path": r"path=\"([^\"]+)\"",
                 "scontext": r"scontext=(\S+)", 
                 "tcontext": r"tcontext=(\S+)", 
                 "tclass": r"tclass=(\S+)", 
                 "dest_port": r"dest=(\S+)",
+                "permissive": r"permissive=(\d+)",
             }
             
             for key, pattern in avc_patterns.items():
-                field_match = re.search(pattern, line)
+                field_match = re.search(pattern, avc_content)
                 if field_match:
-                    avc_data[key] = field_match.group(1).strip()
+                    # For USER_AVC, don't override pid if it was already set from outer message
+                    if 'type=USER_AVC' in line and key == "pid" and key in avc_data:
+                        continue
+                    
+                    if key == "comm" and len(field_match.groups()) > 1:
+                        # Handle comm field which can be quoted or unquoted
+                        avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
+                    else:
+                        avc_data[key] = field_match.group(1).strip()
             
             if "permission" in avc_data:  # Only add if it's a valid AVC
+                # Use comm as fallback for proctitle if proctitle is null or missing
+                if avc_data.get('proctitle') in ["(null)", "null", "", None] and avc_data.get('comm'):
+                    avc_data['proctitle'] = avc_data['comm']
+                
                 avc_denials.append(avc_data)
                 print(f" [DEBUG] Parsed AVC: {avc_data}")  # DEBUG
 
@@ -140,34 +187,81 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
     action_fields = [("Syscall", "syscall")]
     
     # Handle permissions - either single permission or comma-separated list
-    if 'permissions' in denial_info and denial_info['permissions']:
+    if 'permissions' in denial_info and denial_info['permissions'] and len(denial_info['permissions']) > 0:
         permissions_str = ", ".join(sorted(denial_info['permissions']))
         action_fields.append(("Permission", permissions_str))
     elif parsed_log.get("permission"):
         action_fields.append(("Permission", parsed_log["permission"]))
+    
+    # Handle permissive mode - check both collected and single values
+    if "permissives" in denial_info and denial_info["permissives"] and len(denial_info["permissives"]) > 0:
+        modes = []
+        for perm_val in sorted(denial_info["permissives"]):
+            modes.append("Permissive" if perm_val == "1" else "Enforcing")
+        action_fields.append(("SELinux Mode", ", ".join(modes)))
+    elif parsed_log.get("permissive"):
+        mode = "Permissive" if parsed_log["permissive"] == "1" else "Enforcing"
+        action_fields.append(("SELinux Mode", mode))
+    
     target_fields = [
-        ("Target Path", "path"), ("Target Port", "dest_port"),
-        ("Socket Address", "saddr"), ("Target Class", "tclass"),
-        ("Target Context", "tcontext")
+        ("Target Path", "path"), ("Socket Address", "saddr"), 
+        ("Target Class", "tclass"), ("Target Context", "tcontext")
     ]
 
     # --- Process Information ---
     for label, key in process_fields:
-        if parsed_log.get(key):
+        # Check if we have multiple values for this field
+        multi_key = f"{key}s"
+        if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
+            values = ", ".join(sorted(denial_info[multi_key]))
+            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{values}")
+        elif parsed_log.get(key) and parsed_log[key] not in ["(null)", "null", ""]:
             console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{parsed_log[key]}")
 
     console.print("-" * 35)
     # --- Action Details ---
     console.print(f"  [bold]Action:[/bold]".ljust(22) + "Denied")
+    
+    # Show denial type (AVC vs USER_AVC)
+    if parsed_log.get("denial_type"):
+        denial_type_display = "Kernel AVC" if parsed_log["denial_type"] == "AVC" else "Userspace AVC"
+        console.print(f"  [bold]Denial Type:[/bold]".ljust(22) + f"{denial_type_display}")
+    
     for label, key in action_fields:
-        if key in parsed_log or (label == "Permission" and 'permissions' in denial_info):
-            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{key}")
+        if key in parsed_log or (label == "Permission" and 'permissions' in denial_info) or (label == "SELinux Mode"):
+            if label == "Permission" and 'permissions' in denial_info:
+                value = ", ".join(sorted(denial_info['permissions']))
+            elif label == "SELinux Mode":
+                value = key  # key already contains the computed value
+            else:
+                value = parsed_log.get(key, key)
+            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{value}")
 
     console.print("-" * 35)
     # --- Target Information ---
     for label, key in target_fields:
-        if parsed_log.get(key):
+        # Check if we have multiple values for this field
+        multi_key = f"{key}s"
+        if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
+            values = ", ".join(sorted(denial_info[multi_key]))
+            console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{values}")
+        elif parsed_log.get(key) and parsed_log[key] not in ["(null)", "null", ""]:
             console.print(f"  [bold]{label}:[/bold]".ljust(22) + f"{parsed_log[key]}")
+
+    # Handle dest_port separately with dynamic labeling
+    if parsed_log.get("dest_port") and parsed_log["dest_port"] not in ["(null)", "null", ""]:
+        # Determine label based on target class
+        if parsed_log.get("tclass") == "dbus":
+            dest_label = "D-Bus Destination"
+        else:
+            dest_label = "Target Port"
+        
+        # Check if we have multiple dest_port values
+        if "dest_ports" in denial_info and denial_info["dest_ports"] and len(denial_info["dest_ports"]) > 0:
+            values = ", ".join(sorted(denial_info["dest_ports"]))
+            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22) + f"{values}")
+        else:
+            console.print(f"  [bold]{dest_label}:[/bold]".ljust(22) + f"{parsed_log['dest_port']}")
 
     console.print("-" * 35)
 
@@ -238,17 +332,17 @@ def main():
     unique_denials = {}
     all_unparsed_types = set()
 
-    for block_idx, block in enumerate(log_blocks):
+    for block in log_blocks:
         avc_denials, unparsed = parse_avc_log(block)  # Now returns list
         all_unparsed_types.update(unparsed)
         
         # Process each AVC denial separately
         for parsed_log in avc_denials:
             if "permission" in parsed_log:
-                #Create a unique signature for the denial (include block index)
+                #Create a unique signature for the denial
                 signature = (
                     parsed_log.get('scontext'), parsed_log.get('tcontext'),
-                    parsed_log.get('tclass'), block_idx
+                    parsed_log.get('tclass')
                 )
                 permission = parsed_log.get('permission')
                 dt_obj = parsed_log.get('datetime_obj')
@@ -258,16 +352,36 @@ def main():
                     if 'permissions' not in unique_denials[signature]:
                         unique_denials[signature]['permissions'] = set()
                     unique_denials[signature]['permissions'].add(permission)
+                    
+                    # Collect varying fields (not part of signature)
+                    varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
+                    for field in varying_fields:
+                        if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
+                            field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
+                            if field_key not in unique_denials[signature]:
+                                unique_denials[signature][field_key] = set()
+                            unique_denials[signature][field_key].add(parsed_log[field])
+                    
                     unique_denials[signature]['count'] += 1
                     unique_denials[signature]['last_seen_obj'] = dt_obj
                 else:
-                    unique_denials[signature] = {
+                    # Initialize new signature
+                    denial_entry = {
                         'log': parsed_log, 
                         'count': 1, 
                         'first_seen_obj': dt_obj, 
                         'last_seen_obj': dt_obj,
                         'permissions': {permission}
                     }
+                    
+                    # Initialize varying fields for first occurrence
+                    varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
+                    for field in varying_fields:
+                        if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
+                            field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
+                            denial_entry[field_key] = {parsed_log[field]}
+                    
+                    unique_denials[signature] = denial_entry
     if args.json:
         # Convert the dictionary of unique denials to a list for JSON output
         output_list = []
