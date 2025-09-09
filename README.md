@@ -77,11 +77,12 @@ python parse_avc.py --raw-file /var/log/audit/audit.log --json
 
 ### Standard AVC Denial
 ```bash
-$ python parse_avc.py --avc-file example.log
+$ python3 parse_avc.py --avc-file file_context_AVC.log 
+Pre-processed AVC file provided: 'file_context_AVC.log'
 
 Found 1 AVC events. Displaying 1 unique denials...
-──────────────── Parsed Log Summary ────────────────
-── Unique Denial #1 (1 occurrences, last seen 1 year(s) ago) ──
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+────────── Unique Denial #1 (1 occurrences, last seen 1 year(s) ago) ───────────
   Timestamp:2024-09-05 02:18:01
   Process Title:httpd
   Executable:/usr/sbin/httpd
@@ -106,29 +107,32 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 
 ### JSON Output
 ```bash
-$ python parse_avc.py --json --avc-file example.log
+$ python3 parse_avc.py --json --avc-file file_context_AVC.log 
 [
   {
     "log": {
       "datetime_str": "2024-09-05 02:18:01",
       "timestamp": "1725482881.101",
+      "syscall": "openat",
+      "exe": "/usr/sbin/httpd",
+      "cwd": "/",
+      "path": "/var/www/html/index.html",
+      "denial_type": "AVC",
+      "permission": "read",
       "pid": "1234",
       "comm": "httpd",
       "scontext": "system_u:system_r:httpd_t:s0",
       "tcontext": "unconfined_u:object_r:default_t:s0",
-      "permission": "read",
       "tclass": "file",
-      "path": "/var/www/html/index.html",
-      "syscall": "openat",
-      "exe": "/usr/sbin/httpd",
-      "cwd": "/",
       "permissive": "0",
-      "proctitle": "httpd",
-      "denial_type": "AVC"
+      "proctitle": "httpd"
     },
     "count": 1,
     "first_seen": "2024-09-05T02:18:01.101000",
-    "last_seen": "2024-09-05T02:18:01.101000"
+    "last_seen": "2024-09-05T02:18:01.101000",
+    "permissions": [
+      "read"
+    ]
   }
 ]
 ```
@@ -137,11 +141,12 @@ $ python parse_avc.py --json --avc-file example.log
 
 ### Network AVC Denial
 ```bash
-$ python parse_avc.py --avc-file network_denial.log
+$ python3 parse_avc.py --avc-file network_AVC.log 
+Pre-processed AVC file provided: 'network_AVC.log'
 
 Found 1 AVC events. Displaying 1 unique denials...
-──────────────── Parsed Log Summary ────────────────
-── Unique Denial #1 (1 occurrences, last seen 1 month(s) ago) ──
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+────────── Unique Denial #1 (1 occurrences, last seen 1 month(s) ago) ──────────
   Timestamp:2025-07-29 09:52:29
   Process Title:/usr/sbin/httpd -DFOREGROUND
   Process Name:httpd
@@ -164,11 +169,12 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 
 ### Multiple Denials with Field Aggregation
 ```bash
-$ python parse_avc.py --avc-file test_multiple_pids.log
+$ python3 parse_avc.py --avc-file test_multiple_pids.log
+Pre-processed AVC file provided: 'testAVC/test_multiple_pids.log'
 
 Found 2 AVC events. Displaying 1 unique denials...
-──────────────── Parsed Log Summary ────────────────
-─── Unique Denial #1 (2 occurrences, last seen 5 day(s) ago) ───
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+─────────── Unique Denial #1 (2 occurrences, last seen 5 day(s) ago) ───────────
   Timestamp:2025-09-04 18:19:00
   Process Title:/usr/sbin/httpd -DFOREGROUND
   Executable:/usr/sbin/httpd
@@ -188,6 +194,50 @@ Found 2 AVC events. Displaying 1 unique denials...
 -----------------------------------
 
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
+```
+
+### Multiple Denials with De-duplication
+```bash
+$ python3 parse_avc.py -rf testAVC/audit.log 
+Raw file input provided. Running ausearch on 'audit.log'...
+
+Found 76 AVC events. Displaying 2 unique denials...
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+───────── Unique Denial #1 (74 occurrences, last seen an unknown time) ─────────
+  Process Title:/usr/bin/python3.11 /usr/bin/pulpcore-worker
+  Process Name:pulpcore-worker
+  Process ID (PID):1020588, 1020782, 1020887, 1020976, 1021077, 1021270, 
+1021901, 1039740, 1039928, 1040118, 1040570, 1040889, 1041354, 1343630, 1343656,
+1343803, 1346039, 1346299, 1346310, 1346564, 1347373, 1348333, 1348467, 1348855,
+1349773, 1349927, 1350460, 1350668, 1350850, 1351213, 1376151, 1376165, 1376316,
+1376718, 1377033
+  Source Context:system_u:system_r:pulpcore_t:s0
+-----------------------------------
+  Action:Denied
+  Denial Type:Kernel AVC
+  Syscall:keyctl
+  Permission:read, view
+  SELinux Mode:Permissive
+-----------------------------------
+  Target Class:key
+  Target Context:system_u:system_r:unconfined_service_t:s0
+-----------------------------------
+────────────────────────────────────────────────────────────────────────────────
+───────── Unique Denial #2 (2 occurrences, last seen an unknown time) ──────────
+  Process ID (PID):1094
+  Source Context:system_u:system_r:systemd_localed_t:s0
+-----------------------------------
+  Action:Denied
+  Denial Type:Userspace AVC
+  Permission:send_msg
+  SELinux Mode:Enforcing
+-----------------------------------
+  Target Class:dbus
+  Target Context:system_u:system_r:insights_client_t:s0
+  D-Bus Destination::1.41126, :1.53788
+-----------------------------------
+
+Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 ```
 
 ## Command Line Options
