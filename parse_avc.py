@@ -34,7 +34,7 @@ def parse_avc_log(log_block: str) -> (list, set):
                 dt_object = datetime.fromtimestamp(float(timestamp_str))
             except ValueError:
                 dt_object = None # Could not parse timestamp
-                print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
+#                print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
 
         if dt_object:
             shared_context['datetime_obj'] = dt_object
@@ -145,9 +145,9 @@ def parse_avc_log(log_block: str) -> (list, set):
                     avc_data['proctitle'] = avc_data['comm']
                 
                 avc_denials.append(avc_data)
-                print(f" [DEBUG] Parsed AVC: {avc_data}")  # DEBUG
+#                print(f" [DEBUG] Parsed AVC: {avc_data}")  # DEBUG
 
-    print(f" [DEBUG] Found {len(avc_denials)} AVC denials in this block")  # DEBUG
+#    print(f" [DEBUG] Found {len(avc_denials)} AVC denials in this block")  # DEBUG
     return avc_denials, unparsed_types
 
 def human_time_ago(dt_object: datetime) -> str:
