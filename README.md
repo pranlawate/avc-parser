@@ -38,7 +38,7 @@ A simple, standalone Python script to parse raw or pre-processed SELinux audit l
 
 2. **Install Dependencies**:
    ```bash
-   pip install rich
+   pip3 install rich
    sudo dnf install audit  # If needed (Fedora/RHEL)
    sudo apt install auditd  # If needed (Ubuntu/Debian)
    ```
