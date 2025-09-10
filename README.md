@@ -48,7 +48,7 @@ A simple, standalone Python script to parse raw or pre-processed SELinux audit l
 ### Option A: Raw Audit File Processing
 Process system audit logs directly using internal `ausearch`:
 ```bash
-python parse_avc.py --raw-file /var/log/audit/audit.log
+python3 parse_avc.py --raw-file /var/log/audit/audit.log
 ```
 
 ### Option B: Pre-processed AVC File
@@ -58,20 +58,20 @@ Process AVC logs already filtered with `ausearch`:
 ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR -ts recent > avc_denials.log
 
 # Then, parse it:
-python parse_avc.py --avc-file avc_denials.log
+python3 parse_avc.py --avc-file avc_denials.log
 ```
 
 ### Option C: Interactive Mode
 Paste logs directly into the terminal:
 ```bash
-python parse_avc.py
+python3 parse_avc.py
 # Paste your log and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
 ```
 
 ### Option D: JSON Output
 Add `--json` flag for machine-readable output:
 ```bash
-python parse_avc.py --raw-file /var/log/audit/audit.log --json
+python3 parse_avc.py --raw-file /var/log/audit/audit.log --json
 ```
 
 ## Example Output
