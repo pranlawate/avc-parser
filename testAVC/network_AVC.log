@@ -1,0 +1,5 @@
+type=PROCTITLE msg=audit(07/29/2025 09:52:29.237:87712186) : proctitle=2F7573722F7362696E2F6874747064202D44464F524547524F554E44
+type=SOCKADDR msg=audit(07/29/2025 09:52:29.237:87712186) : saddr={ saddr_fam=inet laddr=10.233.237.96 lport=9999 }
+type=SYSCALL msg=audit(07/29/2025 09:52:29.237:87712186) : arch=x86_64 syscall=connect success=no exit=EACCES comm=httpd exe=/usr/sbin/httpd subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(07/29/2025 09:52:29.237:87712186) : avc:  denied  { name_connect } for  pid=4182412 comm=httpd dest=9999 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:jboss_management_port_t:s0 tclass=tcp_socket
+

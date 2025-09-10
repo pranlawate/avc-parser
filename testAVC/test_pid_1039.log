@@ -1,0 +1,4 @@
+----
+type=PROCTITLE msg=audit(1753468795.949:45): proctitle="(null)"
+type=AVC msg=audit(1753468795.949:45): avc: denied { map } for pid=1039 comm="TaniumAuditPipe" path="/opt/Tanium/TaniumClient/extensions/recorder/TaniumAuditPipe" dev="dm-1" ino=18139035 scontext=system_u:system_r:tanium_recorder_t:s0 tcontext=system_u:object_r:tanium_recorder_exec_t:s0 tclass=file permissive=0
+----

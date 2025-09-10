@@ -1,0 +1,14 @@
+----
+type=PROCTITLE msg=audit(09/04/2025 18:19:00.303:503): proctitle=2F7573722F7362696E2F6874747064202D44464F524547524F554E44
+type=SYSCALL msg=audit(09/04/2025 18:19:00.303:503): arch=x86_64 syscall=openat success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=PATH msg=audit(09/04/2025 18:19:00.303:503): item=0 name="/var/www/html/file1.html" obj=unconfined_u:object_r:default_t:s0
+type=AVC msg=audit(09/04/2025 18:19:00.303:503): avc: denied  { read } for  pid=1234 comm="httpd" path="/var/www/html/file1.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file
+----
+type=USER_ACCT msg=audit(09/04/2025 18:19:05.305:504): acct="root" exe="/usr/sbin/crond"
+----
+type=SYSCALL msg=audit(09/04/2025 18:19:20.404:505): arch=x86_64 syscall=connect success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(09/04/2025 18:19:20.404:505): avc: denied  { name_connect } for  pid=5678 comm="httpd" dest=5432 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:postgresql_port_t:s0 tclass=tcp_socket
+----
+type=SYSCALL msg=audit(09/04/2025 18:19:30.505:506): arch=x86_64 syscall=openat success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(09/04/2025 18:19:30.505:506): avc: denied  { read } for  pid=1235 comm="httpd" path="/var/www/html/file2.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file
+----

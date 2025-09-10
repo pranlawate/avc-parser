@@ -1,0 +1,6 @@
+type=PROCTITLE msg=audit(08/13/2025 15:10:41.085:463474) : proctitle=/usr/sbin/unix_chkpwd zabbix chkexpiry 
+type=PATH msg=audit(08/13/2025 15:10:41.085:463474) : item=0 name=/etc/shadow inode=8388860 dev=fd:00 mode=file,600 ouid=root ogid=root rdev=00:00 obj=system_u:object_r:shadow_t:s0 nametype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0 cap_frootid=0 
+type=CWD msg=audit(08/13/2025 15:10:41.085:463474) : cwd=/U2/PROD 
+type=SYSCALL msg=audit(08/13/2025 15:10:41.085:463474) : arch=x86_64 syscall=openat success=yes exit=3 a0=AT_FDCWD a1=0x7fe49224aec6 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=1 ppid=1240772 pid=1240781 auid=unset uid=root gid=zabbix euid=root suid=root fsuid=root egid=zabbix sgid=zabbix fsgid=zabbix tty=(none) ses=unset comm=unix_chkpwd exe=/usr/sbin/unix_chkpwd subj=system_u:system_r:zabbix_agent_t:s0 key=(null) 
+type=AVC msg=audit(08/13/2025 15:10:41.085:463474) : avc:  denied  { open } for  pid=1240781 comm=unix_chkpwd path=/etc/shadow dev="dm-0" ino=8388860 scontext=system_u:system_r:zabbix_agent_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=1 
+type=AVC msg=audit(08/13/2025 15:10:41.085:463474) : avc:  denied  { read } for  pid=1240781 comm=unix_chkpwd name=shadow dev="dm-0" ino=8388860 scontext=system_u:system_r:zabbix_agent_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=1
