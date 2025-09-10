@@ -262,13 +262,14 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{values}[/green]")
             elif key == "comm":
-                console.print(f"[bright_green]{values}[/bright_green]")
+                console.print(f"[green]{values}[/green]")
             elif key == "pid":
                 console.print(f"[cyan]{values}[/cyan]")
             elif key == "cwd":
                 console.print(f"[dim green]{values}[/dim green]")
             elif key == "scontext":
-                console.print(f"[bright_cyan]{values}[/bright_cyan]")
+                # Signature field - use bright_cyan bold
+                console.print(f"[bright_cyan bold]{values}[/bright_cyan bold]")
             else:
                 console.print(values)
         elif parsed_log.get(key) and parsed_log[key] not in ["(null)", "null", ""]:
@@ -281,13 +282,14 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{parsed_log[key]}[/green]")
             elif key == "comm":
-                console.print(f"[bright_green]{parsed_log[key]}[/bright_green]")
+                console.print(f"[green]{parsed_log[key]}[/green]")
             elif key == "pid":
                 console.print(f"[cyan]{parsed_log[key]}[/cyan]")
             elif key == "cwd":
                 console.print(f"[dim green]{parsed_log[key]}[/dim green]")
             elif key == "scontext":
-                console.print(f"[bright_cyan]{parsed_log[key]}[/bright_cyan]")
+                # Signature field - use bright_cyan bold
+                console.print(f"[bright_cyan bold]{parsed_log[key]}[/bright_cyan bold]")
             else:
                 console.print(str(parsed_log[key]))
 
@@ -312,11 +314,11 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
             console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
             # Apply professional color scheme for action fields
             if label == "Permission":
-                console.print(f"[bright_cyan]{value}[/bright_cyan]")
+                console.print(f"[bright_cyan bold]{value}[/bright_cyan bold]")
             elif label == "Syscall":
                 console.print(f"[green]{value}[/green]")
             elif label == "SELinux Mode":
-                console.print(f"[cyan bold]{value}[/cyan bold]")
+                console.print(f"[cyan]{value}[/cyan]")
             else:
                 console.print(str(value))
 
@@ -332,11 +334,11 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
                 # No highlighting for Target Path due to color bleeding
                 console.print(values, highlight=False)
             elif key == "tclass":
-                # Special highlighting for Target Class
+                # Signature field - use green bold
                 console.print(f"[green bold]{values}[/green bold]")
             elif key == "tcontext":
-                # Target SELinux context
-                console.print(f"[cyan]{values}[/cyan]")
+                # Signature field - use bright_cyan bold
+                console.print(f"[bright_cyan bold]{values}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{values}[/dim white]")
@@ -348,11 +350,11 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
                 # No highlighting for Target Path due to color bleeding
                 console.print(str(parsed_log[key]), highlight=False)
             elif key == "tclass":
-                # Special highlighting for Target Class
+                # Signature field - use green bold
                 console.print(f"[green bold]{parsed_log[key]}[/green bold]")
             elif key == "tcontext":
-                # Target SELinux context
-                console.print(f"[cyan]{parsed_log[key]}[/cyan]")
+                # Signature field - use bright_cyan bold
+                console.print(f"[bright_cyan bold]{parsed_log[key]}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{parsed_log[key]}[/dim white]")
@@ -445,19 +447,50 @@ def main():
     unique_denials = {}
     all_unparsed_types = set()
 
-    for block in log_blocks:
-        avc_denials, unparsed = parse_avc_log(block)  # Now returns list
+    # First pass: Analyze each block to determine signature strategy
+    block_analysis = {}
+    for i, block in enumerate(log_blocks):
+        avc_denials, unparsed = parse_avc_log(block)
         all_unparsed_types.update(unparsed)
         
-        # Process each AVC denial separately
+        # Group by basic signature (without permission) to detect multiple permissions per block
+        block_signatures = {}
         for parsed_log in avc_denials:
             if "permission" in parsed_log:
-                #Create a unique signature for the denial
-                signature = (
+                basic_sig = (
+                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                    parsed_log.get('tclass')
+                )
+                if basic_sig not in block_signatures:
+                    block_signatures[basic_sig] = set()
+                block_signatures[basic_sig].add(parsed_log.get('permission'))
+        
+        block_analysis[i] = {
+            'avc_denials': avc_denials,
+            'signatures_with_multiple_permissions': {sig for sig, perms in block_signatures.items() if len(perms) > 1}
+        }
+
+    # Second pass: Process with appropriate signature strategy
+    for i, block_data in block_analysis.items():
+        avc_denials = block_data['avc_denials']
+        multi_perm_sigs = block_data['signatures_with_multiple_permissions']
+        
+        for parsed_log in avc_denials:
+            if "permission" in parsed_log:
+                basic_sig = (
                     parsed_log.get('scontext'), parsed_log.get('tcontext'),
                     parsed_log.get('tclass')
                 )
                 permission = parsed_log.get('permission')
+                
+                # Decide signature strategy: include permission unless block has multiple permissions for this signature
+                if basic_sig in multi_perm_sigs:
+                    # Multiple permissions in same block -> exclude permission from signature
+                    signature = basic_sig
+                else:
+                    # Single permission in block -> include permission in signature
+                    signature = basic_sig + (permission,)
+                
                 dt_obj = parsed_log.get('datetime_obj')
                 
                 if signature in unique_denials:
