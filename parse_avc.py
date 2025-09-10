@@ -25,16 +25,20 @@ def parse_avc_log(log_block: str) -> (list, set):
         timestamp_str = timestamp_pattern.group(1).rsplit(':',1)[0]
 
         try:
-            # Try to parse as a human-readable or unix timestamps ---
+            # Try to parse as a human-readable timestamp (MM/DD/YYYY format)
             dt_object = datetime.strptime(timestamp_str, '%m/%d/%Y %H:%M:%S.%f')
         except ValueError:
             try:
-                # Fallback to parsing as a unix timestamp
-#                print(f"\nDEBUG: Extracted timestamp to parse as unix timestamp: '{timestamp_str}'")
-                dt_object = datetime.fromtimestamp(float(timestamp_str))
+                # Try to parse as ausearch -i output format (DD/MM/YY format)
+                dt_object = datetime.strptime(timestamp_str, '%d/%m/%y %H:%M:%S.%f')
             except ValueError:
-                dt_object = None # Could not parse timestamp
-#                print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
+                try:
+                    # Fallback to parsing as a unix timestamp
+#                    print(f"\nDEBUG: Extracted timestamp to parse as unix timestamp: '{timestamp_str}'")
+                    dt_object = datetime.fromtimestamp(float(timestamp_str))
+                except ValueError:
+                    dt_object = None # Could not parse timestamp
+#                    print(f"\nDEBUG: Extracted timestamp could not be parsed '{timestamp_str}'")
 
         if dt_object:
             shared_context['datetime_obj'] = dt_object
@@ -252,7 +256,9 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
             console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
             # Apply professional color scheme based on field type
             if key == "datetime_str":
-                console.print(f"[dim white]{values}[/dim white]")
+                # For timestamp, show the last seen time instead of all times
+                last_seen_str = denial_info['last_seen_obj'].strftime('%Y-%m-%d %H:%M:%S') if denial_info['last_seen_obj'] else values
+                console.print(f"[dim white]{last_seen_str}[/dim white]")
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{values}[/green]")
             elif key == "comm":
@@ -269,7 +275,9 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):
             console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
             # Apply professional color scheme based on field type
             if key == "datetime_str":
-                console.print(f"[dim white]{parsed_log[key]}[/dim white]")
+                # For timestamp, show the last seen time for consistency
+                last_seen_str = denial_info['last_seen_obj'].strftime('%Y-%m-%d %H:%M:%S') if denial_info['last_seen_obj'] else parsed_log[key]
+                console.print(f"[dim white]{last_seen_str}[/dim white]")
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{parsed_log[key]}[/green]")
             elif key == "comm":
@@ -468,7 +476,9 @@ def main():
                             unique_denials[signature][field_key].add(parsed_log[field])
                     
                     unique_denials[signature]['count'] += 1
-                    unique_denials[signature]['last_seen_obj'] = dt_obj
+                    # Only update last_seen_obj if this timestamp is newer
+                    if dt_obj and (not unique_denials[signature]['last_seen_obj'] or dt_obj > unique_denials[signature]['last_seen_obj']):
+                        unique_denials[signature]['last_seen_obj'] = dt_obj
                 else:
                     # Initialize new signature
                     denial_entry = {
