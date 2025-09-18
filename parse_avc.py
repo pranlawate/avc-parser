@@ -390,6 +390,10 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output the parsed data in JSON format.")
     args = parser.parse_args()
 
+    # Validate arguments
+    if args.json and not args.raw_file and not args.avc_file:
+        parser.error("--json requires either --raw-file or --avc-file to be specified")
+
     # Create a Rich Console instance
     console = Console()
     log_string = ""
