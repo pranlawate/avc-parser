@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import sys
 import subprocess
@@ -394,11 +395,19 @@ def main():
     if args.json and not args.raw_file and not args.avc_file:
         parser.error("--json requires either --raw-file or --avc-file to be specified")
 
+    if args.raw_file and args.avc_file:
+        parser.error("Cannot specify both --raw-file and --avc-file. Please choose one.")
+
     # Create a Rich Console instance
     console = Console()
     log_string = ""
 
     if args.raw_file:
+        # Check if raw file exists before calling ausearch
+        if not os.path.isfile(args.raw_file):
+            console.print(f"Error: Raw file not found at '{args.raw_file}'", style="bold red")
+            sys.exit(1)
+
         if not args.json:
             console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
         try:
@@ -412,14 +421,30 @@ def main():
             console.print(f"Error running ausearch: {e.stderr}", style="bold red")
             sys.exit(1)
     elif args.avc_file:
+        # Check if path exists and is a file
+        if not os.path.exists(args.avc_file):
+            console.print(f"Error: File not found at '{args.avc_file}'", style="bold red")
+            sys.exit(1)
+        elif os.path.isdir(args.avc_file):
+            console.print(f"Error: '{args.avc_file}' is a directory, not a file", style="bold red")
+            sys.exit(1)
+
         if not args.json:
             console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
         try:
-            with open(args.avc_file, 'r') as f:
+            with open(args.avc_file, 'r', encoding='utf-8') as f:
                 log_string = f.read()
         except FileNotFoundError:
             console.print(f"Error: File not found at '{args.avc_file}'", style="bold red")
-#           print(f"Error: File not found at '{args.file}'")
+            sys.exit(1)
+        except IsADirectoryError:
+            console.print(f"Error: '{args.avc_file}' is a directory, not a file", style="bold red")
+            sys.exit(1)
+        except UnicodeDecodeError:
+            console.print(f"Error: '{args.avc_file}' appears to be a binary file or has invalid encoding", style="bold red")
+            sys.exit(1)
+        except PermissionError:
+            console.print(f"Error: Permission denied reading '{args.avc_file}'", style="bold red")
             sys.exit(1)
     else:
         if not args.json:
