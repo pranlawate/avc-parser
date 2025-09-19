@@ -40,6 +40,7 @@ This tool specializes in **post-incident SELinux audit log analysis** for scenar
 - **Multiple Input Methods**: Supports raw log files, pre-processed files, or interactive input
 - **Rich Output**: Clean, formatted, color-coded summaries using the Rich library
 - **JSON Export**: Structured JSON output for integration with ML/AI applications
+- **Robust Error Handling**: Comprehensive input validation, graceful error recovery, and detailed error messages
 
 ## Upcoming Features (Planned)
 
