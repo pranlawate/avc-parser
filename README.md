@@ -1,15 +1,37 @@
-# SELinux AVC Log Parser
+# SELinux AVC Denial Analyzer
 
-A simple, standalone Python script to parse raw or pre-processed SELinux audit logs into a clean, human-readable format.
+A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
 
-## Features
+## Project Scope & Purpose
+
+### What This Tool Does
+This tool specializes in **post-incident SELinux audit log analysis** for scenarios requiring:
+- Clear correlation of complex denial patterns
+- Intelligent deduplication with occurrence tracking
+- Static log file analysis without system access
+- Professional output suitable for reporting and documentation
+
+### How This Differs from sealert
+**Complementary tool** designed for different use cases:
+
+| **sealert** | **AVC Denial Analyzer** |
+|-------------|-------------------------|
+| Real-time monitoring & policy suggestions | Post-incident log analysis & correlation |
+| Live audit socket processing | Static file analysis |
+| Policy recommendations | Clear denial summaries |
+| Daemon-based setup | Single standalone script |
+| Verbose data dumps | Professional formatted output |
+
+**Use this tool when**: You need clear analysis of audit logs from systems you can't access directly, or when sealert's real-time output becomes overwhelming.
+
+## Current Features
 
 - **Multi-line AVC Parsing**: Parses complex AVC audit log blocks containing `AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records
 - **USER_AVC Support**: Handles userspace AVC denials (e.g., D-Bus, systemd) with proper message extraction
 - **Raw Audit Log Support**: Can directly process raw `audit.log` files by internally using `ausearch` with comprehensive message types
 - **Intelligent Deduplication**: Groups identical denials and tracks occurrence counts with first/last seen timestamps
 - **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicate denials and displays them comma-separated
-- **Enhanced Path Resolution**: Uses PATH record `name` field for complete paths, falls back to `dev+inode` identifiers when paths are missing
+- **Enhanced Path Resolution**: Uses PATH record `name` field for complete paths, falls back to `dev+inode` identifiers when paths are missing *(WIP)*
 - **Comprehensive Data Extraction**: Extracts process information, security contexts, permissions, paths, and network details
 - **Denial Type Detection**: Distinguishes between Kernel AVC and Userspace AVC denials
 - **Dynamic Labeling**: Correctly labels D-Bus destinations vs network ports based on target class
@@ -18,6 +40,26 @@ A simple, standalone Python script to parse raw or pre-processed SELinux audit l
 - **Multiple Input Methods**: Supports raw log files, pre-processed files, or interactive input
 - **Rich Output**: Clean, formatted, color-coded summaries using the Rich library
 - **JSON Export**: Structured JSON output for integration with ML/AI applications
+
+## Upcoming Features (Planned)
+
+### Phase 1-3: Core Enhancements
+- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files
+- **Correlation Tracking**: Solve PID-to-resource mapping problem with individual event details
+- **Rich Display Format**: Professional responsive output with correlation events
+- **Syscall Success Tracking**: Replace generic permissive warnings with actual syscall results
+- **Dontaudit Detection**: Identify when dontaudit rules are disabled for enhanced audit mode
+
+### Phase 4-5: Quality & Documentation
+- **Comprehensive Testing**: Unit tests, integration tests, and regression testing
+- **Enhanced Documentation**: Migration guides, usage examples, and installation instructions
+
+### Phase 6-8: Advanced Features
+- **Performance Optimization**: Memory management and progress indicators for large files
+- **Extended Parsing**: Support for FANOTIFY, SELINUX_ERR, and USER_SELINUX_ERR message types
+- **Advanced UX**: Color customization, filtering capabilities, and interactive features
+
+📋 **Detailed Implementation Plan**: See [ROADMAP.md](ROADMAP.md) for comprehensive 8-phase roadmap with technical specifications and design decisions.
 
 ## Prerequisites
 
@@ -277,45 +319,22 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 - **Socket Address**: Network address information
 - **Target Class**: Object class (file, socket, dbus, etc.)
 
-## Future Scope
+## Development Roadmap
 
-The following enhancements are planned for future releases, prioritized by implementation complexity and user impact:
+This project follows a structured 8-phase development plan focusing on incremental improvements and user experience enhancements.
 
-### High Priority Improvements (Quick Wins)
-- **Extended Message Type Parsing**: Add parsing support for `FANOTIFY`, `SELINUX_ERR`, and `USER_SELINUX_ERR` message types (currently collected but not parsed)
-- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files
-- **Structured Logging**: Replace print statements with configurable logging framework
-- **Type Safety**: Full type hints throughout the codebase for better development experience
-- **Performance Optimization**: Pre-compiled regex patterns and memory-efficient stream processing
-- **Enhanced CLI**: Unified command-line interface consolidating multiple file input options
+### Implementation Strategy
+- **Phases 1-3**: Core functionality enhancements (auto-detection, correlation tracking, professional display)
+- **Phases 4-5**: Quality assurance and documentation improvements
+- **Phases 6-8**: Performance optimization and advanced features
 
-### Medium Priority Enhancements
-- **Data Validation**: Optional `--validate` flag for comprehensive parsed data validation
-- **Code Organization**: Centralized configuration module with parsing patterns and field definitions
-- **Structured Data Models**: Proper data classes (ParsedLog, DenialInfo, ProcessingStats) for better data handling
-- **Enhanced JSON Output**: Improved serialization with better string cleaning and error handling
-- **Better Error Handling**: More informative error messages and graceful failure recovery
+### Key Focus Areas
+- **Forensic Accuracy**: Enhanced correlation tracking and syscall success monitoring
+- **User Experience**: Professional responsive output and simplified command-line interface
+- **Robustness**: Comprehensive testing, input validation, and error handling
+- **Extensibility**: Support for additional message types and export formats
 
-### Development Quality Improvements
-- **Pre-commit Hooks**: Automated code quality checks with black, isort, flake8, and mypy
-- **Code Quality Tools**: Automatic fixes for unused imports, missing docstrings, and type annotations
-- **Package Structure**: Proper Python packaging with requirements.txt and setup.py
-- **Unit Testing**: Comprehensive test suite with pytest framework
-- **Quality Automation**: Automated code quality validation scripts
-
-### Advanced Features (Future Releases)
-- **Audit2allow Integration**: Direct integration with audit2allow tool for policy generation
-- **Live Monitoring**: Real-time log monitoring with `--follow` flag
-- **Context Translation**: Human-readable SELinux context descriptions
-- **Event Correlation**: Detection of denial bursts and patterns over time
-- **Process Tracking**: Cross-denial process analysis and behavior patterns
-- **Multiple Output Formats**: CSV, HTML, and XML report generation options
-- **Custom Parsing Rules**: User-configurable parsing patterns and field extraction
-- **Interactive Analysis**: Terminal UI interface for complex analysis workflows
-- **Performance Scaling**: Parallel processing and distributed analysis support
-- **Machine Learning Integration**: Anomaly detection and pattern recognition
-- **Policy Recommendation**: AI-powered SELinux policy suggestions
-- **Dashboard Integration**: Web-based visualization and monitoring interface
+🗺️ **Complete Development Plan**: See [ROADMAP.md](ROADMAP.md) for detailed implementation phases, technical specifications, design decisions, and strategic positioning analysis.
 
 ## Contributing
 
