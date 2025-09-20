@@ -46,22 +46,26 @@ This tool specializes in **post-incident SELinux audit log analysis** for scenar
 
 ## Upcoming Features (Planned)
 
-### Phase 2-3: Core Enhancements
+### Phase 2: Event Assembly & Correlation Tracking
 - **Correlation Tracking**: Solve PID-to-resource mapping problem with individual event details
-- **Rich Display Format**: Professional responsive output with correlation events
-- **Syscall Success Tracking**: Replace generic permissive warnings with actual syscall results
-- **Dontaudit Detection**: Identify when dontaudit rules are disabled for enhanced audit mode
+- **Enhanced Record Types**: Support AVC, USER_AVC, AVC_PATH, 1400, 1107 message types
+- **Permission Semantic Analysis**: Human-readable permission descriptions and contextual analysis
+- **Syscall Success Tracking**: Actual syscall results and exit codes
+- **Basic Dontaudit Detection**: Identify when dontaudit rules are disabled
 
-### Phase 4-5: Quality & Documentation
+### Phase 3: Rich Display Format
+- **Professional Output**: Responsive Rich-based formatting with correlation events
+- **Legacy Compatibility**: `--legacy-format` flag preserves current behavior
+- **Smart Sorting**: Recent-first default, count-based, and chronological options
+- **Enhanced Status Indicators**: Clear BLOCKED/ALLOWED status based on syscall results
+
+### Phase 4-6: Quality & Performance
 - **Comprehensive Testing**: Unit tests, integration tests, and regression testing
 - **Enhanced Documentation**: Migration guides, usage examples, and installation instructions
-
-### Phase 6-8: Advanced Features
 - **Performance Optimization**: Memory management and progress indicators for large files
-- **Extended Parsing**: Support for FANOTIFY, SELINUX_ERR, and USER_SELINUX_ERR message types
-- **Advanced UX**: Color customization, filtering capabilities, and interactive features
+- **Practical Filtering**: Process, path, time range, and context filtering capabilities
 
-📋 **Detailed Implementation Plan**: See [ROADMAP.md](ROADMAP.md) for comprehensive 8-phase roadmap with technical specifications and design decisions.
+📋 **Detailed Implementation Plan**: See [ROADMAP.md](ROADMAP.md) for focused implementation roadmap with technical specifications and design decisions.
 
 ## Prerequisites
 
@@ -112,7 +116,14 @@ python3 parse_avc.py
 # Paste your log and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
 ```
 
-### Option D: JSON Output
+### Option D: Auto-Detection (NEW!)
+Single flag that automatically detects file format:
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log
+python3 parse_avc.py --file avc_denials.log
+```
+
+### Option E: JSON Output
 Add `--json` flag for machine-readable output:
 ```bash
 python3 parse_avc.py --raw-file /var/log/audit/audit.log --json
@@ -289,6 +300,7 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 
 | Option | Description |
 |--------|-------------|
+| `-f, --file` | Path to any audit file (auto-detects format) |
 | `-rf, --raw-file` | Path to a raw audit.log file |
 | `-af, --avc-file` | Path to a pre-processed AVC file |
 | `--json` | Output in JSON format |
@@ -323,20 +335,21 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 
 ## Development Roadmap
 
-This project follows a structured 8-phase development plan focusing on incremental improvements and user experience enhancements.
+This project follows a focused development plan prioritizing core audit analysis capabilities over feature complexity.
 
 ### Implementation Strategy
-- **Phases 1-3**: Core functionality enhancements (auto-detection, correlation tracking, professional display)
-- **Phases 4-5**: Quality assurance and documentation improvements
-- **Phases 6-8**: Performance optimization and advanced features
+- **Phase 1**: Core foundation and input validation ✅ COMPLETED
+- **Phase 2**: Event assembly and correlation tracking
+- **Phase 3**: Rich display format implementation
+- **Phases 4-6**: Testing, documentation, and performance optimization
 
 ### Key Focus Areas
-- **Forensic Accuracy**: Enhanced correlation tracking and syscall success monitoring
-- **User Experience**: Professional responsive output and simplified command-line interface
-- **Robustness**: Comprehensive testing, input validation, and error handling
-- **Extensibility**: Support for additional message types and export formats
+- **Correlation Clarity**: Solve PID-to-resource mapping problem completely
+- **Professional Output**: Rich-based responsive format across all terminal sizes
+- **Forensic Accuracy**: Syscall success/failure tracking and semantic analysis
+- **Practical Value**: Focus on real-world audit analysis scenarios
 
-🗺️ **Complete Development Plan**: See [ROADMAP.md](ROADMAP.md) for detailed implementation phases, technical specifications, design decisions, and strategic positioning analysis.
+🗺️ **Complete Development Plan**: See [ROADMAP.md](ROADMAP.md) for streamlined implementation phases focused on delivering maximum value through core functionality.
 
 ## Contributing
 
