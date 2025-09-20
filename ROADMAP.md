@@ -1,14 +1,14 @@
 # AVC Parser Enhancement Roadmap
 
-This document contains the comprehensive implementation plan for enhancing the AVC parser with auto-detection, correlation tracking, Rich Rule display format, and numerous other improvements.
+This document contains the focused implementation plan for enhancing the AVC parser with auto-detection, correlation tracking, and semantic analysis capabilities.
 
 ## Overview
 
-This roadmap was developed through extensive analysis of current limitations and user experience issues. The plan addresses:
+This roadmap addresses core limitations identified through analysis of user needs and real-world audit analysis scenarios:
 - **Correlation Loss Problem**: Current deduplication loses PID-to-resource mapping (e.g., can't tell which PID maps to which target path)
 - **Argument Logic Issues**: Edge cases with conflicting arguments, binary files, directory inputs
 - **Display Format Limitations**: Current verbose format doesn't scale well across terminal sizes
-- **User Experience**: Need for auto-detection, sorting options, and focus capabilities
+- **User Experience**: Need for auto-detection, semantic understanding, and focus capabilities
 
 ## Design Decisions Made
 
@@ -17,11 +17,11 @@ This roadmap was developed through extensive analysis of current limitations and
 ```
 ─────────── Unique Denial #1 • 2 occurrences • last seen 2 weeks ago ───────────
 system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0
-Denied read, write on file
+Denied read (Read file content), write (Modify file content) on file
 
 Events:
-• PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing]
-• PID 5678 (httpd-worker) denied 'write' to file /var/www/html/file2.html [Permissive]
+• PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
+• PID 5678 (httpd-worker) denied 'write' to file /var/www/html/file2.html [Permissive] ✓ ALLOWED
 ```
 
 **Why Selected:**
@@ -30,9 +30,6 @@ Events:
 - Better copy-paste compatibility
 - Integrates with existing color theme
 - Automatic ASCII fallback built-in
-
-**Alternative Considered:** Manual line separators, tabular format, header styles with ASCII characters
-**Key Decision:** Keep "Unique Denial" terminology for semantic clarity
 
 ### 2. Correlation Tracking Approach
 **Solution:** Store individual event correlations alongside aggregated data
@@ -59,14 +56,14 @@ correlations = [
 - Existing `print_summary()` function kept intact
 - Smooth migration path for existing users/scripts
 
-### 5. Color Theme Integration
-- Continue professional green/cyan/white palette
-- Rich Rule styling based on denial characteristics
-- Context-aware formatting for different target classes
+### 5. Semantic Analysis (Policy-Independent)
+- Human-readable permission descriptions using static mappings
+- Context intelligence based on object class + permission combinations
+- No policy file access required - works with audit logs alone
 
 ## Implementation Plan
 
-### PHASE 1: Core Foundation & Quick Fixes
+### PHASE 1: Core Foundation & Quick Fixes ✅ COMPLETED
 
 #### 1A. Immediate Code Quality & Input Validation ✅ COMPLETED
 - [x] **Code documentation**: Add docstrings and inline comments for maintainability
@@ -85,22 +82,28 @@ correlations = [
 - [x] Maintain backward compatibility with existing `--raw-file` and `--avc-file` flags
 
 ### PHASE 2: Event Assembly & Correlation Tracking
+
 #### 2A. Event Assembly Foundation
-- [ ] **Implement Event Assembly Logic**: Adopt setroubleshoot's event-based correlation approach with time-based caching
-- [ ] **Event Caching System**: 5ms TTL cache for proper AVC+SYSCALL+PATH record correlation
+- [ ] **Implement Event Assembly Logic**: Adopt setroubleshoot's event-based correlation approach with temporal grouping by event ID
 - [ ] **AvcContext Class**: Implement proven SELinux context parsing from setroubleshoot
 - [ ] **Enhanced Record Types**: Support AVC, USER_AVC, AVC_PATH, 1400, 1107 message types
 - [ ] **End-of-Event Handling**: Proper EOE record processing for complete event assembly
 
-#### 2B. Correlation Data Implementation
+#### 2B. Correlation Data Implementation & Semantic Enhancement
 - [ ] Design correlation data structure to store individual event details
 - [ ] Implement correlation storage alongside existing aggregated data
 - [ ] Track all varying fields: pid, comm, exe, proctitle, path, dest_port, saddr, permission, permissive
 - [ ] **Enhanced SYSCALL parsing**: Extract success/failure and exit codes (requires event assembly)
 - [ ] **Add syscall success/failure to correlation data structure**
 - [ ] **Track exit codes alongside other varying fields**
-- [ ] **Add dontaudit detection logic to denial analysis (noatsecure/rlimitinh/siginh trio)**
+- [ ] **Add basic dontaudit detection logic (noatsecure/rlimitinh/siginh trio)**
 - [ ] **Track dontaudit status in correlation data structure**
+- [ ] **Permission Semantic Analysis**: Add human-readable permission descriptions and contextual analysis
+  - Implement permission semantic mappings (read → "Read file content", name_connect → "Connect to network service")
+  - Add object class + permission contextual intelligence (file+read → "Reading file content", tcp_socket+name_connect → "Connecting to network service")
+  - Basic SELinux context field parsing (user:role:type:level extraction)
+  - Integrate semantic enrichment into display output without replacing raw permissions
+  - Add target analysis for common SELinux types (port types, file types, process types)
 - [ ] Maintain existing aggregated sets for backward compatibility
 - [ ] Update deduplication logic to preserve correlation information
 - [ ] **Enable BLOCKED/ALLOWED status determination logic**
@@ -116,8 +119,7 @@ correlations = [
 - [ ] Preserve "Unique Denial" terminology for semantic clarity
 - [ ] **Implement syscall success indicators (✓ ALLOWED, ✗ BLOCKED) in event display**
 - [ ] **Add color coding for success/failure status**
-- [ ] **Add dontaudit disabled indicator to denial headers when detected**
-- [ ] **Include informational message about enhanced audit mode**
+- [ ] **Add basic dontaudit disabled indicator to denial headers when detected**
 
 #### 3B. Advanced Display Features
 - [ ] Implement detailed view (`-d/--detailed`) with tree structure sub-details
@@ -126,12 +128,11 @@ correlations = [
 - [ ] Implement sorting options: default (recent first), `--sort count` (frequency first), `--sort chrono` (oldest first)
 - [ ] **Enhanced detailed mode with syscall results, exit codes**
 - [ ] **Smart status determination based on success + permissive correlation**
-- [ ] **Optional strengthening detection heuristics for dontaudit (frequency, clustering, patterns)**
-- [ ] **Configurable sensitivity for additional dontaudit indicators**
-- [ ] **Add focus/filtering capabilities** *(Note: Revisit and finalize approach during implementation based on code state at that time)*
-  - Consider: `--focus <id>`, `--process <name>`, `--path <pattern>`, `--frequent <threshold>`, `--recent <timeframe>`
-  - Evaluate: Denial ID selection vs. pattern-based filtering vs. hybrid approach
-  - Assess: Implementation complexity based on correlation tracking and display format changes
+- [ ] **Add practical filtering capabilities**:
+  - `--process <name>`: Filter by process name
+  - `--path <pattern>`: Filter by path pattern
+  - `--recent <timeframe>`: Show only recent denials
+  - `--context <pattern>`: Filter by security context pattern
 
 ### PHASE 4: Testing & Validation
 - [ ] **Unit tests**: Add comprehensive test suite for new features
@@ -153,49 +154,24 @@ correlations = [
 - [ ] **Usage examples**: Add examples showing auto-detection, detailed mode, legacy format
 - [ ] **Migration guide**: Help users transition from old argument style to new format
 - [ ] **Version management**: Update version strings and changelog
-- [ ] **Document what dontaudit disabled means for audit analysis**
-- [ ] **Explain why certain denials appear when dontaudit is disabled**
+- [ ] **Document dontaudit detection**: Explain what it means for audit analysis
 - [ ] **Installation instructions**: Update for new dependencies and installation methods
 
-### PHASE 6: Performance & Robustness
+### PHASE 6: Performance & Practical Extensions
+
+#### 6A. Performance Optimization
 - [ ] **Memory management**: Optimize for very large audit log files
 - [ ] **Performance benchmarks**: Measure impact of correlation tracking
 - [ ] **Progress indicators**: Show progress for large file processing
 - [ ] **Graceful degradation**: Handle terminal capability limitations
-- [ ] **Performance documentation**: Document behavior with large log files
 
-### PHASE 7: Extended Features (Future Enhancements)
-
-#### 7A. Architecture Improvements
-- [ ] **Structured Logging**: Replace print statements with configurable logging framework
-  - Add verbosity control (`-v`, `-q`, `--debug`)
-  - Separate user output from debug/error logging
-  - Clean JSON output (logs to stderr, JSON to stdout)
-- [ ] **Type Safety**: Add full type hints throughout the codebase
-- [ ] **Configuration File**: Support for user preferences and default settings
-
-#### 7B. Feature Extensions
-- [ ] **Extended Message Type Parsing**: Add support for `FANOTIFY`, `SELINUX_ERR`, and `USER_SELINUX_ERR` message types
+#### 6B. Practical Feature Extensions
 - [ ] **Time Range Filtering**: Filter denials by date/time ranges
-- [ ] **Context-Aware Grouping**: Group related denials by process or target
-- [ ] **Enhanced Export Formats**: CSV, Excel, SIEM integration for management reporting
-- [ ] **Filtering capabilities**: Filter by source context, target context, process name
 - [ ] **Statistics mode**: Show denial frequency statistics and trends
+- [ ] **Enhanced JSON export**: Include semantic analysis in JSON output
+- [ ] **Basic reporting**: Simple summary statistics for management reports
 
-#### 7C. Advanced UX Features
-- [ ] **Color customization**: Allow users to customize color themes
-- [ ] **Output formatting options**: Add compact vs. verbose modes
-- [ ] **Shell completion**: Add bash/zsh completion support for new arguments
-- [ ] **Interactive Query Interface**: Advanced filtering and search capabilities
-
-#### 7D. Innovation Opportunities (Research Phase)
-- [ ] **Timeline Analysis**: Temporal pattern visualization for attack progression and burst detection
-- [ ] **Denial Context Intelligence**: Process ancestry, session context, container/namespace awareness
-- [ ] **Cross-System Correlation**: Multi-host audit log analysis capabilities
-- [ ] **Performance Impact Analysis**: System impact visualization and I/O blocking analysis
-- [ ] **Security Pattern Detection**: Automated attack pattern recognition and correlation
-
-### PHASE 8: Development & Distribution
+### PHASE 7: Development Infrastructure
 - [ ] **Development setup**: Instructions for contributors
 - [ ] **Linting configuration**: Set up code style enforcement
 - [ ] **Release process**: Document release procedure and version management
@@ -225,21 +201,16 @@ correlations = [
 ### setroubleshoot Analysis Insights
 **Adopted Improvements:**
 - **Enhanced Regex Pattern**: More robust audit record parsing with node= and type= prefix support
-- **Event Assembly Logic**: Time-based caching system for proper record correlation
+- **Event Assembly Logic**: Temporal grouping system for proper record correlation (simplified from complex caching)
 - **AvcContext Class**: Proven SELinux context parsing and field extraction
 - **Extended Record Types**: Support for additional message types (AVC_PATH, 1400, 1107)
+- **Permission Semantic Analysis**: Static permission mappings and contextual intelligence (no policy file required)
 
 **Strategic Positioning:**
 - **Complementary Tool**: Post-incident analysis vs real-time monitoring
 - **File-focused**: Static log analysis vs socket-based streaming
 - **Correlation Clarity**: PID-to-resource mapping vs policy recommendations
 - **Professional Output**: Clean summaries vs verbose data dumps
-
-**Innovation Opportunities Identified:**
-- Timeline analysis and attack progression visualization
-- Denial context intelligence with process ancestry
-- Cross-system correlation for distributed environments
-- Performance impact analysis and system behavior correlation
 
 ### Rich Library Features to Leverage
 - **Automatic Width Management**: No manual terminal width calculations
@@ -248,19 +219,14 @@ correlations = [
 - **Character Customization**: Different line styles for different denial types
 - **Terminal Capability Detection**: Unicode support with ASCII fallback
 
-### Format Comparison Analysis
-- **Line Separator vs Header Style**: Line separator wins on terminal responsiveness, accessibility, color theming, tool integration
-- **Unicode vs ASCII**: Unicode preferred with automatic ASCII fallback
-- **Tabular vs Card Format**: Card format better for variable-length content
-
 ### Display Format Examples
 
 #### Compact View (Default):
 ```
 ─────────── Unique Denial #1 • 2 occurrences • last seen 2 weeks ago ───────────
-ℹ️  DONTAUDIT DISABLED: Enhanced audit mode detected (noatsecure trio present)
+ℹ️  DONTAUDIT DISABLED: Enhanced audit mode detected
 system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0
-Denied read, write on file
+Denied read (Read file content), write (Modify file content) on file
 
 Events:
 • PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
@@ -270,26 +236,29 @@ Events:
 #### Detailed View (`-d/--detailed`):
 ```
 ─────────── Unique Denial #1 • 2 occurrences • last seen 2 weeks ago ───────────
-ℹ️  DONTAUDIT DISABLED: Enhanced audit mode detected (noatsecure trio present)
+ℹ️  DONTAUDIT DISABLED: Enhanced audit mode detected
 system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0
-Denied read, write on file
+  └─ Source: Web server process (httpd_t) | Target: Default file context (default_t)
+Denied read (Read file content), write (Modify file content) on file
 Timeframe: 2025-09-04 18:19:00 → 2025-09-04 18:19:00
 
 Detailed Events:
 • PID 1234 (httpd) [/usr/sbin/httpd] denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
   ├─ Syscall: openat | Result: failed | Exit: EACCES | Time: 18:19:00.303
+  ├─ Analysis: Web server attempting to read website content
   └─ Proctitle: /usr/sbin/httpd -DFOREGROUND
 
 • PID 5678 (httpd-worker) [/usr/sbin/httpd] denied 'write' to file /var/www/html/file2.html [Permissive] ✓ ALLOWED
   ├─ Syscall: openat | Result: succeeded | Exit: 0 | Time: 18:19:00.303
+  ├─ Analysis: Web server attempting to modify website content
   └─ Proctitle: /usr/sbin/httpd -DFOREGROUND
 ```
 
 ## Current Implementation Focus
 
-**Phases 1-5**: Auto-detection + Correlation + Rich Display + Testing + Documentation
-
-**Future Enhancements**: Phases 6-8 (Performance + Extended Features + Development Infrastructure)
+**Phases 1-5**: Core functionality complete implementation
+**Phase 6**: Performance and practical extensions
+**Phase 7**: Development infrastructure
 
 ## Key Benefits Expected
 
@@ -302,7 +271,19 @@ Detailed Events:
 7. **Forensic Accuracy**: Syscall success/failure tracking shows actual system behavior
 8. **Security Context**: Dontaudit detection helps interpret audit log significance and volume
 9. **Actionable Information**: Clear distinction between blocked vs allowed actions
+10. **Semantic Intelligence**: Human-readable permission descriptions and contextual analysis without requiring policy files
+
+## Future Research Ideas (Not Committed Features)
+
+These ideas are preserved for potential future exploration but are not part of the committed roadmap:
+
+- **Timeline Analysis**: Temporal pattern visualization for attack progression
+- **Cross-System Correlation**: Multi-host audit log analysis capabilities
+- **Advanced Pattern Detection**: Machine learning for attack pattern recognition
+- **Interactive Query Interface**: GUI/TUI for complex filtering
+- **Performance Impact Analysis**: System behavior correlation
+- **Container/Namespace Awareness**: Modern deployment context understanding
 
 ---
 
-*This roadmap serves as the definitive guide for AVC parser enhancements and should be referenced throughout implementation to maintain consistency with design decisions and user experience goals.*
+*This roadmap serves as the definitive guide for AVC parser enhancements focused on delivering maximum value through core audit analysis capabilities.*

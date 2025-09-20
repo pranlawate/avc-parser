@@ -23,6 +23,22 @@ from datetime import datetime
 from rich.console import Console
 from rich.rule import Rule
 
+# Configuration constants
+MAX_FILE_SIZE_MB = 100
+FILE_ANALYSIS_LINES = 10
+
+
+def print_error(message: str, console: Console = None):
+    """
+    Print error message to stderr using Rich formatting.
+
+    Args:
+        message (str): Error message to print
+        console (Console): Optional console instance for additional non-error output
+    """
+    error_console = Console(stderr=True)
+    error_console.print(message)
+
 
 def signal_handler(signum, frame):  # pylint: disable=unused-argument
     """
@@ -43,8 +59,9 @@ def signal_handler(signum, frame):  # pylint: disable=unused-argument
 
 # Enhanced audit record regex pattern from setroubleshoot for robust parsing
 # Handles: (node=XXX )?(type=XXX )?(msg=)?audit(timestamp:serial): body
+# Modified to handle optional whitespace before colon: ") :" or "):"
 AUDIT_RECORD_RE = re.compile(
-    r'(node=(\S+)\s+)?(type=(\S+)\s+)?(msg=)?audit\(((\d+)\.(\d+):(\d+))\):\s*(.*)'
+    r'(node=(\S+)\s+)?(type=(\S+)\s+)?(msg=)?audit\(((\d+)\.(\d+):(\d+))\)\s*:\s*(.*)'
 )
 
 
@@ -99,39 +116,23 @@ def detect_file_format(file_path: str) -> str:
             # Read first few lines for analysis
             lines = []
             for i, line in enumerate(f):
-                if i >= 10:  # Analyze first 10 lines
+                if i >= FILE_ANALYSIS_LINES:
                     break
                 lines.append(line.strip())
 
-        # Check for pre-processed patterns
-        pre_processed_indicators = 0
-        raw_indicators = 0
+        # Read more content to check for ausearch output markers
+        content_sample = '\n'.join(lines)
 
-        for line in lines:
-            if not line:
-                continue
+        # Definitive pre-processed indicators (ausearch output)
+        has_time_headers = 'time->' in content_sample
+        has_separators = '----' in content_sample
+        has_human_timestamps = bool(re.search(r'\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}', content_sample))
 
-            # Pre-processed indicators
-            if re.search(r'type=AVC.*msg=audit\(.*\):', line):
-                pre_processed_indicators += 1
-
-            # Human-readable timestamp patterns (ausearch -i output)
-            if re.search(r'\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}', line):
-                pre_processed_indicators += 1
-
-            # Raw audit.log indicators
-            # Unix timestamp pattern: audit(1234567890.123:456)
-            if re.search(r'audit\(\d{10}\.\d{3}:\d+\)', line):
-                raw_indicators += 1
-
-            # Missing type= prefix (common in raw logs)
-            if re.search(r'^audit\(\d{10}\.\d{3}:\d+\):', line):
-                raw_indicators += 1
-
-        # Decision logic
-        if pre_processed_indicators > raw_indicators:
+        # If any ausearch marker is present, it's definitely pre-processed
+        if has_time_headers or has_separators or has_human_timestamps:
             return 'processed'
         else:
+            # No ausearch markers = raw audit.log format
             return 'raw'
 
     except (FileNotFoundError, PermissionError, UnicodeDecodeError):
@@ -468,9 +469,6 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                     avc_data['proctitle'] = avc_data['comm']
 
                 avc_denials.append(avc_data)
-#                print(f" [DEBUG] Parsed AVC: {avc_data}")  # DEBUG
-
-#    print(f" [DEBUG] Found {len(avc_denials)} AVC denials in this block")  # DEBUG
     return avc_denials, unparsed_types
 
 
@@ -734,27 +732,29 @@ def validate_arguments(args, console: Console) -> str:
     file_args_count = sum(1 for arg in file_args if arg is not None)
 
     if file_args_count > 1:
-        console.print("❌ [bold red]Error: Conflicting Arguments[/bold red]")
-        console.print("   Cannot specify multiple file arguments simultaneously.")
-        console.print("   [dim]Choose one input method:[/dim]")
-        console.print("   • [cyan]--file[/cyan] for auto-detection (recommended)")
-        console.print("   • [cyan]--raw-file[/cyan] for raw audit.log files")
-        console.print("   • [cyan]--avc-file[/cyan] for pre-processed ausearch output")
+        # Use stderr for error messages so tests can capture them
+        error_console = Console(stderr=True)
+        error_console.print("❌ [bold red]Error: Conflicting Arguments[/bold red]")
+        error_console.print("   Cannot specify multiple file arguments simultaneously.")
+        error_console.print("   [dim]Choose one input method:[/dim]")
+        error_console.print("   • [cyan]--file[/cyan] for auto-detection (recommended)")
+        error_console.print("   • [cyan]--raw-file[/cyan] for raw audit.log files")
+        error_console.print("   • [cyan]--avc-file[/cyan] for pre-processed ausearch output")
         sys.exit(1)
 
     # Validate JSON flag requirements
     if args.json and file_args_count == 0:
-        console.print("❌ [bold red]Error: Missing Required Arguments[/bold red]")
-        console.print("   --json flag requires a file input to process.")
-        console.print("   [dim]Valid combinations:[/dim]")
-        console.print("   • [cyan]--json --file audit.log[/cyan] (recommended)")
-        console.print("   • [cyan]--json --raw-file audit.log[/cyan]")
-        console.print("   • [cyan]--json --avc-file processed.log[/cyan]")
+        print_error("❌ [bold red]Error: Missing Required Arguments[/bold red]")
+        print_error("   --json flag requires a file input to process.")
+        print_error("   [dim]Valid combinations:[/dim]")
+        print_error("   • [cyan]--json --file audit.log[/cyan] (recommended)")
+        print_error("   • [cyan]--json --raw-file audit.log[/cyan]")
+        print_error("   • [cyan]--json --avc-file processed.log[/cyan]")
         sys.exit(1)
 
     # Handle new --file argument with auto-detection
     if args.file:
-        return validate_file_with_auto_detection(args.file, console)
+        return validate_file_with_auto_detection(args.file, console, quiet=args.json)
 
     # Validate raw file if provided
     elif args.raw_file:
@@ -774,7 +774,7 @@ def validate_arguments(args, console: Console) -> str:
         return 'interactive'
 
 
-def validate_file_with_auto_detection(file_path: str, console: Console) -> str:
+def validate_file_with_auto_detection(file_path: str, console: Console, quiet: bool = False) -> str:
     """
     Validate file and auto-detect format type (raw vs pre-processed).
 
@@ -804,12 +804,12 @@ def validate_file_with_auto_detection(file_path: str, console: Console) -> str:
 
         file_size = os.path.getsize(file_path)
         if file_size == 0:
-            console.print(f"❌ [bold red]Error: Empty File[/bold red]")
-            console.print(f"   File is empty: [cyan]{file_path}[/cyan]")
-            console.print("   [dim]Please provide a file with audit log content.[/dim]")
+            print_error(f"❌ [bold red]Error: Empty File[/bold red]")
+            print_error(f"   File is empty: [cyan]{file_path}[/cyan]")
+            print_error("   [dim]Please provide a file with audit log content.[/dim]")
             sys.exit(1)
 
-        if file_size > 100 * 1024 * 1024:  # 100MB limit
+        if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
             console.print(f"⚠️  [bold yellow]Warning: Large File Detected[/bold yellow]")
             console.print(f"   File size: {file_size / (1024*1024):.1f}MB")
             console.print("   [dim]Processing may take some time...[/dim]")
@@ -817,7 +817,7 @@ def validate_file_with_auto_detection(file_path: str, console: Console) -> str:
         # Auto-detect format type
         detected_format = detect_file_format(file_path)
 
-        if not console.quiet if hasattr(console, 'quiet') else False:
+        if not quiet:
             if detected_format == 'raw':
                 console.print(f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format")
                 console.print(f"   Will process using ausearch: [cyan]{file_path}[/cyan]")
@@ -891,6 +891,11 @@ def validate_raw_file(file_path: str, console: Console) -> str:
         console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Raw audit files should be text files. Please check the file format.[/dim]")
+        sys.exit(1)
+    except PermissionError:
+        print_error(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        print_error(f"   Cannot read file: [cyan]{file_path}[/cyan]")
+        print_error("   [dim]Please check file permissions or run with appropriate privileges.[/dim]")
         sys.exit(1)
 
     return 'raw_file'
@@ -1034,19 +1039,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
             log_string = result.stdout
         except FileNotFoundError:
-            console.print("❌ [bold red]Error: ausearch Command Not Found[/bold red]")
-            console.print("   The 'ausearch' command is required for processing raw audit files.")
-            console.print("   [dim]Please install the audit package:[/dim]")
-            console.print("   • [cyan]sudo dnf install audit[/cyan] (Fedora/RHEL)")
-            console.print("   • [cyan]sudo apt install auditd[/cyan] (Ubuntu/Debian)")
+            print_error("❌ [bold red]Error: ausearch Command Not Found[/bold red]")
+            print_error("   The 'ausearch' command is required for processing raw audit files.")
+            print_error("   [dim]Please install the audit package:[/dim]")
+            print_error("   • [cyan]sudo dnf install audit[/cyan] (Fedora/RHEL)")
+            print_error("   • [cyan]sudo apt install auditd[/cyan] (Ubuntu/Debian)")
             sys.exit(1)
         except subprocess.CalledProcessError as e:
-            console.print("❌ [bold red]Error: ausearch Command Failed[/bold red]")
-            console.print(f"   ausearch returned an error: [dim]{e.stderr.strip()}[/dim]")
-            console.print("   [dim]This may indicate:[/dim]")
-            console.print("   • File contains no AVC records")
-            console.print("   • File format is not compatible with ausearch")
-            console.print("   • Audit log file is corrupted")
+            print_error("❌ [bold red]Error: ausearch Command Failed[/bold red]")
+            print_error(f"   ausearch returned an error: [dim]{e.stderr.strip()}[/dim]")
+            print_error("   [dim]This may indicate:[/dim]")
+            print_error("   • File contains no AVC records")
+            print_error("   • File format is not compatible with ausearch")
+            print_error("   • Audit log file is corrupted")
             sys.exit(1)
     elif input_type == 'avc_file':
         # Determine the correct file path (could be from --file or --avc-file)
@@ -1073,18 +1078,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             console.print("\n📄 [dim]Input completed (EOF received)[/dim]")
             log_string = ""
 
-#   --- Split, De-duplicate, and Process Logic ---
-# Old logic commented as it didn't look inside the block to remove time-> added by ausearch
+    # Split log into blocks using '----' separator
     log_blocks = [block.strip() for block in log_string.split('----') if block.strip()]
-
-# New logic trying to find and remove 'time->' if present in the log
-#    log_blocks_raw = log_string.split('----')
-
-#    log_blocks = []
-#    for block in log_blocks_raw:
-#        clean_lines = [line for line in block.strip().split('\n') if not line.strip().startswith('time->')]
-#        if clean_lines:
-#            log_blocks.append("\n".join(clean_lines))
     if not log_blocks:
         if not args.json:
             console.print("Error: No valid log blocks found.", style="bold red")
@@ -1274,8 +1269,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
             output_list.append(json_denial)
 
+        # Create structured JSON output with summary
+        total_events = sum(denial['count'] for denial in unique_denials.values())
+        json_structure = {
+            'unique_denials': output_list,
+            'summary': {
+                'total_events': total_events,
+                'unique_denials_count': len(unique_denials),
+                'log_blocks_processed': len(valid_blocks)
+            }
+        }
+
         try:
-            json_output = json.dumps(output_list, indent=2, ensure_ascii=False)
+            json_output = json.dumps(json_structure, indent=2, ensure_ascii=False)
             print(json_output)
         except (TypeError, ValueError) as e:
             console.print(f"Error generating JSON: {e}", style="bold red")
