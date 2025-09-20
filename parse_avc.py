@@ -41,6 +41,105 @@ def signal_handler(signum, frame):  # pylint: disable=unused-argument
     sys.exit(130)  # Standard exit code for Ctrl+C interruption
 
 
+# Enhanced audit record regex pattern from setroubleshoot for robust parsing
+# Handles: (node=XXX )?(type=XXX )?(msg=)?audit(timestamp:serial): body
+AUDIT_RECORD_RE = re.compile(
+    r'(node=(\S+)\s+)?(type=(\S+)\s+)?(msg=)?audit\(((\d+)\.(\d+):(\d+))\):\s*(.*)'
+)
+
+
+def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
+    """
+    Parse audit record using enhanced setroubleshoot regex pattern.
+
+    Args:
+        input_line (str): Raw audit log line to parse
+
+    Returns:
+        tuple[bool, str, str, str, str]: (parse_succeeded, host, record_type, event_id, body_text)
+            - parse_succeeded: True if line matches audit record format
+            - host: Node hostname if present (or None)
+            - record_type: Record type (AVC, USER_AVC, SYSCALL, etc.) if present
+            - event_id: Complete event ID (timestamp:serial) if present
+            - body_text: Message body after event ID
+
+    Note:
+        Enhanced pattern handles edge cases like node= prefixes, optional msg=,
+        and various audit record formats found in real-world logs.
+    """
+    match = AUDIT_RECORD_RE.search(input_line)
+    if match is None:
+        return False, None, None, None, None
+
+    host = match.group(2) if match.group(2) else None
+    record_type = match.group(4) if match.group(4) else None
+    event_id = match.group(6) if match.group(6) else None
+    body_text = match.group(10) if match.group(10) else None
+
+    return True, host, record_type, event_id, body_text
+
+
+def detect_file_format(file_path: str) -> str:
+    """
+    Analyze file content to detect if it's raw audit.log or pre-processed format.
+
+    Args:
+        file_path (str): Path to the file to analyze
+
+    Returns:
+        str: 'raw' for raw audit.log format, 'processed' for pre-processed format
+
+    Note:
+        Detection logic:
+        - Pre-processed: Contains 'type=AVC msg=audit(...)' patterns with human-readable timestamps
+        - Raw: Contains audit records without 'type=' prefix or with binary timestamps
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # Read first few lines for analysis
+            lines = []
+            for i, line in enumerate(f):
+                if i >= 10:  # Analyze first 10 lines
+                    break
+                lines.append(line.strip())
+
+        # Check for pre-processed patterns
+        pre_processed_indicators = 0
+        raw_indicators = 0
+
+        for line in lines:
+            if not line:
+                continue
+
+            # Pre-processed indicators
+            if re.search(r'type=AVC.*msg=audit\(.*\):', line):
+                pre_processed_indicators += 1
+
+            # Human-readable timestamp patterns (ausearch -i output)
+            if re.search(r'\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}', line):
+                pre_processed_indicators += 1
+
+            # Raw audit.log indicators
+            # Unix timestamp pattern: audit(1234567890.123:456)
+            if re.search(r'audit\(\d{10}\.\d{3}:\d+\)', line):
+                raw_indicators += 1
+
+            # Missing type= prefix (common in raw logs)
+            if re.search(r'^audit\(\d{10}\.\d{3}:\d+\):', line):
+                raw_indicators += 1
+
+        # Decision logic
+        if pre_processed_indicators > raw_indicators:
+            return 'processed'
+        else:
+            return 'raw'
+
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
+        # Default to processed format if we can't read the file
+        # The file validation will catch and handle the actual error
+        return 'processed'
+
+
 def validate_log_entry(log_block: str) -> tuple[bool, str, list]:  # pylint: disable=too-many-branches
     """
     Validates and sanitizes a log block before parsing.
@@ -79,11 +178,12 @@ def validate_log_entry(log_block: str) -> tuple[bool, str, list]:  # pylint: dis
         if not line:
             continue
 
-        # Check for basic audit log line structure: type=XXX msg=audit(...)
-        if re.search(r'type=\w+.*msg=audit\([^)]+\)', line):
+        # Check for basic audit record structure (handles optional whitespace)
+        if re.search(r'type=\w+.*msg=audit\([^)]+\)\s*:', line):
+            # Standard audit record format - valid
             valid_lines.append(line)
         elif re.search(r'(type=|msg=|avc:|denied|granted)', line, re.IGNORECASE):
-            # Looks like audit content but malformed - try to salvage
+            # Looks like audit content but possibly malformed - try to salvage
             valid_lines.append(line)
             malformed_lines += 1
         else:
@@ -220,13 +320,25 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
         "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}"}     # Socket address info
     }
 
-    # Process non-AVC lines for shared context
+    # Process non-AVC lines for shared context using enhanced parsing
     for line in log_block.strip().split('\n'):
         line = line.strip()
-        match = re.search(r"type=(\w+)", line)
-        if not match:
-            continue
-        log_type = match.group(1)
+
+        # Use enhanced audit record parsing for better extraction
+        parse_succeeded, host, record_type, event_id, body_text = parse_audit_record_text(line)
+        if not parse_succeeded:
+            # Fallback to simple regex for malformed lines
+            match = re.search(r"type=(\w+)", line)
+            if not match:
+                continue
+            log_type = match.group(1)
+        else:
+            log_type = record_type
+            # Store additional parsed information if available
+            if host:
+                shared_context['host'] = host
+            if event_id:
+                shared_context['event_id'] = event_id
 
         if log_type in patterns:
             for key, pattern in patterns[log_type].items():
@@ -618,25 +730,34 @@ def validate_arguments(args, console: Console) -> str:
         SystemExit: On validation failures with descriptive error messages
     """
     # Check for conflicting arguments
-    if args.raw_file and args.avc_file:
-        console.print("❌ [bold red]Error: Conflicting Arguments[/bold red]", style="bold red")
-        console.print("   Cannot specify both --raw-file and --avc-file simultaneously.")
+    file_args = [args.file, args.raw_file, args.avc_file]
+    file_args_count = sum(1 for arg in file_args if arg is not None)
+
+    if file_args_count > 1:
+        console.print("❌ [bold red]Error: Conflicting Arguments[/bold red]")
+        console.print("   Cannot specify multiple file arguments simultaneously.")
         console.print("   [dim]Choose one input method:[/dim]")
+        console.print("   • [cyan]--file[/cyan] for auto-detection (recommended)")
         console.print("   • [cyan]--raw-file[/cyan] for raw audit.log files")
         console.print("   • [cyan]--avc-file[/cyan] for pre-processed ausearch output")
         sys.exit(1)
 
     # Validate JSON flag requirements
-    if args.json and not args.raw_file and not args.avc_file:
+    if args.json and file_args_count == 0:
         console.print("❌ [bold red]Error: Missing Required Arguments[/bold red]")
         console.print("   --json flag requires a file input to process.")
         console.print("   [dim]Valid combinations:[/dim]")
+        console.print("   • [cyan]--json --file audit.log[/cyan] (recommended)")
         console.print("   • [cyan]--json --raw-file audit.log[/cyan]")
         console.print("   • [cyan]--json --avc-file processed.log[/cyan]")
         sys.exit(1)
 
+    # Handle new --file argument with auto-detection
+    if args.file:
+        return validate_file_with_auto_detection(args.file, console)
+
     # Validate raw file if provided
-    if args.raw_file:
+    elif args.raw_file:
         return validate_raw_file(args.raw_file, console)
 
     # Validate AVC file if provided
@@ -651,6 +772,71 @@ def validate_arguments(args, console: Console) -> str:
             console.print("   JSON output requires file input for processing.")
             sys.exit(1)
         return 'interactive'
+
+
+def validate_file_with_auto_detection(file_path: str, console: Console) -> str:
+    """
+    Validate file and auto-detect format type (raw vs pre-processed).
+
+    Args:
+        file_path (str): Path to the audit file
+        console (Console): Rich console for formatted output
+
+    Returns:
+        str: 'raw_file' for raw audit.log format, 'avc_file' for pre-processed format
+
+    Raises:
+        SystemExit: On file validation errors
+    """
+    # First, perform basic file validation (similar to existing functions)
+    try:
+        if not os.path.exists(file_path):
+            console.print(f"❌ [bold red]Error: File Not Found[/bold red]")
+            console.print(f"   File does not exist: [cyan]{file_path}[/cyan]")
+            console.print("   [dim]Please verify the file path and try again.[/dim]")
+            sys.exit(1)
+
+        if not os.access(file_path, os.R_OK):
+            console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+            console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
+            console.print("   [dim]Please check file permissions or run with appropriate privileges.[/dim]")
+            sys.exit(1)
+
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            console.print(f"❌ [bold red]Error: Empty File[/bold red]")
+            console.print(f"   File is empty: [cyan]{file_path}[/cyan]")
+            console.print("   [dim]Please provide a file with audit log content.[/dim]")
+            sys.exit(1)
+
+        if file_size > 100 * 1024 * 1024:  # 100MB limit
+            console.print(f"⚠️  [bold yellow]Warning: Large File Detected[/bold yellow]")
+            console.print(f"   File size: {file_size / (1024*1024):.1f}MB")
+            console.print("   [dim]Processing may take some time...[/dim]")
+
+        # Auto-detect format type
+        detected_format = detect_file_format(file_path)
+
+        if not console.quiet if hasattr(console, 'quiet') else False:
+            if detected_format == 'raw':
+                console.print(f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format")
+                console.print(f"   Will process using ausearch: [cyan]{file_path}[/cyan]")
+            else:
+                console.print(f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format")
+                console.print(f"   Will parse directly: [cyan]{file_path}[/cyan]")
+
+        return 'raw_file' if detected_format == 'raw' else 'avc_file'
+
+    except UnicodeDecodeError:
+        console.print(f"❌ [bold red]Error: Binary File Detected[/bold red]")
+        console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
+        console.print("   [dim]Audit files should be text files.[/dim]")
+        sys.exit(1)
+    except PermissionError:
+        console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
+        console.print("   [dim]Please check file permissions or run with appropriate privileges.[/dim]")
+        sys.exit(1)
 
 
 def validate_raw_file(file_path: str, console: Console) -> str:
@@ -790,6 +976,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     pre-processed files, interactive input) and output formats (formatted, JSON).
 
     Command-line Arguments:
+        -f, --file: Path to audit file (auto-detects format - recommended)
         -rf, --raw-file: Path to raw audit.log file (uses internal ausearch)
         -af, --avc-file: Path to pre-processed ausearch output file
         --json: Output results in JSON format for integration
@@ -799,6 +986,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     """
     parser = argparse.ArgumentParser(
         description="A tool to parse an SELinux AVC denial log from a file or user prompt.")
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="Path to audit file (auto-detects raw audit.log vs pre-processed format).")
     parser.add_argument(
         "-rf",
         "--raw-file",
@@ -827,8 +1019,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     log_string = ""
 
     if input_type == 'raw_file':
+        # Determine the correct file path (could be from --file or --raw-file)
+        file_path = args.file if args.file else args.raw_file
         if not args.json:
-            console.print(f"Raw file input provided. Running ausearch on '{args.raw_file}'...")
+            console.print(f"Raw file input provided. Running ausearch on '{file_path}'...")
         try:
             ausearch_cmd = [
                 "ausearch",
@@ -836,7 +1030,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 "AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR",
                 "-i",
                 "-if",
-                args.raw_file]
+                file_path]
             result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=True)
             log_string = result.stdout
         except FileNotFoundError:
@@ -855,10 +1049,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             console.print("   • Audit log file is corrupted")
             sys.exit(1)
     elif input_type == 'avc_file':
+        # Determine the correct file path (could be from --file or --avc-file)
+        file_path = args.file if args.file else args.avc_file
         if not args.json:
-            console.print(f"Pre-processed AVC file provided: '{args.avc_file}'")
+            console.print(f"Pre-processed AVC file provided: '{file_path}'")
         try:
-            with open(args.avc_file, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 log_string = f.read()
         except Exception as e:
             # This should rarely happen due to pre-validation, but handle gracefully
@@ -950,12 +1146,34 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 "   [dim]All input blocks contained malformed or unrecognizable data.[/dim]")
         sys.exit(1)
 
-    # Display validation warnings summary (non-JSON mode only)
+    # Display validation summary (non-JSON mode only)
     if validation_warnings and not args.json:
-        console.print(f"\n⚠️  [bold yellow]Validation Warnings ({
-                      len(validation_warnings)} issues found):[/bold yellow]")
+        # Aggregate warnings by type for clearer messaging
+        malformed_lines = 0
+        empty_blocks = 0
+        other_warnings = []
+
         for block_num, warning in validation_warnings:
-            console.print(f"   [dim]Block {block_num}: {warning}[/dim]")
+            if "malformed or non-audit lines" in warning:
+                # Extract number from warning like "Found 4 malformed or non-audit lines (skipped)"
+                match = re.search(r'Found (\d+) malformed', warning)
+                if match:
+                    malformed_lines += int(match.group(1))
+            elif "No AVC denial/grant records found" in warning:
+                empty_blocks += 1
+            else:
+                other_warnings.append(warning)
+
+        console.print(f"\n📋 [bold cyan]Input Processing Summary:[/bold cyan]")
+        if malformed_lines > 0:
+            console.print(f"   • Processed {len(valid_blocks)} audit record sections")
+            console.print(f"   • Skipped {malformed_lines} non-audit lines (comments, headers, etc.)")
+        if empty_blocks > 0:
+            console.print(f"   • Found {empty_blocks} sections without AVC records (other audit types)")
+        if other_warnings:
+            for warning in other_warnings:
+                console.print(f"   • {warning}")
+        console.print(f"   • [bold green]Successfully processed all AVC data[/bold green]")
         console.print()  # Extra line for readability
 
     # Second pass: Process with appropriate signature strategy

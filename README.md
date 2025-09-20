@@ -37,15 +37,16 @@ This tool specializes in **post-incident SELinux audit log analysis** for scenar
 - **Dynamic Labeling**: Correctly labels D-Bus destinations vs network ports based on target class
 - **SELinux Mode Display**: Shows Enforcing/Permissive mode for each denial
 - **Unparsed Type Tracking**: Identifies and reports unparsed record types for development guidance
+- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files (NEW!)
 - **Multiple Input Methods**: Supports raw log files, pre-processed files, or interactive input
 - **Rich Output**: Clean, formatted, color-coded summaries using the Rich library
 - **JSON Export**: Structured JSON output for integration with ML/AI applications
 - **Robust Error Handling**: Comprehensive input validation, graceful error recovery, and detailed error messages
+- **Enhanced Parsing**: Uses setroubleshoot's robust audit record regex for better edge case handling
 
 ## Upcoming Features (Planned)
 
-### Phase 1-3: Core Enhancements
-- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files
+### Phase 2-3: Core Enhancements
 - **Correlation Tracking**: Solve PID-to-resource mapping problem with individual event details
 - **Rich Display Format**: Professional responsive output with correlation events
 - **Syscall Success Tracking**: Replace generic permissive warnings with actual syscall results

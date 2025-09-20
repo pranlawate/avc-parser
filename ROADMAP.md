@@ -75,14 +75,14 @@ correlations = [
 - [x] **Input Validation**: Enhanced validation for malformed log entries and edge cases
 - [x] **Error Handling**: Robust error handling for corrupted/incomplete audit records
 
-#### 1B. Auto-Detection & Enhanced Parsing
-- [ ] **Enhanced Regex Pattern**: Adopt setroubleshoot's robust audit record regex for better edge case handling (node=, type= prefixes)
-- [ ] Add new `--file` or `-f` argument that replaces `--raw-file` and `--avc-file`
-- [ ] Implement file content analysis logic to detect format type
-- [ ] Add detection for `type=AVC msg=audit(...)` patterns → pre-processed
-- [ ] Default to raw audit.log treatment when patterns not found
-- [ ] Extend existing file validation logic to new flag
-- [ ] Maintain backward compatibility with existing `--raw-file` and `--avc-file` flags
+#### 1B. Auto-Detection & Enhanced Parsing ✅ COMPLETED
+- [x] **Enhanced Regex Pattern**: Adopt setroubleshoot's robust audit record regex for better edge case handling (node=, type= prefixes)
+- [x] Add new `--file` or `-f` argument that replaces `--raw-file` and `--avc-file`
+- [x] Implement file content analysis logic to detect format type
+- [x] Add detection for `type=AVC msg=audit(...)` patterns → pre-processed
+- [x] Default to raw audit.log treatment when patterns not found
+- [x] Extend existing file validation logic to new flag
+- [x] Maintain backward compatibility with existing `--raw-file` and `--avc-file` flags
 
 ### PHASE 2: Event Assembly & Correlation Tracking
 #### 2A. Event Assembly Foundation
