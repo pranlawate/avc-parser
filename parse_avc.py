@@ -152,6 +152,193 @@ class AvcContext:
         return type_descriptions.get(self.type, self.type)
 
 
+class PermissionSemanticAnalyzer:
+    """
+    Provides human-readable descriptions and contextual analysis for SELinux permissions.
+
+    Uses static mappings to avoid requiring policy file access while providing
+    meaningful insights into denial semantics.
+    """
+
+    # Permission descriptions for common SELinux permissions
+    PERMISSION_DESCRIPTIONS = {
+        # File permissions
+        'read': 'Read file content',
+        'write': 'Modify file content',
+        'append': 'Append to file',
+        'execute': 'Run executable file',
+        'open': 'Open file handle',
+        'create': 'Create new file',
+        'unlink': 'Delete file',
+        'rename': 'Rename file',
+        'setattr': 'Change file attributes',
+        'getattr': 'Read file attributes',
+        'lock': 'Lock file for exclusive access',
+        'ioctl': 'Perform device control operations',
+        'map': 'Memory map file',
+
+        # Network permissions
+        'name_connect': 'Connect to network service',
+        'name_bind': 'Bind to network port',
+        'accept': 'Accept network connections',
+        'listen': 'Listen for network connections',
+        'recv_msg': 'Receive network message',
+        'send_msg': 'Send network message',
+        'node_bind': 'Bind to network node',
+
+        # Process permissions
+        'transition': 'Change security context',
+        'signal': 'Send signal to process',
+        'signull': 'Check process existence',
+        'sigkill': 'Terminate process forcefully',
+        'sigstop': 'Suspend process',
+        'ptrace': 'Debug or trace process',
+        'getsched': 'Get process scheduling info',
+        'setsched': 'Set process scheduling',
+        'share': 'Share process memory',
+
+        # Directory permissions
+        'search': 'Search directory contents',
+        'add_name': 'Add entry to directory',
+        'remove_name': 'Remove entry from directory',
+        'reparent': 'Move directory entry',
+        'rmdir': 'Remove directory',
+
+        # D-Bus permissions
+        'acquire_svc': 'Acquire D-Bus service name',
+        'send_msg': 'Send D-Bus message',
+
+        # System permissions
+        'load': 'Load system module',
+        'use': 'Use system resource',
+        'admin': 'Perform administrative operation',
+        'audit_access': 'Access audit logs',
+        'audit_control': 'Control audit system',
+        'setuid': 'Change user ID',
+        'setgid': 'Change group ID',
+
+        # Security permissions
+        'enforce': 'Enforce security policy',
+        'load_policy': 'Load security policy',
+        'compute_av': 'Compute access vector',
+        'compute_create': 'Compute creation context',
+        'compute_member': 'Compute member context',
+        'check_context': 'Validate security context',
+    }
+
+    # Object class descriptions
+    CLASS_DESCRIPTIONS = {
+        'file': 'file',
+        'dir': 'directory',
+        'lnk_file': 'symbolic link',
+        'chr_file': 'character device',
+        'blk_file': 'block device',
+        'sock_file': 'socket file',
+        'fifo_file': 'named pipe',
+        'tcp_socket': 'TCP network socket',
+        'udp_socket': 'UDP network socket',
+        'unix_stream_socket': 'Unix stream socket',
+        'unix_dgram_socket': 'Unix datagram socket',
+        'process': 'process',
+        'dbus': 'D-Bus service',
+        'capability': 'system capability',
+        'key': 'security key',
+        'shm': 'shared memory',
+        'sem': 'semaphore',
+        'msg': 'message queue',
+        'security': 'security subsystem',
+        'system': 'system resource',
+    }
+
+    @classmethod
+    def get_permission_description(cls, permission: str) -> str:
+        """Get human-readable description for a permission."""
+        return cls.PERMISSION_DESCRIPTIONS.get(permission, permission)
+
+    @classmethod
+    def get_class_description(cls, obj_class: str) -> str:
+        """Get human-readable description for an object class."""
+        return cls.CLASS_DESCRIPTIONS.get(obj_class, obj_class)
+
+    @classmethod
+    def get_contextual_analysis(cls, permission: str, obj_class: str,
+                              source_context: AvcContext = None,
+                              target_context: AvcContext = None) -> str:
+        """
+        Generate contextual analysis based on permission, class, and contexts.
+
+        Args:
+            permission: The denied permission
+            obj_class: The target object class
+            source_context: Source AvcContext object (optional)
+            target_context: Target AvcContext object (optional)
+
+        Returns:
+            Human-readable analysis string
+        """
+        # Get source process description
+        source_desc = "Process"
+        if source_context and source_context.type:
+            source_desc = source_context.get_type_description()
+
+        # Get target description
+        target_desc = cls.get_class_description(obj_class)
+
+        # Generate contextual descriptions based on permission + class combinations
+        context_patterns = {
+            ('read', 'file'): f"{source_desc} attempting to read file content",
+            ('write', 'file'): f"{source_desc} attempting to modify file content",
+            ('execute', 'file'): f"{source_desc} attempting to run executable",
+            ('open', 'file'): f"{source_desc} attempting to open file",
+            ('create', 'file'): f"{source_desc} attempting to create new file",
+            ('unlink', 'file'): f"{source_desc} attempting to delete file",
+
+            ('search', 'dir'): f"{source_desc} attempting to search directory",
+            ('add_name', 'dir'): f"{source_desc} attempting to add entry to directory",
+            ('remove_name', 'dir'): f"{source_desc} attempting to remove directory entry",
+
+            ('name_connect', 'tcp_socket'): f"{source_desc} attempting to connect to network service",
+            ('name_bind', 'tcp_socket'): f"{source_desc} attempting to bind to network port",
+            ('listen', 'tcp_socket'): f"{source_desc} attempting to listen for connections",
+
+            ('send_msg', 'dbus'): f"{source_desc} attempting to send D-Bus message",
+            ('acquire_svc', 'dbus'): f"{source_desc} attempting to acquire D-Bus service",
+
+            ('signal', 'process'): f"{source_desc} attempting to send signal to process",
+            ('ptrace', 'process'): f"{source_desc} attempting to debug/trace process",
+            ('transition', 'process'): f"{source_desc} attempting to change security context",
+        }
+
+        # Look for specific pattern match
+        pattern_key = (permission, obj_class)
+        if pattern_key in context_patterns:
+            return context_patterns[pattern_key]
+
+        # Fallback to generic description
+        perm_desc = cls.get_permission_description(permission).lower()
+        return f"{source_desc} attempting to {perm_desc} on {target_desc}"
+
+    @classmethod
+    def get_port_description(cls, port: str) -> str:
+        """Get description for common network ports."""
+        port_descriptions = {
+            '22': 'SSH service',
+            '80': 'HTTP web service',
+            '443': 'HTTPS web service',
+            '3306': 'MySQL database',
+            '5432': 'PostgreSQL database',
+            '6379': 'Redis cache',
+            '8080': 'HTTP alternate service',
+            '9999': 'JBoss management',
+            '25': 'SMTP mail service',
+            '53': 'DNS service',
+            '443': 'HTTPS service',
+            '993': 'IMAPS mail service',
+            '995': 'POP3S mail service',
+        }
+        return port_descriptions.get(port, f"port {port}")
+
+
 def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
     """
     Parse audit record using enhanced setroubleshoot regex pattern.
@@ -336,9 +523,7 @@ def parse_avc_log(log_block: str) -> tuple[list, set]:
         Implements robust error handling for corrupted audit records.
         Returns empty results rather than failing on malformed input.
     """
-    avc_denials = []  # pylint: disable=unused-variable
-    unparsed_types = set()  # pylint: disable=unused-variable
-
+    
     try:
         return _parse_avc_log_internal(log_block)
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -577,6 +762,36 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                         "(null)", "null", "", None] and avc_data.get('comm'):
                     avc_data['proctitle'] = avc_data['comm']
 
+                # Add semantic analysis for enhanced user comprehension
+                if avc_data.get('permission') and avc_data.get('tclass'):
+                    permission = avc_data['permission']
+                    obj_class = avc_data['tclass']
+                    source_context = avc_data.get('scontext')
+                    target_context = avc_data.get('tcontext')
+
+                    # Add permission description
+                    avc_data['permission_description'] = PermissionSemanticAnalyzer.get_permission_description(permission)
+
+                    # Add contextual analysis
+                    avc_data['contextual_analysis'] = PermissionSemanticAnalyzer.get_contextual_analysis(
+                        permission, obj_class, source_context, target_context
+                    )
+
+                    # Add object class description
+                    avc_data['class_description'] = PermissionSemanticAnalyzer.get_class_description(obj_class)
+
+                    # Add source type description if available
+                    if source_context and hasattr(source_context, 'get_type_description'):
+                        avc_data['source_type_description'] = source_context.get_type_description()
+
+                    # Add target type description if available
+                    if target_context and hasattr(target_context, 'get_type_description'):
+                        avc_data['target_type_description'] = target_context.get_type_description()
+
+                    # Add port description for network denials
+                    if avc_data.get('dest_port'):
+                        avc_data['port_description'] = PermissionSemanticAnalyzer.get_port_description(avc_data['dest_port'])
+
                 avc_denials.append(avc_data)
     return avc_denials, unparsed_types
 
@@ -662,10 +877,28 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     # Handle permissions - either single permission or comma-separated list
     if 'permissions' in denial_info and denial_info['permissions'] and len(
             denial_info['permissions']) > 0:
-        permissions_str = ", ".join(sorted(denial_info['permissions']))
+        #Enhanced permission display with descriptions
+        enhanced_perms = []
+        for perm in sorted(denial_info['permissions']):
+            # For single permission case, use pre-computed description from parsed_log
+            if len(denial_info['permissions']) == 1 and parsed_log.get('permission_description'):
+                perm_desc = parsed_log['permission_description']
+            else:
+                perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
+            if perm_desc != perm:
+                enhanced_perms.append(f"{perm} ({perm_desc})")
+            else:
+                enhanced_perms.append(perm)
+        permissions_str = ", ".join(enhanced_perms)
         action_fields.append(("Permission", permissions_str))
     elif parsed_log.get("permission"):
-        action_fields.append(("Permission", parsed_log["permission"]))
+        # Enhanced permission display with semantic analysis
+        permission = parsed_log["permission"]
+        if parsed_log.get("permission_description"):
+            permission_display = f"{permission} ({parsed_log['permission_description']})"
+        else:
+            permission_display = permission
+        action_fields.append(("Permission", permission_display))
 
     # Handle permissive mode - check both collected and single values
     if "permissives" in denial_info and denial_info["permissives"] and len(
@@ -677,6 +910,10 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     elif parsed_log.get("permissive"):
         mode = "Permissive" if parsed_log["permissive"] == "1" else "Enforcing"
         action_fields.append(("SELinux Mode", mode))
+
+    # Add contextual analysis if available
+    if parsed_log.get("contextual_analysis"):
+        action_fields.append(("Analysis", "contextual_analysis"))
 
     target_fields = [
         ("Target Path", "path"), ("Socket Address", "saddr"),
@@ -699,7 +936,13 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{values}[/green]")
             elif key == "comm":
-                console.print(f"[green]{values}[/green]")
+                # Enhance comm display with source type description if available
+                if parsed_log.get('source_type_description'):
+                    source_desc = parsed_log['source_type_description']
+                    enhanced_values = f"{values} ({source_desc})"
+                    console.print(f"[green]{enhanced_values}[/green]")
+                else:
+                    console.print(f"[green]{values}[/green]")
             elif key == "pid":
                 console.print(f"[cyan]{values}[/cyan]")
             elif key == "cwd":
@@ -720,7 +963,12 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
             elif key in ["proctitle", "exe"]:
                 console.print(f"[green]{parsed_log[key]}[/green]")
             elif key == "comm":
-                console.print(f"[green]{parsed_log[key]}[/green]")
+                # Enhance comm display with source type description if available
+                if parsed_log.get('source_type_description'):
+                    enhanced_comm = f"{parsed_log[key]} ({parsed_log['source_type_description']})"
+                    console.print(f"[green]{enhanced_comm}[/green]")
+                else:
+                    console.print(f"[green]{parsed_log[key]}[/green]")
             elif key == "pid":
                 console.print(f"[cyan]{parsed_log[key]}[/cyan]")
             elif key == "cwd":
@@ -753,7 +1001,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 label == "Permission" and 'permissions' in denial_info) or (
                 label == "SELinux Mode"):
             if label == "Permission" and 'permissions' in denial_info:
-                value = ", ".join(sorted(denial_info['permissions']))
+                # Use the enhanced permissions string that was computed earlier
+                value = key  # key contains the enhanced permissions_str
             elif label == "SELinux Mode":
                 value = key  # key already contains the computed value
             else:
@@ -766,6 +1015,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 console.print(f"[green]{value}[/green]")
             elif label == "SELinux Mode":
                 console.print(f"[cyan]{value}[/cyan]")
+            elif label == "Analysis":
+                console.print(f"[yellow]{value}[/yellow]")
             else:
                 console.print(str(value))
 
@@ -792,7 +1043,13 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 else:
                     # Single value - could be AvcContext or string
                     display_value = str(values) if values else ""
-                    console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
+                    # Enhance with target type description if available
+                    if parsed_log.get('target_type_description'):
+                        target_desc = parsed_log['target_type_description']
+                        enhanced_value = f"{display_value} ({target_desc})"
+                        console.print(f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]")
+                    else:
+                        console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{values}[/dim white]")
@@ -810,7 +1067,12 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 # Signature field - use bright_cyan bold
                 # Handle both AvcContext objects and raw strings
                 display_value = str(parsed_log[key]) if parsed_log[key] else ""
-                console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
+                # Enhance with target type description if available
+                if parsed_log.get('target_type_description'):
+                    enhanced_value = f"{display_value} ({parsed_log['target_type_description']})"
+                    console.print(f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]")
+                else:
+                    console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{parsed_log[key]}[/dim white]")
@@ -833,7 +1095,13 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
             console.print(f"[green]{values}[/green]")
         else:
             console.print(f"  [bold]{dest_label}:[/bold]".ljust(22), end="")
-            console.print(f"[green]{parsed_log['dest_port']}[/green]")
+            # Enhance port display with description if available
+            port_value = parsed_log['dest_port']
+            if parsed_log.get('port_description'):
+                enhanced_port = f"{port_value} ({parsed_log['port_description']})"
+                console.print(f"[green]{enhanced_port}[/green]")
+            else:
+                console.print(f"[green]{port_value}[/green]")
 
     console.print("-" * 35)
 
