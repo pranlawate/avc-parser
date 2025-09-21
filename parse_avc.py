@@ -1601,6 +1601,24 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         unique_denials[signature]['permissions'] = set()
                     unique_denials[signature]['permissions'].add(permission)
 
+                    # Store individual event correlation for PID-to-resource mapping
+                    if 'correlations' not in unique_denials[signature]:
+                        unique_denials[signature]['correlations'] = []
+
+                    correlation_event = {
+                        'pid': parsed_log.get('pid'),
+                        'comm': parsed_log.get('comm'),
+                        'path': parsed_log.get('path'),
+                        'permission': permission,
+                        'permissive': parsed_log.get('permissive'),
+                        'timestamp': parsed_log.get('datetime_str'),
+                        'dest_port': parsed_log.get('dest_port'),
+                        'saddr': parsed_log.get('saddr')
+                    }
+                    # Only store non-null values to keep correlations clean
+                    correlation_event = {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
+                    unique_denials[signature]['correlations'].append(correlation_event)
+
                     # Collect varying fields (not part of signature)
                     varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
                     for field in varying_fields:
@@ -1625,6 +1643,21 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         'permissions': {permission}
                     }
 
+                    # Initialize correlation storage for first event
+                    correlation_event = {
+                        'pid': parsed_log.get('pid'),
+                        'comm': parsed_log.get('comm'),
+                        'path': parsed_log.get('path'),
+                        'permission': permission,
+                        'permissive': parsed_log.get('permissive'),
+                        'timestamp': parsed_log.get('datetime_str'),
+                        'dest_port': parsed_log.get('dest_port'),
+                        'saddr': parsed_log.get('saddr')
+                    }
+                    # Only store non-null values to keep correlations clean
+                    correlation_event = {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
+                    denial_entry['correlations'] = [correlation_event]
+
                     # Initialize varying fields for first occurrence
                     varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
                     for field in varying_fields:
@@ -1647,6 +1680,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             # Add permissions set if it exists
             if 'permissions' in denial_info:
                 json_denial['permissions'] = sorted(list(denial_info['permissions']))
+
+            # Add correlation data for PID-to-resource mapping
+            if 'correlations' in denial_info:
+                json_denial['correlations'] = denial_info['correlations']
 
             # Remove datetime_obj from the log data and convert any remaining datetime
             # objects to strings

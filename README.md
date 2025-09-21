@@ -42,14 +42,16 @@ A forensic-focused tool for analyzing SELinux audit logs with intelligent dedupl
 - **JSON Export**: Structured output including semantic fields for integration
 - **Cross-Platform**: Works on Linux, macOS, and Windows where Python runs
 
+## ✅ Recent Additions
+
+### 🔗 **Phase 2A: Simple Correlation Storage** ✨ NEW
+- **PID-to-Resource Mapping**: Individual event correlations solve deduplication mapping loss
+- **JSON Integration**: Correlation data available in `--json` output for API consumers
+- **Forensic Analysis**: Track exactly which PID accessed which resource with which permission
+
 ## 🔮 Upcoming Features
 
-### 🔗 **Phase 2A: Simple Correlation Storage** (Next)
-- **PID-to-Resource Mapping**: Store individual event correlations to solve deduplication mapping loss
-- **Enhanced Record Support**: Robust parsing for all AVC variant message types
-- **Correlation Integration**: Individual event details alongside existing aggregated data
-
-### 🎨 **Phase 3: Rich Display Format**
+### 🎨 **Phase 3: Rich Display Format** (Next)
 - **Responsive Headers**: Professional Rich-based formatting that adapts to terminal width
 - **Correlation Events**: Display individual PID-to-resource mappings when available
 - **Legacy Compatibility**: `--legacy-format` flag preserves current behavior
@@ -182,6 +184,16 @@ $ python3 parse_avc.py --json --avc-file file_context_AVC.log
     "last_seen": "2024-09-05T02:18:01.101000",
     "permissions": [
       "read"
+    ],
+    "correlations": [
+      {
+        "pid": "1234",
+        "comm": "httpd",
+        "path": "/var/www/html/index.html",
+        "permission": "read",
+        "permissive": "0",
+        "timestamp": "2024-09-05 02:18:01"
+      }
     ]
   }
 ]
@@ -329,14 +341,15 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 
 ## 📈 Development Status
 
-**Current Phase**: 2A (Simple Correlation Storage)
+**Current Phase**: 3A (Rich Display Format)
 
 | Phase | Status | Key Features |
 |-------|--------|--------------|
 | **1A/1B** | ✅ **COMPLETED** | Foundation, auto-detection, validation |
 | **2B** | ✅ **COMPLETED** | Semantic analysis, permission descriptions |
-| **2A** | 🔄 **IN PROGRESS** | Simple correlation storage |
-| **3** | ⏳ **PLANNED** | Rich display format, filtering |
+| **2A** | ✅ **COMPLETED** | Simple correlation storage, PID-to-resource mapping |
+| **3A** | 🔄 **NEXT** | Rich display format, correlation events display |
+| **3B** | ⏳ **PLANNED** | Smart filtering, sorting options |
 | **4** | ⏳ **PLANNED** | Testing, documentation |
 
 ### 🎯 **Design Focus**

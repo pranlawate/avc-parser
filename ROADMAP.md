@@ -95,11 +95,11 @@ correlations = [
 
 ### 🔄 **PHASE 2: Correlation & Semantic Analysis**
 
-#### **2A: Simple Correlation Storage** (IN PROGRESS)
-- [ ] **Correlation Data Structure**: Lightweight storage for individual event details
-- [ ] **Enhanced Record Support**: Robust parsing for all AVC message type variants
-- [ ] **Correlation Integration**: Individual correlations alongside aggregated data
-- [ ] **Enhanced AvcContext**: Minor improvements for better type descriptions
+#### ✅ **2A: Simple Correlation Storage** (COMPLETED)
+- [x] **Correlation Data Structure**: Lightweight storage for individual event details
+- [x] **Enhanced Record Support**: Robust parsing for all AVC message type variants
+- [x] **Correlation Integration**: Individual correlations alongside aggregated data
+- [x] **JSON Integration**: Correlation data available in structured output
 
 #### ✅ **2B: Semantic Enhancement** (COMPLETED)
 - [x] **Permission Semantic Analysis**: Human-readable descriptions + contextual intelligence
@@ -108,7 +108,7 @@ correlations = [
 
 **Scope Note**: SYSCALL success/failure tracking moved OUT OF SCOPE (requires complex event assembly)
 
-### 🎨 **PHASE 3: Rich Display Format** (PLANNED)
+### 🔄 **PHASE 3: Rich Display Format** (NEXT)
 **3A: Core Display** | **3B: Practical Features**
 - Rich Rule header format with responsive design | Detailed view with enhanced information
 - Legacy compatibility flag | Smart filtering (process, path, time, context)
@@ -229,11 +229,13 @@ Detailed Events:
 **✅ WITHIN SCOPE & COMPLETED:**
 - Phase 1A: Core Foundation & Input Validation
 - Phase 1B: Auto-Detection & Enhanced Parsing
+- Phase 2A: Simple Correlation Storage (lightweight approach)
 - Phase 2B: Permission Semantic Analysis
 
-**✅ WITHIN SCOPE & PLANNED:**
-- Phase 2A: Simple Correlation Storage (lightweight approach)
+**🔄 WITHIN SCOPE & NEXT:**
 - Phase 3A: Rich Rule Display Format (terminal-focused)
+
+**✅ WITHIN SCOPE & PLANNED:**
 - Phase 3B: Practical Display Features (filtering, sorting)
 - Phase 4: Testing & Validation
 
