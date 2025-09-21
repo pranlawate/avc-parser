@@ -2,70 +2,65 @@
 
 A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
 
-## Project Scope & Purpose
+## 🎯 Purpose
 
-### What This Tool Does
-This tool specializes in **post-incident SELinux audit log analysis** for scenarios requiring:
-- Clear correlation of complex denial patterns
-- Intelligent deduplication with occurrence tracking
-- Static log file analysis without system access
-- Professional output suitable for reporting and documentation
+**Post-incident SELinux audit log forensic analysis** for security analysts, system administrators, and compliance auditors.
 
-### How This Differs from sealert
-**Complementary tool** designed for different use cases:
+### 🔄 How This Differs from sealert/setroubleshoot
 
-| **sealert** | **AVC Denial Analyzer** |
-|-------------|-------------------------|
+| **setroubleshoot/sealert** | **AVC Denial Analyzer** |
+|---------------------------|-------------------------|
 | Real-time monitoring & policy suggestions | Post-incident log analysis & correlation |
 | Live audit socket processing | Static file analysis |
 | Policy recommendations | Clear denial summaries |
 | Daemon-based setup | Single standalone script |
-| Verbose data dumps | Professional formatted output |
 
-**Use this tool when**: You need clear analysis of audit logs from systems you can't access directly, or when sealert's real-time output becomes overwhelming.
+**Use this tool when**: You need forensic analysis of audit logs from systems you can't access directly, or when setroubleshoot's real-time output becomes overwhelming during incident response.
 
-## Current Features
+## ✅ Current Features
 
-- **Multi-line AVC Parsing**: Parses complex AVC audit log blocks containing `AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, and `SOCKADDR` records
-- **USER_AVC Support**: Handles userspace AVC denials (e.g., D-Bus, systemd) with proper message extraction
-- **Raw Audit Log Support**: Can directly process raw `audit.log` files by internally using `ausearch` with comprehensive message types
-- **Intelligent Deduplication**: Groups identical denials and tracks occurrence counts with first/last seen timestamps
-- **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicate denials and displays them comma-separated
-- **Enhanced Path Resolution**: Uses PATH record `name` field for complete paths, falls back to `dev+inode` identifiers when paths are missing *(WIP)*
-- **Comprehensive Data Extraction**: Extracts process information, security contexts, permissions, paths, and network details
-- **Denial Type Detection**: Distinguishes between Kernel AVC and Userspace AVC denials
-- **Dynamic Labeling**: Correctly labels D-Bus destinations vs network ports based on target class
-- **SELinux Mode Display**: Shows Enforcing/Permissive mode for each denial
-- **Unparsed Type Tracking**: Identifies and reports unparsed record types for development guidance
-- **Auto-Detection**: Single `--file` flag that automatically detects raw vs pre-processed files (NEW!)
-- **Multiple Input Methods**: Supports raw log files, pre-processed files, or interactive input
-- **Rich Output**: Clean, formatted, color-coded summaries using the Rich library
-- **JSON Export**: Structured JSON output for integration with ML/AI applications
-- **Robust Error Handling**: Comprehensive input validation, graceful error recovery, and detailed error messages
-- **Enhanced Parsing**: Uses setroubleshoot's robust audit record regex for better edge case handling
+### 🔍 **Core Analysis**
+- **Multi-line AVC Parsing**: Complex audit log blocks with `AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, `SOCKADDR` records
+- **Intelligent Deduplication**: Groups identical denials with occurrence counts and timestamps
+- **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicates
+- **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback
 
-## Upcoming Features (Planned)
+### 🎨 **Semantic Analysis** ✨ NEW
+- **Human-Readable Permissions**: `read` → `read (Read file content)`
+- **Contextual Analysis**: `Analysis: Web server process attempting to read file content`
+- **Type Descriptions**: Enhanced context display with `httpd (Web server process)`
+- **Port Intelligence**: `5432 (PostgreSQL database)` for common services
 
-### Phase 2: Event Assembly & Correlation Tracking
-- **Correlation Tracking**: Solve PID-to-resource mapping problem with individual event details
-- **Enhanced Record Types**: Support AVC, USER_AVC, AVC_PATH, 1400, 1107 message types
-- **Permission Semantic Analysis**: Human-readable permission descriptions and contextual analysis
-- **Syscall Success Tracking**: Actual syscall results and exit codes
-- **Basic Dontaudit Detection**: Identify when dontaudit rules are disabled
+### 📥 **Input Processing**
+- **Auto-Detection**: Single `--file` flag detects raw vs pre-processed format automatically
+- **Multiple Input Methods**: Raw audit.log, pre-processed files, or interactive input
+- **Robust Parsing**: setroubleshoot's proven regex patterns for edge case handling
+- **Comprehensive Validation**: File type, permission, and content validation with helpful errors
 
-### Phase 3: Rich Display Format
-- **Professional Output**: Responsive Rich-based formatting with correlation events
+### 📊 **Output Formats**
+- **Rich Terminal Output**: Color-coded, formatted summaries with professional appearance
+- **JSON Export**: Structured output including semantic fields for integration
+- **Cross-Platform**: Works on Linux, macOS, and Windows where Python runs
+
+## 🔮 Upcoming Features
+
+### 🔗 **Phase 2A: Simple Correlation Storage** (Next)
+- **PID-to-Resource Mapping**: Store individual event correlations to solve deduplication mapping loss
+- **Enhanced Record Support**: Robust parsing for all AVC variant message types
+- **Correlation Integration**: Individual event details alongside existing aggregated data
+
+### 🎨 **Phase 3: Rich Display Format**
+- **Responsive Headers**: Professional Rich-based formatting that adapts to terminal width
+- **Correlation Events**: Display individual PID-to-resource mappings when available
 - **Legacy Compatibility**: `--legacy-format` flag preserves current behavior
-- **Smart Sorting**: Recent-first default, count-based, and chronological options
-- **Enhanced Status Indicators**: Clear BLOCKED/ALLOWED status based on syscall results
+- **Smart Filtering**: Process, path, time range, and context filtering capabilities
 
-### Phase 4-6: Quality & Performance
-- **Comprehensive Testing**: Unit tests, integration tests, and regression testing
-- **Enhanced Documentation**: Migration guides, usage examples, and installation instructions
-- **Performance Optimization**: Memory management and progress indicators for large files
-- **Practical Filtering**: Process, path, time range, and context filtering capabilities
+### 🧪 **Phase 4: Testing & Quality**
+- **Comprehensive Testing**: Unit tests, integration tests, regression testing
+- **Performance Optimization**: Memory management for large files
+- **Enhanced Documentation**: Migration guides and usage examples
 
-📋 **Detailed Implementation Plan**: See [ROADMAP.md](ROADMAP.md) for focused implementation roadmap with technical specifications and design decisions.
+📊 **Complete Plan**: See [ROADMAP.md](ROADMAP.md) for detailed implementation roadmap and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for scope decisions.
 
 ## Prerequisites
 
@@ -91,50 +86,48 @@ This tool specializes in **post-incident SELinux audit log analysis** for scenar
    sudo apt install auditd  # If needed (Ubuntu/Debian)
    ```
 
-## Usage
+## 🚀 Usage
 
-### Option A: Raw Audit File Processing
-Process system audit logs directly using internal `ausearch`:
-```bash
-python3 parse_avc.py --raw-file /var/log/audit/audit.log
-```
-
-### Option B: Pre-processed AVC File
-Process AVC logs already filtered with `ausearch`:
-```bash
-# First, create the AVC file:
-ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR -ts recent > avc_denials.log
-
-# Then, parse it:
-python3 parse_avc.py --avc-file avc_denials.log
-```
-
-### Option C: Interactive Mode
-Paste logs directly into the terminal:
-```bash
-python3 parse_avc.py
-# Paste your log and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
-```
-
-### Option D: Auto-Detection (NEW!)
-Single flag that automatically detects file format:
+### **Recommended: Auto-Detection** ✨
+Single flag automatically detects file format (raw audit.log vs pre-processed):
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log
 python3 parse_avc.py --file avc_denials.log
 ```
 
-### Option E: JSON Output
-Add `--json` flag for machine-readable output:
+### **Alternative Methods:**
+
+**Raw Audit File Processing:**
 ```bash
-python3 parse_avc.py --raw-file /var/log/audit/audit.log --json
+python3 parse_avc.py --raw-file /var/log/audit/audit.log
+```
+
+**Pre-processed AVC File:**
+```bash
+# Create AVC file:
+ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR -ts recent > avc_denials.log
+# Parse it:
+python3 parse_avc.py --avc-file avc_denials.log
+```
+
+**Interactive Mode:**
+```bash
+python3 parse_avc.py
+# Paste logs and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
+```
+
+### **JSON Output:**
+Add `--json` for machine-readable output:
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log --json
 ```
 
 ## Example Output
 
-### Standard AVC Denial
+### **Standard AVC Denial with Semantic Analysis** ✨
 ```bash
-$ python3 parse_avc.py --avc-file file_context_AVC.log 
-Pre-processed AVC file provided: 'file_context_AVC.log'
+$ python3 parse_avc.py --file file_context_AVC.log
+🔍 Auto-detected: Pre-processed format
 
 Found 1 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
@@ -142,7 +135,7 @@ Found 1 AVC events. Displaying 1 unique denials...
   Timestamp:2024-09-05 02:18:01
   Process Title:httpd
   Executable:/usr/sbin/httpd
-  Process Name:httpd
+  Process Name:httpd (Web server process)
   Process ID (PID):1234
   Working Dir (CWD):/
   Source Context:system_u:system_r:httpd_t:s0
@@ -150,12 +143,13 @@ Found 1 AVC events. Displaying 1 unique denials...
   Action:Denied
   Denial Type:Kernel AVC
   Syscall:openat
-  Permission:read
+  Permission:read (Read file content)
   SELinux Mode:Enforcing
+  Analysis:Web server process attempting to read file content
 -----------------------------------
   Target Path:/var/www/html/index.html
   Target Class:file
-  Target Context:unconfined_u:object_r:default_t:s0
+  Target Context:unconfined_u:object_r:default_t:s0 (Default file context)
 -----------------------------------
 
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
@@ -333,23 +327,25 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 - **Socket Address**: Network address information
 - **Target Class**: Object class (file, socket, dbus, etc.)
 
-## Development Roadmap
+## 📈 Development Status
 
-This project follows a focused development plan prioritizing core audit analysis capabilities over feature complexity.
+**Current Phase**: 2A (Simple Correlation Storage)
 
-### Implementation Strategy
-- **Phase 1**: Core foundation and input validation ✅ COMPLETED
-- **Phase 2**: Event assembly and correlation tracking
-- **Phase 3**: Rich display format implementation
-- **Phases 4-6**: Testing, documentation, and performance optimization
+| Phase | Status | Key Features |
+|-------|--------|--------------|
+| **1A/1B** | ✅ **COMPLETED** | Foundation, auto-detection, validation |
+| **2B** | ✅ **COMPLETED** | Semantic analysis, permission descriptions |
+| **2A** | 🔄 **IN PROGRESS** | Simple correlation storage |
+| **3** | ⏳ **PLANNED** | Rich display format, filtering |
+| **4** | ⏳ **PLANNED** | Testing, documentation |
 
-### Key Focus Areas
-- **Correlation Clarity**: Solve PID-to-resource mapping problem completely
-- **Professional Output**: Rich-based responsive format across all terminal sizes
-- **Forensic Accuracy**: Syscall success/failure tracking and semantic analysis
-- **Practical Value**: Focus on real-world audit analysis scenarios
+### 🎯 **Design Focus**
+- **Forensic Analysis**: Post-incident audit log analysis (not real-time monitoring)
+- **Correlation Clarity**: Solve PID-to-resource mapping without architectural complexity
+- **Professional Output**: Terminal-friendly with clean JSON export
+- **Minimal Dependencies**: Python + Rich only (no policy files required)
 
-🗺️ **Complete Development Plan**: See [ROADMAP.md](ROADMAP.md) for streamlined implementation phases focused on delivering maximum value through core functionality.
+📊 **Details**: [ROADMAP.md](ROADMAP.md) | **Decisions**: [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md)
 
 ## Contributing
 

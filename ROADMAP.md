@@ -1,14 +1,38 @@
 # AVC Parser Enhancement Roadmap
 
-This document contains the focused implementation plan for enhancing the AVC parser with auto-detection, correlation tracking, and semantic analysis capabilities.
+Focused implementation plan for enhancing the AVC parser with correlation tracking and professional display capabilities.
 
-## Overview
+## 🎯 Application Scope
 
-This roadmap addresses core limitations identified through analysis of user needs and real-world audit analysis scenarios:
-- **Correlation Loss Problem**: Current deduplication loses PID-to-resource mapping (e.g., can't tell which PID maps to which target path)
-- **Argument Logic Issues**: Edge cases with conflicting arguments, binary files, directory inputs
-- **Display Format Limitations**: Current verbose format doesn't scale well across terminal sizes
-- **User Experience**: Need for auto-detection, semantic understanding, and focus capabilities
+**Purpose**: Post-incident SELinux audit log forensic analysis
+**Users**: Security analysts, system administrators, compliance auditors
+**Function**: Parse, correlate, and present SELinux denial patterns for human analysis
+
+### 🔍 **Scope Boundaries**
+
+**✅ IN SCOPE:**
+- Static audit log file analysis | Human-readable semantic analysis
+- Correlation tracking for PID-to-resource mapping | Professional terminal & JSON output
+- File format auto-detection | Deduplication with intelligent aggregation
+
+**❌ OUT OF SCOPE:**
+- Real-time monitoring | Policy file analysis | Web interfaces
+- Event streaming | Automated remediation | System behavior tracking
+
+### 🎨 **Design Principles**
+1. **Forensic Focus**: Post-incident analysis clarity over real-time features
+2. **Minimal Dependencies**: Python + Rich only (no policy files)
+3. **Correlation Clarity**: Simple mapping solutions over complex architectures
+4. **Professional Output**: Terminal-friendly with clean JSON export
+
+## 💡 Core Problems Solved
+
+| Problem | Solution |
+|---------|----------|
+| **Correlation Loss** | PID-to-resource mapping through simple correlation storage |
+| **Argument Confusion** | Single `--file` flag with auto-detection |
+| **Display Limitations** | Rich-based responsive formatting |
+| **User Experience** | Semantic analysis + auto-detection |
 
 ## Design Decisions Made
 
@@ -61,124 +85,51 @@ correlations = [
 - Context intelligence based on object class + permission combinations
 - No policy file access required - works with audit logs alone
 
-## Implementation Plan
+## 📋 Implementation Plan
 
-### PHASE 1: Core Foundation & Quick Fixes ✅ COMPLETED
+### ✅ **PHASE 1: Foundation** (COMPLETED)
+**1A: Code Quality & Validation** | **1B: Auto-Detection & Parsing**
+- Documentation & error handling | Enhanced regex patterns from setroubleshoot
+- Input validation & signal handling | Single `--file` flag with auto-detection
+- Argument validation improvements | Backward compatibility maintained
 
-#### 1A. Immediate Code Quality & Input Validation ✅ COMPLETED
-- [x] **Code documentation**: Add docstrings and inline comments for maintainability
-- [x] **Argument validation enhancements**: Better error messages for invalid combinations
-- [x] **Signal handling**: Proper cleanup on Ctrl+C during long operations
-- [x] **Input Validation**: Enhanced validation for malformed log entries and edge cases
-- [x] **Error Handling**: Robust error handling for corrupted/incomplete audit records
+### 🔄 **PHASE 2: Correlation & Semantic Analysis**
 
-#### 1B. Auto-Detection & Enhanced Parsing ✅ COMPLETED
-- [x] **Enhanced Regex Pattern**: Adopt setroubleshoot's robust audit record regex for better edge case handling (node=, type= prefixes)
-- [x] Add new `--file` or `-f` argument that replaces `--raw-file` and `--avc-file`
-- [x] Implement file content analysis logic to detect format type
-- [x] Add detection for `type=AVC msg=audit(...)` patterns → pre-processed
-- [x] Default to raw audit.log treatment when patterns not found
-- [x] Extend existing file validation logic to new flag
-- [x] Maintain backward compatibility with existing `--raw-file` and `--avc-file` flags
+#### **2A: Simple Correlation Storage** (IN PROGRESS)
+- [ ] **Correlation Data Structure**: Lightweight storage for individual event details
+- [ ] **Enhanced Record Support**: Robust parsing for all AVC message type variants
+- [ ] **Correlation Integration**: Individual correlations alongside aggregated data
+- [ ] **Enhanced AvcContext**: Minor improvements for better type descriptions
 
-### PHASE 2: Event Assembly & Correlation Tracking
+#### ✅ **2B: Semantic Enhancement** (COMPLETED)
+- [x] **Permission Semantic Analysis**: Human-readable descriptions + contextual intelligence
+- [x] **Enhanced Display**: Type descriptions, port intelligence, professional formatting
+- [x] **JSON Support**: Semantic fields included in structured output
 
-#### 2A. Event Assembly Foundation
-- [ ] **Implement Event Assembly Logic**: Adopt setroubleshoot's event-based correlation approach with temporal grouping by event ID
-- [ ] **AvcContext Class**: Implement proven SELinux context parsing from setroubleshoot
-- [ ] **Enhanced Record Types**: Support AVC, USER_AVC, AVC_PATH, 1400, 1107 message types
-- [ ] **End-of-Event Handling**: Proper EOE record processing for complete event assembly
+**Scope Note**: SYSCALL success/failure tracking moved OUT OF SCOPE (requires complex event assembly)
 
-#### 2B. Correlation Data Implementation & Semantic Enhancement
-- [ ] Design correlation data structure to store individual event details
-- [ ] Implement correlation storage alongside existing aggregated data
-- [ ] Track all varying fields: pid, comm, exe, proctitle, path, dest_port, saddr, permission, permissive
-- [ ] **Enhanced SYSCALL parsing**: Extract success/failure and exit codes (requires event assembly)
-- [ ] **Add syscall success/failure to correlation data structure**
-- [ ] **Track exit codes alongside other varying fields**
-- [ ] **Add basic dontaudit detection logic (noatsecure/rlimitinh/siginh trio)**
-- [ ] **Track dontaudit status in correlation data structure**
-- [ ] **Permission Semantic Analysis**: Add human-readable permission descriptions and contextual analysis
-  - Implement permission semantic mappings (read → "Read file content", name_connect → "Connect to network service")
-  - Add object class + permission contextual intelligence (file+read → "Reading file content", tcp_socket+name_connect → "Connecting to network service")
-  - Basic SELinux context field parsing (user:role:type:level extraction)
-  - Integrate semantic enrichment into display output without replacing raw permissions
-  - Add target analysis for common SELinux types (port types, file types, process types)
-- [ ] Maintain existing aggregated sets for backward compatibility
-- [ ] Update deduplication logic to preserve correlation information
-- [ ] **Enable BLOCKED/ALLOWED status determination logic**
-- [ ] Enhance JSON output to include correlations array
-- [ ] **Include syscall_success, exit_code, computed status, and dontaudit_disabled in JSON output**
+### 🎨 **PHASE 3: Rich Display Format** (PLANNED)
+**3A: Core Display** | **3B: Practical Features**
+- Rich Rule header format with responsive design | Detailed view with enhanced information
+- Legacy compatibility flag | Smart filtering (process, path, time, context)
+- Correlation events display | Sorting options (recent, count, chronological)
+- Dynamic styling & context-aware formatting | Smart resource display based on object class
 
-### PHASE 3: Rich Rule Display Format Implementation
+**Scope Note**: Syscall success indicators moved OUT OF SCOPE (requires complex event assembly)
 
-#### 3A. Core Display Format
-- [ ] Implement new Rich Rule Header format as default
-- [ ] Add `--legacy-format` flag to preserve current output format
-- [ ] Create compact view with correlation events display
-- [ ] Preserve "Unique Denial" terminology for semantic clarity
-- [ ] **Implement syscall success indicators (✓ ALLOWED, ✗ BLOCKED) in event display**
-- [ ] **Add color coding for success/failure status**
-- [ ] **Add basic dontaudit disabled indicator to denial headers when detected**
+### 🧪 **PHASE 4: Testing & Quality** (PLANNED)
+**Core Testing** | **Integration & Performance**
+- Unit tests for parsing logic & correlation | Real-world audit log scenario testing
+- Input validation & error handling tests | Cross-platform compatibility verification
+- Regression testing for critical functionality | Memory optimization for large files
 
-#### 3B. Advanced Display Features
-- [ ] Implement detailed view (`-d/--detailed`) with tree structure sub-details
-- [ ] Add smart resource display based on tclass (file paths, network ports, D-Bus destinations)
-- [ ] Integrate Rich Rule features: dynamic styling, context-aware formatting, responsive text handling, color integration
-- [ ] Implement sorting options: default (recent first), `--sort count` (frequency first), `--sort chrono` (oldest first)
-- [ ] **Enhanced detailed mode with syscall results, exit codes**
-- [ ] **Smart status determination based on success + permissive correlation**
-- [ ] **Add practical filtering capabilities**:
-  - `--process <name>`: Filter by process name
-  - `--path <pattern>`: Filter by path pattern
-  - `--recent <timeframe>`: Show only recent denials
-  - `--context <pattern>`: Filter by security context pattern
+### 📚 **PHASE 5: Documentation** (PLANNED)
+- Enhanced README with migration guides | Updated help text and usage examples
+- Installation instructions & version management | Feature documentation updates
 
-### PHASE 4: Testing & Validation
-- [ ] **Unit tests**: Add comprehensive test suite for new features
-  - Core parsing logic tests to prevent regressions
-  - Input validation and error handling tests
-  - Correlation tracking accuracy tests
-- [ ] Test auto-detection with various file types and edge cases
-- [ ] Verify correlation tracking accuracy for PID-path-permission mapping
-- [ ] Test display formats across different terminal sizes (60, 80, 120+ columns)
-- [ ] Validate `--legacy-format` maintains exact current behavior
-- [ ] **Integration tests**: Test with real-world audit log scenarios
-- [ ] **Cross-platform testing**: Verify behavior on different operating systems
-- [ ] Ensure all existing functionality remains intact
-- [ ] **Regression testing**: Automated tests for critical functionality
-
-### PHASE 5: Documentation & User Experience
-- [ ] **README updates**: Document new features, correlation tracking, display formats
-- [ ] **Help text improvements**: Update argument descriptions and examples for new flags
-- [ ] **Usage examples**: Add examples showing auto-detection, detailed mode, legacy format
-- [ ] **Migration guide**: Help users transition from old argument style to new format
-- [ ] **Version management**: Update version strings and changelog
-- [ ] **Document dontaudit detection**: Explain what it means for audit analysis
-- [ ] **Installation instructions**: Update for new dependencies and installation methods
-
-### PHASE 6: Performance & Practical Extensions
-
-#### 6A. Performance Optimization
-- [ ] **Memory management**: Optimize for very large audit log files
-- [ ] **Performance benchmarks**: Measure impact of correlation tracking
-- [ ] **Progress indicators**: Show progress for large file processing
-- [ ] **Graceful degradation**: Handle terminal capability limitations
-
-#### 6B. Practical Feature Extensions
-- [ ] **Time Range Filtering**: Filter denials by date/time ranges
-- [ ] **Statistics mode**: Show denial frequency statistics and trends
-- [ ] **Enhanced JSON export**: Include semantic analysis in JSON output
-- [ ] **Basic reporting**: Simple summary statistics for management reports
-
-### PHASE 7: Development Infrastructure
-- [ ] **Development setup**: Instructions for contributors
-- [ ] **Linting configuration**: Set up code style enforcement
-- [ ] **Release process**: Document release procedure and version management
-  - GitHub releases with changelogs
-  - Semantic versioning strategy
-  - Release notes and migration guides
-- [ ] **Package management**: Consider PyPI distribution for easier installation
+### 🚀 **PHASE 6: Performance & Extensions** (FUTURE)
+- Memory management for large files | Time range filtering capabilities
+- Progress indicators & graceful degradation | Statistics mode & enhanced reporting
 
 ## Technical Analysis Context
 
@@ -260,18 +211,38 @@ Detailed Events:
 **Phase 6**: Performance and practical extensions
 **Phase 7**: Development infrastructure
 
-## Key Benefits Expected
+## Key Benefits Expected (Scope-Compliant)
 
-1. **Simplified UX**: Single `--file` flag eliminates user confusion about file types
-2. **Correlation Clarity**: Solves PID-to-resource mapping problem completely
+1. **Simplified UX**: Single `--file` flag eliminates user confusion about file types ✅ COMPLETED
+2. **Correlation Clarity**: Lightweight storage solves PID-to-resource mapping without architectural complexity
 3. **Professional Output**: Rich Rule responsive format works across all terminal sizes
 4. **Enhanced Analysis**: Optional detailed view for deeper investigation
 5. **Legacy Support**: Existing users can continue using familiar format
-6. **Future-Proof**: Rich integration provides foundation for advanced features
-7. **Forensic Accuracy**: Syscall success/failure tracking shows actual system behavior
-8. **Security Context**: Dontaudit detection helps interpret audit log significance and volume
-9. **Actionable Information**: Clear distinction between blocked vs allowed actions
-10. **Semantic Intelligence**: Human-readable permission descriptions and contextual analysis without requiring policy files
+6. **Semantic Intelligence**: Human-readable permission descriptions and contextual analysis without requiring policy files ✅ COMPLETED
+7. **Forensic Focus**: Optimized for post-incident analysis clarity rather than real-time monitoring
+8. **Minimal Dependencies**: No policy file requirements for maximum portability
+9. **Professional Display**: Terminal-friendly with clean JSON export capabilities
+10. **Proven Patterns**: Adopts setroubleshoot's parsing techniques without full architectural complexity
+
+## Scope Compliance Summary
+
+**✅ WITHIN SCOPE & COMPLETED:**
+- Phase 1A: Core Foundation & Input Validation
+- Phase 1B: Auto-Detection & Enhanced Parsing
+- Phase 2B: Permission Semantic Analysis
+
+**✅ WITHIN SCOPE & PLANNED:**
+- Phase 2A: Simple Correlation Storage (lightweight approach)
+- Phase 3A: Rich Rule Display Format (terminal-focused)
+- Phase 3B: Practical Display Features (filtering, sorting)
+- Phase 4: Testing & Validation
+
+**❌ OUT OF SCOPE (Moved to Future Research):**
+- Complex event assembly and streaming correlation
+- Real-time monitoring capabilities
+- System behavior analysis and performance tracking
+- Policy file analysis and automated recommendations
+- Web interfaces and graphical dashboards
 
 ## Future Research Ideas (Not Committed Features)
 

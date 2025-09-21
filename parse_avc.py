@@ -880,8 +880,8 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
         #Enhanced permission display with descriptions
         enhanced_perms = []
         for perm in sorted(denial_info['permissions']):
-            # For single permission case, use pre-computed description from parsed_log
-            if len(denial_info['permissions']) == 1 and parsed_log.get('permission_description'):
+            # Try to get semantic description from parsed_log first, fallback to analyzer
+            if parsed_log.get('permission') == perm and parsed_log.get('permission_description'):
                 perm_desc = parsed_log['permission_description']
             else:
                 perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
@@ -913,7 +913,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
 
     # Add contextual analysis if available
     if parsed_log.get("contextual_analysis"):
-        action_fields.append(("Analysis", "contextual_analysis"))
+        action_fields.append(("Analysis", parsed_log["contextual_analysis"]))
 
     target_fields = [
         ("Target Path", "path"), ("Socket Address", "saddr"),
@@ -1001,7 +1001,6 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 label == "Permission" and 'permissions' in denial_info) or (
                 label == "SELinux Mode"):
             if label == "Permission" and 'permissions' in denial_info:
-                # Use the enhanced permissions string that was computed earlier
                 value = key  # key contains the enhanced permissions_str
             elif label == "SELinux Mode":
                 value = key  # key already contains the computed value
