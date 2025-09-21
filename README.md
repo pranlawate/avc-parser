@@ -1,6 +1,22 @@
 # SELinux AVC Denial Analyzer
 
-A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
+**Version 1.1.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
+
+## ⚡ Quick Start
+
+```bash
+# Install dependencies
+pip3 install rich
+
+# Analyze audit logs (auto-detects format)
+python3 parse_avc.py --file /var/log/audit/audit.log
+
+# Get field-by-field details
+python3 parse_avc.py --file /var/log/audit/audit.log --fields
+
+# Export to JSON
+python3 parse_avc.py --file /var/log/audit/audit.log --json
+```
 
 ## 🎯 Purpose
 
@@ -17,44 +33,24 @@ A forensic-focused tool for analyzing SELinux audit logs with intelligent dedupl
 
 **Use this tool when**: You need forensic analysis of audit logs from systems you can't access directly, or when setroubleshoot's real-time output becomes overwhelming during incident response.
 
-## ✅ Current Features
+## ✅ Key Features
 
-### 🔍 **Core Analysis**
-- **Multi-line AVC Parsing**: Complex audit log blocks with `AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, `SOCKADDR` records
-- **Intelligent Deduplication**: Groups identical denials with occurrence counts and timestamps
-- **Smart Field Aggregation**: Collects varying fields (PIDs, paths, permissions) across duplicates
-- **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback
+### 🎨 **Professional Display**
+- **Rich Terminal Format**: Default responsive formatting with professional styling and correlation events
+- **Field-by-Field View**: Detailed breakdown using `--fields` flag for analysis
+- **JSON Export**: Structured output with semantic fields for automation and integration
 
-### 🎨 **Semantic Analysis** ✨ NEW
-- **Human-Readable Permissions**: `read` → `read (Read file content)`
-- **Contextual Analysis**: `Analysis: Web server process attempting to read file content`
-- **Type Descriptions**: Enhanced context display with `httpd (Web server process)`
-- **Port Intelligence**: `5432 (PostgreSQL database)` for common services
+### 🔍 **Advanced Analysis**
+- **Semantic Intelligence**: Human-readable permissions (`read` → `Read file content`) and contextual analysis
+- **Smart Deduplication**: Groups identical denials with occurrence counts, timestamps, and field aggregation
+- **Correlation Tracking**: Individual PID-to-resource mappings solve deduplication information loss
+- **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback for complex scenarios
 
-### 📥 **Input Processing**
-- **Auto-Detection**: Single `--file` flag detects raw vs pre-processed format automatically
-- **Multiple Input Methods**: Raw audit.log, pre-processed files, or interactive input
-- **Robust Parsing**: setroubleshoot's proven regex patterns for edge case handling
-- **Comprehensive Validation**: File type, permission, and content validation with helpful errors
-
-### 📊 **Output Formats**
-- **Rich Terminal Output**: Color-coded, formatted summaries with professional appearance
-- **JSON Export**: Structured output including semantic fields for integration
-- **Cross-Platform**: Works on Linux, macOS, and Windows where Python runs
-
-## ✅ Recent Additions
-
-### 🎨 **Phase 3A: Rich Display Format** ✨ NEW
-- **Responsive Headers**: Professional Rich-based formatting that adapts to terminal width
-- **Correlation Events Display**: Individual PID-to-resource mappings in clean format
-- **Legacy Compatibility**: `--fields` flag preserves field-by-field display format
-- **Information Hierarchy**: Optimized layout for incident analysis workflow
-- **Dynamic Styling**: Context-aware formatting with professional color scheme
-
-### 🛠️ **Code Quality Optimization** ✨ NEW
-- **Function Refactoring**: Broke down oversized functions into focused components
-- **DRY Improvements**: Extracted repeated logic into reusable helper functions
-- **Enhanced Maintainability**: Clean architecture with single-responsibility functions
+### 📥 **Flexible Input**
+- **Auto-Detection**: Single `--file` flag automatically detects raw audit.log vs pre-processed format
+- **Multiple Sources**: Raw audit.log, ausearch output, or interactive paste input
+- **Robust Parsing**: Multi-line audit blocks (`AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, `SOCKADDR`)
+- **Comprehensive Validation**: File type, permissions, and content validation with helpful error messages
 
 ## 🔮 Upcoming Features
 
@@ -85,10 +81,10 @@ A forensic-focused tool for analyzing SELinux audit logs with intelligent dedupl
 1. **Clone the Repository**:
    ```bash
    # Using HTTPS
-   git clone https://github.com/pranlawate/avc_parser.git
-   
+   git clone https://github.com/[username]/avc-parser.git
+
    # Using SSH
-   git clone git@github.com:pranlawate/avc-parser.git
+   git clone git@github.com:[username]/avc-parser.git
    ```
 
 2. **Install Dependencies**:
@@ -128,17 +124,50 @@ python3 parse_avc.py
 # Paste logs and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
 ```
 
-### **JSON Output:**
-Add `--json` for machine-readable output:
+### **Output Formats:**
+
+**Rich Display (Default)**: Professional terminal format with responsive design
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log
+```
+
+**Field-by-Field Display**: Use `--fields` for detailed field breakdown
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log --fields
+```
+
+**JSON Output**: Add `--json` for machine-readable output
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --json
 ```
 
 ## Example Output
 
-### **Standard AVC Denial with Semantic Analysis** ✨
+### **Rich Display Format (Default)** ✨
 ```bash
 $ python3 parse_avc.py --file file_context_AVC.log
+🔍 Auto-detected: Pre-processed format
+
+Found 1 AVC events. Displaying 1 unique denials...
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+────────── Unique Denial #1 • 1 occurrences • last seen 1 year(s) ago ──────────
+2024-09-05 02:18:01 • Kernel AVC
+Denied read (Read file content) on file via openat
+
+httpd (Web server process) 1234 • working from /
+system_u:system_r:httpd_t:s0 attempting access to
+unconfined_u:object_r:default_t:s0
+
+Events:
+• PID 1234 (httpd) denied 'read' to file /var/www/html/index.html [Enforcing] ✗
+BLOCKED
+
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
+```
+
+### **Field-by-Field Display Format** (using `--fields`)
+```bash
+$ python3 parse_avc.py --file file_context_AVC.log --fields
 🔍 Auto-detected: Pre-processed format
 
 Found 1 AVC events. Displaying 1 unique denials...
@@ -211,9 +240,30 @@ $ python3 parse_avc.py --json --avc-file file_context_AVC.log
 
 ## Advanced Examples
 
-### Network AVC Denial
+### Network AVC Denial (Rich Format)
 ```bash
-$ python3 parse_avc.py --avc-file network_AVC.log 
+$ python3 parse_avc.py --avc-file network_AVC.log
+Pre-processed AVC file provided: 'network_AVC.log'
+
+Found 1 AVC events. Displaying 1 unique denials...
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+────────── Unique Denial #1 • 1 occurrences • last seen 1 month(s) ago ──────────
+2025-07-29 09:52:29 • Kernel AVC
+Denied name_connect (Connect to network service) on tcp_socket via connect
+
+httpd 4182412 • working from unknown
+system_u:system_r:httpd_t:s0 attempting access to
+system_u:object_r:jboss_management_port_t:s0
+
+Events:
+• PID 4182412 (httpd) denied 'name_connect' to tcp_socket port 9999 (JBoss Management) [Enforcing] ✗ BLOCKED
+
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
+```
+
+### Network AVC Denial (Field-by-Field Format)
+```bash
+$ python3 parse_avc.py --avc-file network_AVC.log --fields
 Pre-processed AVC file provided: 'network_AVC.log'
 
 Found 1 AVC events. Displaying 1 unique denials...
@@ -239,9 +289,31 @@ Found 1 AVC events. Displaying 1 unique denials...
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
-### Multiple Denials with Field Aggregation
+### Multiple Denials with Field Aggregation (Rich Format)
 ```bash
 $ python3 parse_avc.py --avc-file test_multiple_pids.log
+Pre-processed AVC file provided: 'testAVC/test_multiple_pids.log'
+
+Found 2 AVC events. Displaying 1 unique denials...
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+─────────── Unique Denial #1 • 2 occurrences • last seen 5 day(s) ago ───────────
+2025-09-04 18:19:00 • Kernel AVC
+Denied read, write (Read file content, Write file content) on file via openat
+
+httpd, httpd-worker 1234, 5678 • working from unknown
+system_u:system_r:httpd_t:s0 attempting access to
+unconfined_u:object_r:default_t:s0
+
+Events:
+• PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
+• PID 5678 (httpd-worker) denied 'write' to file /var/www/html/file2.html [Permissive] ⚠ LOGGED
+
+Analysis Complete: Processed 2 log blocks and found 1 unique denials.
+```
+
+### Multiple Denials with Field Aggregation (Field-by-Field Format)
+```bash
+$ python3 parse_avc.py --avc-file test_multiple_pids.log --fields
 Pre-processed AVC file provided: 'testAVC/test_multiple_pids.log'
 
 Found 2 AVC events. Displaying 1 unique denials...
@@ -268,9 +340,9 @@ Found 2 AVC events. Displaying 1 unique denials...
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
-### Multiple Denials with De-duplication
+### Multiple Denials with De-duplication (Field-by-Field Format)
 ```bash
-$ python3 parse_avc.py -rf testAVC/audit.log 
+$ python3 parse_avc.py -rf testAVC/audit.log --fields
 Raw file input provided. Running ausearch on 'audit.log'...
 
 Found 76 AVC events. Displaying 2 unique denials...
@@ -278,7 +350,7 @@ Found 76 AVC events. Displaying 2 unique denials...
 ───────── Unique Denial #1 (74 occurrences, last seen an unknown time) ─────────
   Process Title:/usr/bin/python3.11 /usr/bin/pulpcore-worker
   Process Name:pulpcore-worker
-  Process ID (PID):1020588, 1020782, 1020887, 1020976, 1021077, 1021270, 
+  Process ID (PID):1020588, 1020782, 1020887, 1020976, 1021077, 1021270,
 1021901, 1039740, 1039928, 1040118, 1040570, 1040889, 1041354, 1343630, 1343656,
 1343803, 1346039, 1346299, 1346310, 1346564, 1347373, 1348333, 1348467, 1348855,
 1349773, 1349927, 1350460, 1350668, 1350850, 1351213, 1376151, 1376165, 1376316,
@@ -319,6 +391,7 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 | `-f, --file` | Path to any audit file (auto-detects format) |
 | `-rf, --raw-file` | Path to a raw audit.log file |
 | `-af, --avc-file` | Path to a pre-processed AVC file |
+| `--fields` | Use field-by-field display format (legacy) |
 | `--json` | Output in JSON format |
 | `-h, --help` | Show help message |
 
@@ -351,36 +424,59 @@ Analysis Complete: Processed 76 log blocks and found 2 unique denials.
 
 ## 📈 Development Status
 
-**Current Phase**: 3B (Advanced Display Features)
+**Current Version**: 1.1.0 | **Current Phase**: 3B (Advanced Display Features)
 
-| Phase | Status | Key Features |
-|-------|--------|--------------|
-| **1A/1B** | ✅ **COMPLETED** | Foundation, auto-detection, validation |
-| **2A** | ✅ **COMPLETED** | Simple correlation storage, PID-to-resource mapping |
-| **2B** | ✅ **COMPLETED** | Semantic analysis, permission descriptions |
-| **3A** | ✅ **COMPLETED** | Rich display format, correlation events display |
-| **Code Opt** | ✅ **COMPLETED** | Function refactoring, DRY improvements |
-| **3B** | 🔄 **NEXT** | Smart filtering, sorting options |
-| **4** | ⏳ **PLANNED** | Testing, quality assurance |
-| **5** | ⏳ **PLANNED** | Enhanced documentation, architecture overview |
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Core Foundation** | ✅ **COMPLETE** | Auto-detection, validation, robust parsing |
+| **Semantic Analysis** | ✅ **COMPLETE** | Human-readable permissions, contextual intelligence |
+| **Correlation Tracking** | ✅ **COMPLETE** | PID-to-resource mapping, individual event details |
+| **Rich Display Format** | ✅ **COMPLETE** | Professional terminal output, responsive design |
+| **Code Quality** | ✅ **COMPLETE** | Refactored architecture, maintainable functions |
+| **Smart Filtering** | 🔄 **IN PROGRESS** | Process, path, time range filtering |
+| **Testing & Quality** | ⏳ **PLANNED** | Comprehensive test suite, performance optimization |
 
-### 🎯 **Design Focus**
-- **Forensic Analysis**: Post-incident audit log analysis (not real-time monitoring)
-- **Correlation Clarity**: PID-to-resource mapping with individual event tracking ✅ COMPLETED
-- **Professional Output**: Rich Rule responsive format with dynamic styling ✅ COMPLETED
-- **Code Quality**: Clean, maintainable architecture with focused functions ✅ COMPLETED
+### 🎯 **Design Principles**
+- **Forensic Focus**: Post-incident analysis (not real-time monitoring)
+- **Professional Output**: Rich terminal formatting with correlation tracking
 - **Minimal Dependencies**: Python + Rich only (no policy files required)
+- **Cross-Platform**: Linux, macOS, Windows compatibility
 
-📊 **Details**: [ROADMAP.md](ROADMAP.md) | **Decisions**: [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md)
+📊 **Complete Roadmap**: [ROADMAP.md](ROADMAP.md) | **Feature Decisions**: [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md)
 
-## Contributing
+## 💡 Tips & Troubleshooting
 
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+### Performance
+- **Large Files**: For audit.log files >100MB, consider using `ausearch` to pre-filter by time range
+- **Memory Usage**: Use `--json` output for processing large datasets programmatically
 
-## License
+### Common Issues
+- **Permission Denied**: Ensure read access to audit files (may require `sudo`)
+- **Missing ausearch**: Install audit package (`dnf install audit` or `apt install auditd`)
+- **Empty Output**: Check SELinux is enabled (`sestatus`) and audit logging is active
 
-This project is open source. Please check the repository for license details.
+### Best Practices
+- **Incident Analysis**: Start with Rich format for overview, use `--fields` for detailed investigation
+- **Automation**: Use `--json` output for integration with SIEM tools or custom scripts
+- **Time Ranges**: Use `ausearch -ts` to filter logs by time before analysis
 
-## Support
+## 🤝 Contributing
 
-For questions, issues, or feature requests, please open an issue on the GitHub repository.
+Contributions are welcome! Please see our development roadmap and feature decisions for current priorities:
+- 🐛 **Bug Reports**: Open an issue with reproduction steps
+- 💡 **Feature Requests**: Check [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for scope alignment
+- 🔧 **Pull Requests**: Follow existing code style and include tests
+
+## 📄 License
+
+**MIT License** - This project is open source and free to use. See the repository for full license details.
+
+## 🆘 Support
+
+- **Questions**: Open a GitHub issue for usage questions
+- **Bug Reports**: Include log samples and error messages
+- **Feature Requests**: Check our roadmap before submitting
+
+---
+
+**SELinux AVC Denial Analyzer v1.1.0** | Made for forensic analysts and system administrators
