@@ -375,6 +375,51 @@ This document maintains a comprehensive record of all feature decisions, includi
 
 ---
 
+## Recent Implementation Decisions (2025-09-21)
+
+### ✅ ACCEPTED: Rich Rule Header Format Implementation
+**Proposal**: Implement professional Rich Rule headers with responsive terminal formatting
+**Implementation**: Rich Rules with dynamic width, correlation events display, professional color scheme
+**Reason**: Superior terminal responsiveness and professional appearance for forensic analysis
+**Date**: 2025-09-21
+**Status**: IMPLEMENTED (Phase 3A)
+
+### ✅ ACCEPTED: Function Refactoring for Code Quality
+**Proposal**: Break down oversized functions into focused, single-responsibility components
+**Implementation**: Extracted helper functions from 260+ line _parse_avc_log_internal()
+**Functions Created**:
+- `parse_timestamp_from_audit_block()` - Timestamp parsing logic
+- `extract_shared_context_from_non_avc_records()` - Context extraction
+- `process_individual_avc_record()` - Individual AVC processing with semantic analysis
+**Reason**: Improved maintainability, testability, and code clarity without functional changes
+**Date**: 2025-09-21
+**Status**: IMPLEMENTED
+
+### ✅ ACCEPTED: DRY Principle Implementation
+**Proposal**: Extract repeated logic into reusable helper functions
+**Implementation**: Created unified helper functions for permission enhancement and correlation building
+**Functions Created**:
+- `get_enhanced_permissions_display()` - Unified permission formatting
+- `build_correlation_event()` - Standardized correlation data structure
+**Reason**: Eliminated code duplication and improved consistency
+**Date**: 2025-09-21
+**Status**: IMPLEMENTED
+
+### ✅ ACCEPTED: Legacy Format Flag Rename
+**Proposal**: Rename `--legacy-format` flag to `--fields` for better clarity
+**Reason**: More intuitive naming that describes the field-by-field display format
+**Date**: 2025-09-21
+**Status**: IMPLEMENTED
+
+### ✅ ACCEPTED: Lightweight Architecture Documentation
+**Proposal**: Add ASCII-based architecture documentation to Phase 5 instead of full UML
+**Components**: Function relationship trees, data flow diagrams, developer guide
+**Reason**: Provides architectural clarity while maintaining minimal dependencies and scope compliance
+**Date**: 2025-09-21
+**Status**: PLANNED (Phase 5)
+
+---
+
 ## Decision Process
 
 All feature decisions should follow this process:

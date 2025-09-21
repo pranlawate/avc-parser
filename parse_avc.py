@@ -7,9 +7,9 @@ A forensic-focused tool for analyzing SELinux audit logs with intelligent
 deduplication and clear correlation tracking. This tool specializes in
 post-incident SELinux audit log analysis for complex denial patterns.
 
-Author: [Author Name]
+Author: Pranav Lawate
 License: [License Type]
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import argparse
@@ -532,7 +532,7 @@ def parse_avc_log(log_block: str) -> tuple[list, set]:
         return [], {f"PARSE_ERROR_{type(e).__name__}"}
 
 
-def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
+def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:
     """
     Internal parsing function with detailed error handling for audit record processing.
 
@@ -542,8 +542,43 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
     avc_denials = []
     unparsed_types = set()
 
-    # Extract shared context that applies to all AVC records in this log block
-    shared_context = {}
+    # Extract timestamp context from the log block
+    shared_context = parse_timestamp_from_audit_block(log_block)
+
+    # Extract shared context from non-AVC records
+    context_data, context_unparsed = extract_shared_context_from_non_avc_records(log_block)
+    shared_context.update(context_data)
+    unparsed_types.update(context_unparsed)
+
+    # Process each AVC and USER_AVC line separately
+    for line in log_block.strip().split('\n'):
+        line = line.strip()
+        if re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line):
+            # Parse this specific AVC or USER_AVC line with error handling
+            try:
+                avc_data = process_individual_avc_record(line, shared_context)
+                if avc_data and "permission" in avc_data:  # Only add if it's a valid AVC
+                    avc_denials.append(avc_data)
+            except Exception as parse_error:  # pylint: disable=broad-exception-caught
+                # Individual AVC parsing failed - skip this record but continue with others
+                # Add error information to unparsed types for tracking
+                unparsed_types.add(f"AVC_PARSE_ERROR_{type(parse_error).__name__}")
+                continue
+
+    return avc_denials, unparsed_types
+
+
+def parse_timestamp_from_audit_block(log_block: str) -> dict:
+    """
+    Extract and parse timestamp information from audit log block.
+
+    Args:
+        log_block (str): Multi-line audit log block
+
+    Returns:
+        dict: Timestamp context with datetime_obj, datetime_str, and timestamp fields
+    """
+    timestamp_context = {}
 
     # Parse timestamp from audit message header
     # Format: msg=audit(1234567890.123:456) where first part is timestamp
@@ -571,12 +606,27 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
 
         # Store parsed timestamp in multiple useful formats
         if dt_object:
-            shared_context['datetime_obj'] = dt_object
-            shared_context['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
-            shared_context['timestamp'] = dt_object.timestamp()
+            timestamp_context['datetime_obj'] = dt_object
+            timestamp_context['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+            timestamp_context['timestamp'] = dt_object.timestamp()
+
+    return timestamp_context
+
+
+def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, set]:
+    """
+    Extract shared context information from non-AVC audit records.
+
+    Args:
+        log_block (str): Multi-line audit log block
+
+    Returns:
+        tuple[dict, set]: (shared_context, unparsed_types)
+    """
+    shared_context = {}
+    unparsed_types = set()
 
     # Define regex patterns for extracting context from non-AVC audit records
-    # These records provide additional context that enriches AVC denial information
     patterns = {
         "CWD": {"cwd": r"cwd=\"([^\"]+)\""},  # Current working directory
         "PATH": {
@@ -640,160 +690,225 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
             # Track unparsed types (excluding all supported AVC-related types)
             unparsed_types.add(log_type)
 
-    # Now process each AVC and USER_AVC line separately
-    for line in log_block.strip().split('\n'):
-        line = line.strip()
-        if re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line):
-            # Parse this specific AVC or USER_AVC line with error handling
-            try:
-                avc_data = shared_context.copy()  # Start with shared context
+    return shared_context, unparsed_types
 
-                # Determine record type and extract content accordingly
-                record_type_match = re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line)
-                if not record_type_match:
+
+def process_individual_avc_record(line: str, shared_context: dict) -> dict:
+    """
+    Process a single AVC record line and extract denial information.
+
+    Args:
+        line (str): Single AVC record line
+        shared_context (dict): Shared context from non-AVC records
+
+    Returns:
+        dict: Parsed AVC data with semantic analysis, or empty dict if parsing fails
+    """
+    try:
+        avc_data = shared_context.copy()  # Start with shared context
+
+        # Determine record type and extract content accordingly
+        record_type_match = re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line)
+        if not record_type_match:
+            return {}
+
+        record_type = record_type_match.group(1)
+
+        # Handle USER_AVC and numeric equivalent (1107)
+        if record_type in ['USER_AVC', '1107']:
+            # Extract the msg content from USER_AVC
+            msg_match = re.search(r"msg='([^']+)'", line)
+            if msg_match:
+                avc_content = msg_match.group(1)
+                # Also extract basic USER_AVC fields from the outer message
+                user_avc_patterns = {
+                    "pid": r"pid=(\S+)",
+                    "uid": r"uid=(\S+)",
+                }
+                for key, pattern in user_avc_patterns.items():
+                    field_match = re.search(pattern, line)
+                    if field_match:
+                        avc_data[key] = field_match.group(1).strip()
+            else:
+                # Skip if no msg content (like policyload notices)
+                return {}
+        else:
+            # Handle AVC, AVC_PATH, and numeric equivalent (1400)
+            avc_content = line
+
+        # Set the denial type based on the record type
+        if record_type in ['USER_AVC', '1107']:
+            avc_data['denial_type'] = 'USER_AVC'
+        elif record_type == 'AVC_PATH':
+            avc_data['denial_type'] = 'AVC_PATH'
+        else:
+            # AVC, 1400, or any other kernel AVC type
+            avc_data['denial_type'] = 'AVC'
+
+        # Extract AVC-specific fields (works for both AVC and USER_AVC msg content)
+        avc_patterns = {
+            "permission": r"denied\s+\{ ([^}]+) \}",
+            "pid": r"pid=(\S+)",
+            "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))",
+            "path": r"path=\"([^\"]+)\"",
+            "path_unquoted": r"path=([^\s]+)",  # For unquoted paths in AVC
+            "name": r"name=([^\s]+)",  # name field in AVC (often just filename)
+            "dev": r"dev=\"?([^\"\\s]+)\"?",  # Device, may or may not be quoted
+            "ino": r"ino=(\d+)",  # Inode number
+            "scontext": r"scontext=(\S+)",
+            "tcontext": r"tcontext=(\S+)",
+            "tclass": r"tclass=(\S+)",
+            "dest_port": r"dest=(\S+)",
+            "permissive": r"permissive=(\d+)",
+        }
+
+        for key, pattern in avc_patterns.items():
+            field_match = re.search(pattern, avc_content)
+            if field_match:
+                # For USER_AVC, don't override pid if it was already set from outer message
+                if 'type=USER_AVC' in line and key == "pid" and key in avc_data:
                     continue
 
-                record_type = record_type_match.group(1)
-
-                # Handle USER_AVC and numeric equivalent (1107)
-                if record_type in ['USER_AVC', '1107']:
-                    # Extract the msg content from USER_AVC
-                    msg_match = re.search(r"msg='([^']+)'", line)
-                    if msg_match:
-                        avc_content = msg_match.group(1)
-                        # Also extract basic USER_AVC fields from the outer message
-                        user_avc_patterns = {
-                            "pid": r"pid=(\S+)",
-                            "uid": r"uid=(\S+)",
-                        }
-                        for key, pattern in user_avc_patterns.items():
-                            field_match = re.search(pattern, line)
-                            if field_match:
-                                avc_data[key] = field_match.group(1).strip()
+                if key == "comm" and len(field_match.groups()) > 1:
+                    # Handle comm field which can be quoted or unquoted
+                    avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
+                elif key == 'path_unquoted':
+                    # Only use unquoted path if we don't already have a quoted path
+                    if 'path' not in avc_data:
+                        avc_data['path'] = field_match.group(1).strip()
+                elif key in ['scontext', 'tcontext']:
+                    # Parse SELinux contexts into AvcContext objects for enhanced analysis
+                    context_string = field_match.group(1).strip()
+                    avc_context = AvcContext(context_string)
+                    if avc_context.is_valid():
+                        avc_data[key] = avc_context
+                        # Also store raw string for backward compatibility
+                        avc_data[f"{key}_raw"] = context_string
                     else:
-                        # Skip if no msg content (like policyload notices)
-                        continue
+                        # Fall back to raw string if parsing fails
+                        avc_data[key] = context_string
                 else:
-                    # Handle AVC, AVC_PATH, and numeric equivalent (1400)
-                    avc_content = line
-            except Exception as parse_error:  # pylint: disable=broad-exception-caught
-                # Individual AVC parsing failed - skip this record but continue with others
-                # Add error information to unparsed types for tracking
-                unparsed_types.add(f"AVC_PARSE_ERROR_{type(parse_error).__name__}")
-                continue
+                    avc_data[key] = field_match.group(1).strip()
 
-            # Set the denial type based on the record type
-            if record_type in ['USER_AVC', '1107']:
-                avc_data['denial_type'] = 'USER_AVC'
-            elif record_type == 'AVC_PATH':
-                avc_data['denial_type'] = 'AVC_PATH'
+        # Enhanced path resolution logic
+        if 'path' not in avc_data or not avc_data['path']:
+            # No path in AVC, try to use PATH record data or create dev+inode identifier
+            if shared_context.get('path'):
+                avc_data['path'] = shared_context['path']
+            elif avc_data.get('dev') and avc_data.get('ino'):
+                # Create a dev+inode identifier when path is missing
+                avc_data['path'] = f"dev:{avc_data['dev']},inode:{avc_data['ino']}"
+                avc_data['path_type'] = 'dev_inode'
+            elif shared_context.get('dev') and shared_context.get('inode'):
+                # Use PATH record dev+inode if available
+                dev_val = shared_context['dev']
+                inode_val = shared_context['inode']
+                avc_data['path'] = f"dev:{dev_val},inode:{inode_val}"
+                avc_data['path_type'] = 'dev_inode'
+        else:
+            # We have a path, mark it as a regular path
+            avc_data['path_type'] = 'file_path'
+
+        # Use comm as fallback for proctitle if proctitle is null or missing
+        if avc_data.get('proctitle') in ["(null)", "null", "", None] and avc_data.get('comm'):
+            avc_data['proctitle'] = avc_data['comm']
+
+        # Add semantic analysis for enhanced user comprehension
+        if avc_data.get('permission') and avc_data.get('tclass'):
+            permission = avc_data['permission']
+            obj_class = avc_data['tclass']
+            source_context = avc_data.get('scontext')
+            target_context = avc_data.get('tcontext')
+
+            # Add permission description
+            avc_data['permission_description'] = PermissionSemanticAnalyzer.get_permission_description(permission)
+
+            # Add contextual analysis
+            avc_data['contextual_analysis'] = PermissionSemanticAnalyzer.get_contextual_analysis(
+                permission, obj_class, source_context, target_context
+            )
+
+            # Add object class description
+            avc_data['class_description'] = PermissionSemanticAnalyzer.get_class_description(obj_class)
+
+            # Add source type description if available
+            if source_context and hasattr(source_context, 'get_type_description'):
+                avc_data['source_type_description'] = source_context.get_type_description()
+
+            # Add target type description if available
+            if target_context and hasattr(target_context, 'get_type_description'):
+                avc_data['target_type_description'] = target_context.get_type_description()
+
+            # Add port description for network denials
+            if avc_data.get('dest_port'):
+                avc_data['port_description'] = PermissionSemanticAnalyzer.get_port_description(avc_data['dest_port'])
+
+        return avc_data
+
+    except Exception:
+        # Individual AVC parsing failed - return empty dict
+        return {}
+
+
+def build_correlation_event(parsed_log: dict, permission: str) -> dict:
+    """
+    Build a correlation event dictionary from parsed log data.
+
+    Args:
+        parsed_log (dict): Parsed AVC log data
+        permission (str): The specific permission for this event
+
+    Returns:
+        dict: Clean correlation event with non-null values only
+    """
+    correlation_event = {
+        'pid': parsed_log.get('pid'),
+        'comm': parsed_log.get('comm'),
+        'path': parsed_log.get('path'),
+        'permission': permission,
+        'permissive': parsed_log.get('permissive'),
+        'timestamp': parsed_log.get('datetime_str'),
+        'dest_port': parsed_log.get('dest_port'),
+        'saddr': parsed_log.get('saddr')
+    }
+    # Only store non-null values to keep correlations clean
+    return {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
+
+
+def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str:
+    """
+    Generate enhanced permission display string with semantic descriptions.
+
+    Args:
+        denial_info (dict): Aggregated denial information containing permissions set
+        parsed_log (dict): Parsed log data with permission_description if available
+
+    Returns:
+        str: Enhanced permissions string with descriptions
+    """
+    if 'permissions' in denial_info and len(denial_info['permissions']) > 1:
+        # Multiple permissions case
+        enhanced_perms = []
+        for perm in sorted(denial_info['permissions']):
+            if parsed_log.get('permission') == perm and parsed_log.get('permission_description'):
+                perm_desc = parsed_log['permission_description']
             else:
-                # AVC, 1400, or any other kernel AVC type
-                avc_data['denial_type'] = 'AVC'
+                perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
 
-            # Extract AVC-specific fields (works for both AVC and USER_AVC msg content)
-            avc_patterns = {
-                "permission": r"denied\s+\{ ([^}]+) \}",
-                "pid": r"pid=(\S+)",
-                "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))",
-                "path": r"path=\"([^\"]+)\"",
-                "path_unquoted": r"path=([^\s]+)",  # For unquoted paths in AVC
-                "name": r"name=([^\s]+)",  # name field in AVC (often just filename)
-                "dev": r"dev=\"?([^\"\\s]+)\"?",  # Device, may or may not be quoted
-                "ino": r"ino=(\d+)",  # Inode number
-                "scontext": r"scontext=(\S+)",
-                "tcontext": r"tcontext=(\S+)",
-                "tclass": r"tclass=(\S+)",
-                "dest_port": r"dest=(\S+)",
-                "permissive": r"permissive=(\d+)",
-            }
+            if perm_desc != perm:
+                enhanced_perms.append(f"{perm} ({perm_desc})")
+            else:
+                enhanced_perms.append(perm)
+        return ", ".join(enhanced_perms)
 
-            for key, pattern in avc_patterns.items():
-                field_match = re.search(pattern, avc_content)
-                if field_match:
-                    # For USER_AVC, don't override pid if it was already set from outer message
-                    if 'type=USER_AVC' in line and key == "pid" and key in avc_data:
-                        continue
+    elif parsed_log.get('permission_description'):
+        # Single permission with description
+        permission = parsed_log.get('permission', '')
+        return f"{permission} ({parsed_log['permission_description']})"
 
-                    if key == "comm" and len(field_match.groups()) > 1:
-                        # Handle comm field which can be quoted or unquoted
-                        avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
-                    elif key == 'path_unquoted':
-                        # Only use unquoted path if we don't already have a quoted path
-                        if 'path' not in avc_data:
-                            avc_data['path'] = field_match.group(1).strip()
-                    elif key in ['scontext', 'tcontext']:
-                        # Parse SELinux contexts into AvcContext objects for enhanced analysis
-                        context_string = field_match.group(1).strip()
-                        avc_context = AvcContext(context_string)
-                        if avc_context.is_valid():
-                            avc_data[key] = avc_context
-                            # Also store raw string for backward compatibility
-                            avc_data[f"{key}_raw"] = context_string
-                        else:
-                            # Fall back to raw string if parsing fails
-                            avc_data[key] = context_string
-                    else:
-                        avc_data[key] = field_match.group(1).strip()
-
-            if "permission" in avc_data:  # Only add if it's a valid AVC
-                # Enhanced path resolution logic
-                # Priority: 1) PATH record name field, 2) AVC path field, 3) dev+inode combination
-                if 'path' not in avc_data or not avc_data['path']:
-                    # No path in AVC, try to use PATH record data or create dev+inode identifier
-                    if shared_context.get('path'):
-                        avc_data['path'] = shared_context['path']
-                    elif avc_data.get('dev') and avc_data.get('ino'):
-                        # Create a dev+inode identifier when path is missing
-                        avc_data['path'] = f"dev:{avc_data['dev']},inode:{avc_data['ino']}"
-                        avc_data['path_type'] = 'dev_inode'
-                    elif shared_context.get('dev') and shared_context.get('inode'):
-                        # Use PATH record dev+inode if available
-                        dev_val = shared_context['dev']
-                        inode_val = shared_context['inode']
-                        avc_data['path'] = f"dev:{dev_val},inode:{inode_val}"
-                        avc_data['path_type'] = 'dev_inode'
-                else:
-                    # We have a path, mark it as a regular path
-                    avc_data['path_type'] = 'file_path'
-
-                # Use comm as fallback for proctitle if proctitle is null or missing
-                if avc_data.get('proctitle') in [
-                        "(null)", "null", "", None] and avc_data.get('comm'):
-                    avc_data['proctitle'] = avc_data['comm']
-
-                # Add semantic analysis for enhanced user comprehension
-                if avc_data.get('permission') and avc_data.get('tclass'):
-                    permission = avc_data['permission']
-                    obj_class = avc_data['tclass']
-                    source_context = avc_data.get('scontext')
-                    target_context = avc_data.get('tcontext')
-
-                    # Add permission description
-                    avc_data['permission_description'] = PermissionSemanticAnalyzer.get_permission_description(permission)
-
-                    # Add contextual analysis
-                    avc_data['contextual_analysis'] = PermissionSemanticAnalyzer.get_contextual_analysis(
-                        permission, obj_class, source_context, target_context
-                    )
-
-                    # Add object class description
-                    avc_data['class_description'] = PermissionSemanticAnalyzer.get_class_description(obj_class)
-
-                    # Add source type description if available
-                    if source_context and hasattr(source_context, 'get_type_description'):
-                        avc_data['source_type_description'] = source_context.get_type_description()
-
-                    # Add target type description if available
-                    if target_context and hasattr(target_context, 'get_type_description'):
-                        avc_data['target_type_description'] = target_context.get_type_description()
-
-                    # Add port description for network denials
-                    if avc_data.get('dest_port'):
-                        avc_data['port_description'] = PermissionSemanticAnalyzer.get_port_description(avc_data['dest_port'])
-
-                avc_denials.append(avc_data)
-    return avc_denials, unparsed_types
+    else:
+        # Fallback to raw permission
+        return parsed_log.get('permission', '')
 
 
 def human_time_ago(dt_object: datetime) -> str:  # pylint: disable=too-many-return-statements
@@ -877,27 +992,10 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     # Handle permissions - either single permission or comma-separated list
     if 'permissions' in denial_info and denial_info['permissions'] and len(
             denial_info['permissions']) > 0:
-        #Enhanced permission display with descriptions
-        enhanced_perms = []
-        for perm in sorted(denial_info['permissions']):
-            # Try to get semantic description from parsed_log first, fallback to analyzer
-            if parsed_log.get('permission') == perm and parsed_log.get('permission_description'):
-                perm_desc = parsed_log['permission_description']
-            else:
-                perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
-            if perm_desc != perm:
-                enhanced_perms.append(f"{perm} ({perm_desc})")
-            else:
-                enhanced_perms.append(perm)
-        permissions_str = ", ".join(enhanced_perms)
+        permissions_str = get_enhanced_permissions_display(denial_info, parsed_log)
         action_fields.append(("Permission", permissions_str))
     elif parsed_log.get("permission"):
-        # Enhanced permission display with semantic analysis
-        permission = parsed_log["permission"]
-        if parsed_log.get("permission_description"):
-            permission_display = f"{permission} ({parsed_log['permission_description']})"
-        else:
-            permission_display = permission
+        permission_display = get_enhanced_permissions_display(denial_info, parsed_log)
         action_fields.append(("Permission", permission_display))
 
     # Handle permissive mode - check both collected and single values
@@ -1103,6 +1201,126 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 console.print(f"[green]{port_value}[/green]")
 
     console.print("-" * 35)
+
+
+def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
+    """
+    Print a Rich-formatted summary with correlation events display.
+
+    This function implements the Phase 3A Rich Display Format with:
+    - Rich Rule responsive header format
+    - Correlation events display showing individual PID-to-resource mappings
+    - Professional styling with automatic width handling
+
+    Args:
+        console (Console): Rich console object for formatted output
+        denial_info (dict): Aggregated denial information with correlation data
+        denial_num (int): Sequential denial number for display
+    """
+    from rich.panel import Panel
+    from rich.columns import Columns
+    from rich.text import Text
+
+    parsed_log = denial_info['log']
+    count = denial_info['count']
+    last_seen_dt = denial_info['last_seen_obj']
+    last_seen_ago = human_time_ago(last_seen_dt)
+
+    # Rich Rule header with responsive design
+    header_text = f"Unique Denial #{denial_num} • {count} occurrences • last seen {last_seen_ago}"
+    console.print(Rule(f"[bold green]{header_text}[/bold green]", style="green"))
+
+    # 1. WHEN - Timestamp and technical type (most critical for incident analysis)
+    timestamp_parts = []
+    if parsed_log.get('datetime_str'):
+        timestamp_parts.append(f"[bold white]{parsed_log['datetime_str']}[/bold white]")
+
+    if parsed_log.get('denial_type'):
+        denial_type_display = "Kernel AVC" if parsed_log['denial_type'] == "AVC" else "Userspace AVC" if parsed_log['denial_type'] == "USER_AVC" else parsed_log['denial_type']
+        timestamp_parts.append(f"[bright_green]{denial_type_display}[/bright_green]")
+
+    if timestamp_parts:
+        console.print(" • ".join(timestamp_parts))
+
+    # 2. WHAT - Action summary with syscall context (immediately after timestamp)
+    permissions_display = get_enhanced_permissions_display(denial_info, parsed_log)
+    obj_class = parsed_log.get('class_description', parsed_log.get('tclass', ''))
+    action_line = f"Denied [bright_cyan bold]{permissions_display}[/bright_cyan bold] on [green bold]{obj_class}[/green bold]"
+
+    # Add syscall context to the action line
+    if parsed_log.get('syscall'):
+        action_line += f" via [green]{parsed_log['syscall']}[/green]"
+
+    console.print(action_line)
+    console.print()  # Space after action line
+
+    # 3. WHO & WHERE - Process and location in one flowing line
+    details = []
+
+    # Build process info
+    if parsed_log.get('comm'):
+        if parsed_log.get('source_type_description'):
+            process_info = f"[green bold]{parsed_log['comm']}[/green bold] [dim]({parsed_log['source_type_description']})[/dim]"
+        else:
+            process_info = f"[green bold]{parsed_log['comm']}[/green bold]"
+
+        if parsed_log.get('pid'):
+            process_info += f" [cyan]{parsed_log['pid']}[/cyan]"
+
+        details.append(process_info)
+    elif parsed_log.get('pid'):
+        details.append(f"PID [cyan]{parsed_log['pid']}[/cyan]")
+
+    # Add working directory if available
+    if parsed_log.get('cwd'):
+        details.append(f"working from [dim green]{parsed_log['cwd']}[/dim green]")
+
+    if details:
+        console.print(" • ".join(details))
+
+    # 4. CONTEXT - Security context transition
+    scontext = str(parsed_log.get('scontext', ''))
+    tcontext = str(parsed_log.get('tcontext', ''))
+    if scontext and tcontext:
+        console.print(f"[bright_cyan]{scontext}[/bright_cyan] attempting access to [bright_cyan]{tcontext}[/bright_cyan]")
+
+    console.print()  # Space before events
+
+    # Correlation events display
+    if 'correlations' in denial_info and denial_info['correlations']:
+        console.print("[bold]Events:[/bold]")
+        for correlation in denial_info['correlations']:
+            pid = correlation.get('pid', 'unknown')
+            comm = correlation.get('comm', 'unknown')
+            permission = correlation.get('permission', '')
+            path = correlation.get('path', '')
+            dest_port = correlation.get('dest_port', '')
+            saddr = correlation.get('saddr', '')
+            permissive = correlation.get('permissive', '')
+
+            # Build event description
+            if path:
+                target_desc = f"file {path}"
+            elif dest_port:
+                port_desc = PermissionSemanticAnalyzer.get_port_description(dest_port)
+                target_desc = f"port {dest_port} ({port_desc})" if port_desc != f"port {dest_port}" else f"port {dest_port}"
+            elif saddr:
+                target_desc = f"socket {saddr}"
+            else:
+                target_desc = "resource"
+
+            # Determine enforcement status
+            if permissive == "1":
+                enforcement = "[green]✓ ALLOWED[/green]"
+                mode = "[yellow]Permissive[/yellow]"
+            else:
+                enforcement = "[red]✗ BLOCKED[/red]"
+                mode = "[cyan]Enforcing[/cyan]"
+
+            # Display correlation event
+            console.print(f"• PID {pid} ([green]{comm}[/green]) denied '[bright_cyan]{permission}[/bright_cyan]' to {target_desc} [{mode}] {enforcement}")
+
+    console.print()  # Space after events
 
 
 def validate_arguments(args, console: Console) -> str:
@@ -1402,6 +1620,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "--json",
         action="store_true",
         help="Output the parsed data in JSON format.")
+    parser.add_argument(
+        "--fields",
+        action="store_true",
+        help="Use field-by-field display format instead of compact Rich format.")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -1605,18 +1827,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     if 'correlations' not in unique_denials[signature]:
                         unique_denials[signature]['correlations'] = []
 
-                    correlation_event = {
-                        'pid': parsed_log.get('pid'),
-                        'comm': parsed_log.get('comm'),
-                        'path': parsed_log.get('path'),
-                        'permission': permission,
-                        'permissive': parsed_log.get('permissive'),
-                        'timestamp': parsed_log.get('datetime_str'),
-                        'dest_port': parsed_log.get('dest_port'),
-                        'saddr': parsed_log.get('saddr')
-                    }
-                    # Only store non-null values to keep correlations clean
-                    correlation_event = {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
+                    correlation_event = build_correlation_event(parsed_log, permission)
                     unique_denials[signature]['correlations'].append(correlation_event)
 
                     # Collect varying fields (not part of signature)
@@ -1644,18 +1855,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     }
 
                     # Initialize correlation storage for first event
-                    correlation_event = {
-                        'pid': parsed_log.get('pid'),
-                        'comm': parsed_log.get('comm'),
-                        'path': parsed_log.get('path'),
-                        'permission': permission,
-                        'permissive': parsed_log.get('permissive'),
-                        'timestamp': parsed_log.get('datetime_str'),
-                        'dest_port': parsed_log.get('dest_port'),
-                        'saddr': parsed_log.get('saddr')
-                    }
-                    # Only store non-null values to keep correlations clean
-                    correlation_event = {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
+                    correlation_event = build_correlation_event(parsed_log, permission)
                     denial_entry['correlations'] = [correlation_event]
 
                     # Initialize varying fields for first occurrence
@@ -1740,11 +1940,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         sorted_denials = sorted(unique_denials.values(),
                                 key=lambda x: x['first_seen_obj'] or datetime.fromtimestamp(0))
         if sorted_denials:
-            console.print(Rule("[bold green]Parsed Log Summary[/bold green]"))
+            console.print(Rule("[dim]Parsed Log Summary[/dim]"))
         for i, denial_info in enumerate(sorted_denials):
             if i > 0:
-                console.print(Rule(style="dim"))
-            print_summary(console, denial_info, i + 1)
+                if args.fields:
+                    console.print(Rule(style="dim"))
+                else:
+                    console.print()  # Space between denials
+
+            # Choose display format based on --fields flag
+            if args.fields:
+                print_summary(console, denial_info, i + 1)
+            else:
+                print_rich_summary(console, denial_info, i + 1)
         console.print(
             f"\n[bold green]Analysis Complete:[/bold green] Processed {
                 len(log_blocks)} log blocks and found {
