@@ -65,6 +65,93 @@ AUDIT_RECORD_RE = re.compile(
 )
 
 
+class AvcContext:
+    """
+    Enhanced SELinux context parsing class based on setroubleshoot's proven approach.
+
+    Parses SELinux security contexts (user:role:type:mls) into structured components
+    for enhanced analysis and correlation tracking.
+    """
+
+    def __init__(self, context_string: str):
+        """
+        Initialize AvcContext from a SELinux context string.
+
+        Args:
+            context_string (str): SELinux context string (e.g., "system_u:system_r:httpd_t:s0")
+        """
+        self.user = None
+        self.role = None
+        self.type = None
+        self.mls = None
+
+        if isinstance(context_string, str) and context_string:
+            fields = context_string.split(':')
+            if len(fields) >= 3:
+                self.user = fields[0]
+                self.role = fields[1]
+                self.type = fields[2]
+                if len(fields) > 3:
+                    # Handle MLS labels that may contain colons (e.g., s0:c0.c1023)
+                    self.mls = ':'.join(fields[3:])
+                else:
+                    # Default MLS level if not present
+                    self.mls = 's0'
+
+    def __str__(self) -> str:
+        """Return the full context string."""
+        if all([self.user, self.role, self.type, self.mls]):
+            return f"{self.user}:{self.role}:{self.type}:{self.mls}"
+        return ""
+
+    def __repr__(self) -> str:
+        """Return a detailed representation."""
+        return f"AvcContext(user='{self.user}', role='{self.role}', type='{self.type}', mls='{self.mls}')"
+
+    def __eq__(self, other) -> bool:
+        """Compare two AvcContext objects for equality."""
+        if not isinstance(other, AvcContext):
+            return False
+        return (self.user == other.user and
+                self.role == other.role and
+                self.type == other.type and
+                self.mls == other.mls)
+
+    def __ne__(self, other) -> bool:
+        """Compare two AvcContext objects for inequality."""
+        return not self.__eq__(other)
+
+    def is_valid(self) -> bool:
+        """Check if the context has all required fields."""
+        return all([self.user, self.role, self.type, self.mls])
+
+    def get_type_description(self) -> str:
+        """
+        Get a human-readable description of the SELinux type.
+
+        Returns:
+            str: Human-readable description or the type itself if no mapping exists
+        """
+        # Basic type descriptions for common SELinux types
+        type_descriptions = {
+            'httpd_t': 'Web server process',
+            'init_t': 'System initialization process',
+            'unconfined_t': 'Unconfined process',
+            'sshd_t': 'SSH daemon process',
+            'systemd_t': 'Systemd service manager',
+            'default_t': 'Default file context',
+            'admin_home_t': 'Administrator home directory',
+            'user_home_t': 'User home directory',
+            'tmp_t': 'Temporary file',
+            'var_t': 'Variable data file',
+            'etc_t': 'Configuration file',
+            'bin_t': 'System binary',
+            'lib_t': 'System library',
+        }
+
+        return type_descriptions.get(self.type, self.type)
+
+
 def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
     """
     Parse audit record using enhanced setroubleshoot regex pattern.
@@ -201,7 +288,7 @@ def validate_log_entry(log_block: str) -> tuple[bool, str, list]:  # pylint: dis
 
     # Look for audit/AVC content specifically
     has_audit_content = any(
-        re.search(r'(type=AVC|type=USER_AVC|avc:.*denied|avc:.*granted)', line, re.IGNORECASE)
+        re.search(r'(type=AVC|type=USER_AVC|type=AVC_PATH|type=1400|type=1107|avc:.*denied|avc:.*granted)', line, re.IGNORECASE)
         for line in valid_lines
     )
 
@@ -364,20 +451,27 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                             shared_context['path'] = value.strip()
                     else:
                         shared_context[key] = value.strip()
-        elif log_type not in ["AVC", "USER_AVC"]:
-            # Track unparsed types (excluding AVC and USER_AVC)
+        elif log_type not in ["AVC", "USER_AVC", "AVC_PATH", "1400", "1107"]:
+            # Track unparsed types (excluding all supported AVC-related types)
             unparsed_types.add(log_type)
 
     # Now process each AVC and USER_AVC line separately
     for line in log_block.strip().split('\n'):
         line = line.strip()
-        if 'type=AVC' in line or 'type=USER_AVC' in line:
+        if re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line):
             # Parse this specific AVC or USER_AVC line with error handling
             try:
                 avc_data = shared_context.copy()  # Start with shared context
 
-                # For USER_AVC, we need to extract from the msg field
-                if 'type=USER_AVC' in line:
+                # Determine record type and extract content accordingly
+                record_type_match = re.search(r'type=(AVC|USER_AVC|AVC_PATH|1400|1107)', line)
+                if not record_type_match:
+                    continue
+
+                record_type = record_type_match.group(1)
+
+                # Handle USER_AVC and numeric equivalent (1107)
+                if record_type in ['USER_AVC', '1107']:
                     # Extract the msg content from USER_AVC
                     msg_match = re.search(r"msg='([^']+)'", line)
                     if msg_match:
@@ -395,6 +489,7 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                         # Skip if no msg content (like policyload notices)
                         continue
                 else:
+                    # Handle AVC, AVC_PATH, and numeric equivalent (1400)
                     avc_content = line
             except Exception as parse_error:  # pylint: disable=broad-exception-caught
                 # Individual AVC parsing failed - skip this record but continue with others
@@ -402,10 +497,13 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                 unparsed_types.add(f"AVC_PARSE_ERROR_{type(parse_error).__name__}")
                 continue
 
-            # Set the denial type based on the line type
-            if 'type=USER_AVC' in line:
+            # Set the denial type based on the record type
+            if record_type in ['USER_AVC', '1107']:
                 avc_data['denial_type'] = 'USER_AVC'
+            elif record_type == 'AVC_PATH':
+                avc_data['denial_type'] = 'AVC_PATH'
             else:
+                # AVC, 1400, or any other kernel AVC type
                 avc_data['denial_type'] = 'AVC'
 
             # Extract AVC-specific fields (works for both AVC and USER_AVC msg content)
@@ -439,6 +537,17 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:  # pylint: disa
                         # Only use unquoted path if we don't already have a quoted path
                         if 'path' not in avc_data:
                             avc_data['path'] = field_match.group(1).strip()
+                    elif key in ['scontext', 'tcontext']:
+                        # Parse SELinux contexts into AvcContext objects for enhanced analysis
+                        context_string = field_match.group(1).strip()
+                        avc_context = AvcContext(context_string)
+                        if avc_context.is_valid():
+                            avc_data[key] = avc_context
+                            # Also store raw string for backward compatibility
+                            avc_data[f"{key}_raw"] = context_string
+                        else:
+                            # Fall back to raw string if parsing fails
+                            avc_data[key] = context_string
                     else:
                         avc_data[key] = field_match.group(1).strip()
 
@@ -628,7 +737,14 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
 
     # Show denial type (AVC vs USER_AVC)
     if parsed_log.get("denial_type"):
-        denial_type_display = "Kernel AVC" if parsed_log["denial_type"] == "AVC" else "Userspace AVC"
+        if parsed_log["denial_type"] == "AVC":
+            denial_type_display = "Kernel AVC"
+        elif parsed_log["denial_type"] == "USER_AVC":
+            denial_type_display = "Userspace AVC"
+        elif parsed_log["denial_type"] == "AVC_PATH":
+            denial_type_display = "AVC Path Info"
+        else:
+            denial_type_display = parsed_log["denial_type"]
         console.print(f"  [bold]Denial Type:[/bold]".ljust(22), end="")
         console.print(f"[bright_green bold]{denial_type_display}[/bright_green bold]")
 
@@ -669,7 +785,14 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 console.print(f"[green bold]{values}[/green bold]")
             elif key == "tcontext":
                 # Signature field - use bright_cyan bold
-                console.print(f"[bright_cyan bold]{values}[/bright_cyan bold]")
+                # Handle both AvcContext objects and raw strings
+                if isinstance(values, str) and ',' in values:
+                    # Multiple values - display all
+                    console.print(f"[bright_cyan bold]{values}[/bright_cyan bold]")
+                else:
+                    # Single value - could be AvcContext or string
+                    display_value = str(values) if values else ""
+                    console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{values}[/dim white]")
@@ -685,7 +808,9 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 console.print(f"[green bold]{parsed_log[key]}[/green bold]")
             elif key == "tcontext":
                 # Signature field - use bright_cyan bold
-                console.print(f"[bright_cyan bold]{parsed_log[key]}[/bright_cyan bold]")
+                # Handle both AvcContext objects and raw strings
+                display_value = str(parsed_log[key]) if parsed_log[key] else ""
+                console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{parsed_log[key]}[/dim white]")
@@ -1032,7 +1157,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             ausearch_cmd = [
                 "ausearch",
                 "-m",
-                "AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR",
+                "AVC,USER_AVC,AVC_PATH,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR",
                 "-i",
                 "-if",
                 file_path]
@@ -1118,8 +1243,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         block_signatures = {}
         for parsed_log in avc_denials:
             if "permission" in parsed_log:
+                # Convert AvcContext objects to strings for consistent signature generation
+                scontext_val = parsed_log.get('scontext')
+                tcontext_val = parsed_log.get('tcontext')
                 basic_sig = (
-                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                    str(scontext_val) if scontext_val else None,
+                    str(tcontext_val) if tcontext_val else None,
                     parsed_log.get('tclass')
                 )
                 if basic_sig not in block_signatures:
@@ -1178,8 +1307,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
         for parsed_log in avc_denials:
             if "permission" in parsed_log:
+                # Convert AvcContext objects to strings for consistent signature generation
+                scontext_val = parsed_log.get('scontext')
+                tcontext_val = parsed_log.get('tcontext')
                 basic_sig = (
-                    parsed_log.get('scontext'), parsed_log.get('tcontext'),
+                    str(scontext_val) if scontext_val else None,
+                    str(tcontext_val) if tcontext_val else None,
                     parsed_log.get('tclass')
                 )
                 permission = parsed_log.get('permission')
@@ -1254,6 +1387,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             for key, value in json_denial['log'].items():
                 if isinstance(value, datetime):
                     json_denial['log'][key] = value.isoformat()
+                elif isinstance(value, AvcContext):
+                    # Convert AvcContext objects to strings for JSON serialization
+                    json_denial['log'][key] = str(value)
                 elif key == 'timestamp' and isinstance(value, (int, float)):
                     # Convert timestamp to string to ensure it's quoted in JSON
                     json_denial['log'][key] = str(value)
