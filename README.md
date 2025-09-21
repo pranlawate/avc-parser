@@ -81,10 +81,10 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 1. **Clone the Repository**:
    ```bash
    # Using HTTPS
-   git clone https://github.com/[username]/avc-parser.git
+   git clone https://github.com/pranlawate/avc-parser.git
 
    # Using SSH
-   git clone git@github.com:[username]/avc-parser.git
+   git clone git@github.com:pranlawate/avc-parser.git
    ```
 
 2. **Install Dependencies**:
