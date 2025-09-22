@@ -11,6 +11,9 @@ pip3 install rich
 # Analyze audit logs (auto-detects format)
 python3 parse_avc.py --file /var/log/audit/audit.log
 
+# Get enhanced detailed analysis
+python3 parse_avc.py --file /var/log/audit/audit.log --detailed
+
 # Get field-by-field details
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 
@@ -63,7 +66,6 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 ### 🎯 **Phase 3B: Advanced Display Features** (Next)
 - **Smart Filtering**: Process, path, time range, and context filtering capabilities
 - **Sorting Options**: Recent, count, chronological sorting
-- **Enhanced Detail View**: Expanded information for deeper investigation
 
 ### 🧪 **Phase 4: Testing & Quality**
 - **Comprehensive Testing**: Unit tests, integration tests, regression testing
