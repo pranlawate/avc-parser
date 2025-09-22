@@ -185,6 +185,9 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 Expanded correlation analysis with syscall details and context information:
 ```bash
 $ python3 parse_avc.py --file test_multiple_pids.log --detailed
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/test_multiple_pids.log directly
+
 Found 2 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
 ────────── Unique Denial #1 • 2 occurrences • last seen 2 week(s) ago ──────────
@@ -200,11 +203,13 @@ Found 2 AVC events. Displaying 1 unique denials...
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 Detailed Events:
-• PID 1234 (httpd) [/usr/sbin/httpd] denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
+• PID 1234 (httpd) [/usr/sbin/httpd\] denied 'read' to file
+/var/www/html/file1.html [Enforcing] ✗ BLOCKED
   ├─ Syscall: openat | Exit: EACCES | Time: 2025-09-04 18:19:00
   ├─ Analysis: Web server process attempting to read file content
   └─ Process Title: /usr/sbin/httpd -DFOREGROUND
-• PID 5678 (httpd-worker) [/usr/sbin/httpd] denied 'write' to file /var/www/html/file2.html [Permissive] ✓ ALLOWED
+• PID 5678 (httpd-worker) [/usr/sbin/httpd\] denied 'write' to file
+/var/www/html/file2.html [Permissive] ✓ ALLOWED
   ├─ Syscall: openat | Exit: EACCES | Time: 2025-09-04 18:19:00
   ├─ Analysis: Web server process attempting to read file content
   └─ Process Title: /usr/sbin/httpd -DFOREGROUND
