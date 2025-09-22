@@ -747,6 +747,35 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             # AVC, 1400, or any other kernel AVC type
             avc_data['denial_type'] = 'AVC'
 
+        # Parse timestamp from this specific AVC line (overrides shared context)
+        timestamp_pattern = re.search(r'msg=audit\(([^)]+)\)', line)
+        if timestamp_pattern:
+            # Remove serial number (after last colon) to get just timestamp
+            timestamp_str = timestamp_pattern.group(1).rsplit(':', 1)[0]
+
+            # Try multiple timestamp formats in order of preference
+            dt_object = None
+            try:
+                # Format 1: Human-readable MM/DD/YYYY from ausearch -i
+                dt_object = datetime.strptime(timestamp_str, '%m/%d/%Y %H:%M:%S.%f')
+            except ValueError:
+                try:
+                    # Format 2: Alternative DD/MM/YY format from some ausearch outputs
+                    dt_object = datetime.strptime(timestamp_str, '%d/%m/%y %H:%M:%S.%f')
+                except ValueError:
+                    try:
+                        # Format 3: Unix timestamp (fallback for raw audit.log)
+                        dt_object = datetime.fromtimestamp(float(timestamp_str))
+                    except ValueError:
+                        # Timestamp parsing failed - will be handled gracefully
+                        dt_object = None
+
+            # Store parsed timestamp in multiple useful formats (overrides shared context)
+            if dt_object:
+                avc_data['datetime_obj'] = dt_object
+                avc_data['datetime_str'] = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+                avc_data['timestamp'] = dt_object.timestamp()
+
         # Extract AVC-specific fields (works for both AVC and USER_AVC msg content)
         avc_patterns = {
             "permission": r"denied\s+\{ ([^}]+) \}",

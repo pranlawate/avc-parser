@@ -1,0 +1,13 @@
+----
+type=SYSCALL msg=audit(1725482881.101:501): arch=x86_64 syscall=execve success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0 key=(null)
+type=CWD msg=audit(1725482881.101:501): cwd="/"
+type=PATH msg=audit(1725482881.101:501): item=0 name="/bin/bash" inode=12345 dev=vda1 mode=0100755 ouid=0 ogid=0 rdev=00:00 obj=unconfined_u:object_r:shell_exec_t:s0 objtype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=AVC msg=audit(1725482881.101:501): avc: denied  { noatsecure } for  pid=1234 comm="httpd" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:shell_exec_t:s0 tclass=process permissive=0
+----
+
+----
+type=SYSCALL msg=audit(1725482882.102:502): arch=x86_64 syscall=openat success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0 key=(null)
+type=CWD msg=audit(1725482882.102:502): cwd="/"
+type=PATH msg=audit(1725482882.102:502): item=0 name="/var/www/html/index.html" inode=67890 dev=vda1 mode=0100644 ouid=0 ogid=0 rdev=00:00 obj=unconfined_u:object_r:default_t:s0 objtype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=AVC msg=audit(1725482882.102:502): avc: denied  { read } for  pid=1234 comm="httpd" path="/var/www/html/index.html" dev="vda1" ino=67890 scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+----

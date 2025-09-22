@@ -1,0 +1,675 @@
+[root@lx007jsyb ~]# ausearch -m avc,user_avc -ts recent -i
+----
+type=USER_AVC msg=audit(06/18/2025 09:12:10.993:4997932) : pid=1613 uid=dbus auid=unset ses=unset subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  received policyload notice (seqno=2)  exe=/usr/bin/dbus-daemon sauid=dbus hostname=? addr=? terminal=?'
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997933) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997933) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997933) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997934) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997934) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997934) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997935) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997935) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997935) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997936) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997936) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997936) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997937) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997937) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997937) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:11.727:4997938) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:11.727:4997938) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:11.727:4997938) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997941) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997941) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997941) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997942) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997942) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997942) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997943) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997943) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997943) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997944) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997944) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997944) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997945) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997945) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997945) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:21.737:4997946) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:21.737:4997946) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:21.737:4997946) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.287:4997949) : proctitle=/bin/sh -c [ "$SERVICE" != "no" ] && /usr/bin/mandb $OPTS || true
+type=EXECVE msg=audit(06/18/2025 09:12:31.287:4997949) : argc=3 a0=/bin/sh a1=-c a2=[ "$SERVICE" != "no" ] && /usr/bin/mandb $OPTS || true
+type=SYSCALL msg=audit(06/18/2025 09:12:31.287:4997949) : arch=x86_64 syscall=execve success=yes exit=0 a0=0x5583382abfc0 a1=0x5583382a6650 a2=0x558338265640 a3=0x7 items=0 ppid=1 pid=3635437 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=sh exe=/usr/bin/bash subj=system_u:system_r:initrc_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.287:4997949) : avc:  denied  { siginh } for  pid=3635437 comm=sh scontext=system_u:system_r:init_t:s0 tcontext=system_u:system_r:initrc_t:s0 tclass=process permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997953) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997953) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997953) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997954) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997954) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997954) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997955) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997955) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997955) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997956) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997956) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997956) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997957) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997957) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997957) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:31.747:4997958) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:31.747:4997958) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:31.747:4997958) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997959) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997959) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997959) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997960) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997960) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997960) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997961) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997961) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997961) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997962) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997962) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997962) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997963) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997963) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997963) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:41.748:4997964) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:41.748:4997964) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:41.748:4997964) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.190:4997970) : proctitle=/usr/sbin/unix_chkpwd root nonull
+type=PATH msg=audit(06/18/2025 09:12:51.190:4997970) : item=0 name=/lib64/ld-linux-x86-64.so.2 inode=33555561 dev=fd:00 mode=file,755 ouid=root ogid=root rdev=00:00 obj=system_u:object_r:ld_so_t:s0 nametype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(06/18/2025 09:12:51.190:4997970) : cwd=/
+type=EXECVE msg=audit(06/18/2025 09:12:51.190:4997970) : argc=3 a0=/usr/sbin/unix_chkpwd a1=root a2=nonull
+type=SYSCALL msg=audit(06/18/2025 09:12:51.190:4997970) : arch=x86_64 syscall=execve success=yes exit=0 a0=0x7ff96302676a a1=0x7ffeb9da2d90 a2=0x7ff96322d060 a3=0x7ff9658ece80 items=1 ppid=3636242 pid=3636299 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=unix_chkpwd exe=/usr/sbin/unix_chkpwd subj=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.190:4997970) : avc:  denied  { siginh } for  pid=3636299 comm=unix_chkpwd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+type=AVC msg=audit(06/18/2025 09:12:51.190:4997970) : avc:  denied  { rlimitinh } for  pid=3636299 comm=unix_chkpwd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+type=AVC msg=audit(06/18/2025 09:12:51.190:4997970) : avc:  denied  { noatsecure } for  pid=3636299 comm=sshd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.198:4997972) : proctitle=/usr/sbin/unix_chkpwd root chkexpiry
+type=PATH msg=audit(06/18/2025 09:12:51.198:4997972) : item=0 name=/lib64/ld-linux-x86-64.so.2 inode=33555561 dev=fd:00 mode=file,755 ouid=root ogid=root rdev=00:00 obj=system_u:object_r:ld_so_t:s0 nametype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(06/18/2025 09:12:51.198:4997972) : cwd=/
+type=EXECVE msg=audit(06/18/2025 09:12:51.198:4997972) : argc=3 a0=/usr/sbin/unix_chkpwd a1=root a2=chkexpiry
+type=SYSCALL msg=audit(06/18/2025 09:12:51.198:4997972) : arch=x86_64 syscall=execve success=yes exit=0 a0=0x7ff96302676a a1=0x7ffeb9da2df0 a2=0x7ff963229028 a3=0x7ff9658ece80 items=1 ppid=3636242 pid=3636300 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=unix_chkpwd exe=/usr/sbin/unix_chkpwd subj=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.198:4997972) : avc:  denied  { siginh } for  pid=3636300 comm=unix_chkpwd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+type=AVC msg=audit(06/18/2025 09:12:51.198:4997972) : avc:  denied  { rlimitinh } for  pid=3636300 comm=unix_chkpwd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+type=AVC msg=audit(06/18/2025 09:12:51.198:4997972) : avc:  denied  { noatsecure } for  pid=3636300 comm=sshd scontext=system_u:system_r:sshd_t:s0-s0:c0.c1023 tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023 tclass=process permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997986) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997986) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997986) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997987) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997987) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997987) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997988) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997988) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997988) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997989) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997989) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997989) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997990) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997990) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997990) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:12:51.758:4997991) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:12:51.758:4997991) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:12:51.758:4997991) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997992) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997992) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997992) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997993) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997993) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997993) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997994) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997994) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997994) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997995) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997995) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997995) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997996) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997996) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997996) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:01.760:4997997) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:01.760:4997997) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:01.760:4997997) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998004) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998004) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998004) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998005) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998005) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998005) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998006) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998006) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998006) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998007) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998007) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998007) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998008) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998008) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998008) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:11.770:4998009) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:11.770:4998009) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:11.770:4998009) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998010) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998010) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998010) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998011) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998011) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998011) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998012) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998012) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998012) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998013) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998013) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998013) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998014) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998014) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998014) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:21.775:4998015) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:21.775:4998015) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:21.775:4998015) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998024) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998024) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998024) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998025) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998025) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998025) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998026) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998026) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998026) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998027) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998027) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998027) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998028) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998028) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998028) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:31.785:4998029) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:31.785:4998029) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:31.785:4998029) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998030) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998030) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998030) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998031) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998031) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998031) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998032) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998032) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998032) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998033) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998033) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998033) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998034) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998034) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998034) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:41.795:4998035) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:41.795:4998035) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:41.795:4998035) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998036) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998036) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998036) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998037) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998037) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998037) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998038) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998038) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998038) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998039) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998039) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998039) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998040) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998040) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998040) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:13:51.800:4998041) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:13:51.800:4998041) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:13:51.800:4998041) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998055) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998055) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998055) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998056) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998056) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998056) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998057) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998057) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998057) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998058) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998058) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998058) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998059) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998059) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998059) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:01.810:4998060) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:01.810:4998060) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:01.810:4998060) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998061) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998061) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998061) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998062) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998062) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998062) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998063) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998063) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998063) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998064) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998064) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998064) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998065) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998065) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998065) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:11.820:4998066) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:11.820:4998066) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:11.820:4998066) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998069) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998069) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998069) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998070) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998070) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998070) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998071) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998071) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998071) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998072) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998072) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998072) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998073) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998073) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998073) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:21.826:4998074) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:21.826:4998074) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:21.826:4998074) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998075) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998075) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998075) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998076) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998076) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998076) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998077) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998077) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998077) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998078) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998078) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998078) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998079) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998079) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998079) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:31.837:4998080) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:31.837:4998080) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:31.837:4998080) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998081) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998081) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998081) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998082) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998082) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998082) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998083) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998083) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998083) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998084) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998084) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998084) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998085) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998085) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998085) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:41.847:4998086) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:41.847:4998086) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:41.847:4998086) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998087) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998087) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998087) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998088) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998088) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998088) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998089) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998089) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998089) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998090) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998090) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998090) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998091) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998091) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998091) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:14:51.848:4998092) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:14:51.848:4998092) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:14:51.848:4998092) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998108) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998108) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998108) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998109) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998109) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998109) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998110) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998110) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998110) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998111) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998111) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998111) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998112) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998112) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998112) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:01.849:4998113) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:01.849:4998113) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:01.849:4998113) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998134) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998134) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998134) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998135) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998135) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998135) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998136) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998136) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998136) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998137) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998137) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998137) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998138) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998138) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998138) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:11.858:4998139) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:11.858:4998139) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:11.858:4998139) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998140) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998140) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998140) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998141) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998141) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998141) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998142) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998142) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998142) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998143) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998143) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998143) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998144) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998144) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998144) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:21.868:4998145) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:21.868:4998145) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:21.868:4998145) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998146) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998146) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998146) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998147) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998147) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998147) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998148) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998148) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998148) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998149) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998149) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998149) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998150) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998150) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998150) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:31.878:4998151) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:31.878:4998151) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:31.878:4998151) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998154) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998154) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998154) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998155) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998155) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998155) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998156) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998156) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998156) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998157) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998157) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998157) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998158) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998158) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998158) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:41.889:4998159) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:41.889:4998159) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:41.889:4998159) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998164) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998164) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998164) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998165) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998165) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998165) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998166) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998166) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998166) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998167) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998167) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998167) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998168) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998168) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998168) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:15:51.895:4998169) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:15:51.895:4998169) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:15:51.895:4998169) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998170) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998170) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998170) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998171) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998171) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998171) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998172) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998172) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998172) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998173) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998173) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998173) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998174) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998174) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998174) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:01.895:4998175) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:01.895:4998175) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:01.895:4998175) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998183) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998183) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998183) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998184) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998184) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998184) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998185) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998185) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998185) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998186) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998186) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998186) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998187) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998187) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998187) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:11.901:4998188) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:11.901:4998188) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:11.901:4998188) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998189) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998189) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998189) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998190) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998190) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998190) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998191) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998191) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998191) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998192) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998192) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998192) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998193) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998193) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998193) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:21.906:4998194) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:21.906:4998194) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:21.906:4998194) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.916:4998195) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.916:4998195) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000c00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.916:4998195) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=var dev="dm-0" ino=134 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.917:4998196) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.917:4998196) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000d00 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.917:4998196) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=asesrv dev="dm-0" ino=34573303 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.917:4998197) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.917:4998197) : arch=x86_64 syscall=openat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd420000be0 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.917:4998197) : avc:  denied  { read } for  pid=3181129 comm=in:imfile name=SB007NA dev="dm-0" ino=67554729 scontext=system_u:system_r:syslogd_t:s0 tcontext=unconfined_u:object_r:var_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.917:4998198) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.917:4998198) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcf0 a2=0x7fd4275fdd90 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.917:4998198) : avc:  denied  { getattr } for  pid=3181129 comm=in:imfile path=/var/asesrv/SB007NA/adm dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.917:4998199) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.917:4998199) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdcb0 a2=0x7fd4275fdd60 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.917:4998199) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+----
+type=PROCTITLE msg=audit(06/18/2025 09:16:31.917:4998200) : proctitle=/usr/sbin/rsyslogd -n
+type=SYSCALL msg=audit(06/18/2025 09:16:31.917:4998200) : arch=x86_64 syscall=newfstatat success=no exit=EACCES(Permission denied) a0=0xffffff9c a1=0x7fd4275fdc70 a2=0x7fd4275fdd20 a3=0x100 items=0 ppid=1 pid=3181129 auid=unset uid=root gid=root euid=root suid=root fsuid=root egid=root sgid=root fsgid=root tty=(none) ses=unset comm=in:imfile exe=/usr/sbin/rsyslogd subj=system_u:system_r:syslogd_t:s0 key=(null)
+type=AVC msg=audit(06/18/2025 09:16:31.917:4998200) : avc:  denied  { search } for  pid=3181129 comm=in:imfile name=/ dev="dm-5" ino=128 scontext=system_u:system_r:syslogd_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=0
+[root@lx007jsyb ~]#
