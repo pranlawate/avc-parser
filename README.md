@@ -161,6 +161,7 @@ Professional panels with BIONIC reading for enhanced readability:
 ```bash
 $ python3 parse_avc.py --file file_context_AVC.log
 🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/file_context_AVC.log directly
 
 Found 1 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
@@ -176,7 +177,9 @@ Found 1 AVC events. Displaying 1 unique denials...
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 Events:
-• PID 1234 (httpd) denied 'read' to file /var/www/html/index.html [Enforcing] ✗ BLOCKED
+• PID 1234 (httpd) denied 'read' to file /var/www/html/index.html [Enforcing] ✗
+BLOCKED
+
 
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
@@ -299,47 +302,55 @@ $ python3 parse_avc.py --json --avc-file file_context_AVC.log
 
 ### Network AVC Denial (Rich Format)
 ```bash
-$ python3 parse_avc.py --avc-file network_AVC.log
-Pre-processed AVC file provided: 'network_AVC.log'
+$ python3 parse_avc.py --file network_AVC.log
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/network_AVC.log directly
 
 Found 1 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
-────────── Unique Denial #1 • 1 occurrences • last seen 1 month(s) ago ──────────
-2025-07-29 09:52:29 • Kernel AVC
-Denied name_connect (Connect to network service) on tcp_socket via connect
-
-httpd 4182412 • working from unknown
-system_u:system_r:httpd_t:s0 attempting access to
-system_u:object_r:jboss_management_port_t:s0
+───────── Unique Denial #1 • 1 occurrences • last seen 1 month(s) ago ──────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                             2025-07-29 09:52:29                              │
+│                                  Kernel AVC                                  │
+│ Denied name_connect (Connect to network service) on TCP network socket via   │
+│ connect                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                      httpd (Web server process) 4182412                      │
+│ system_u:system_r:httpd_t:s0 → system_u:object_r:jboss_management_port_t:s0  │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Events:
-• PID 4182412 (httpd) denied 'name_connect' to tcp_socket port 9999 (JBoss Management) [Enforcing] ✗ BLOCKED
+• PID 4182412 (httpd) denied 'name_connect' to port 9999 (JBoss management)
+[Enforcing] ✗ BLOCKED
+
 
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
 ### Network AVC Denial (Field-by-Field Format)
 ```bash
-$ python3 parse_avc.py --avc-file network_AVC.log --fields
-Pre-processed AVC file provided: 'network_AVC.log'
+$ python3 parse_avc.py --file network_AVC.log --fields
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/network_AVC.log directly
 
 Found 1 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
 ────────── Unique Denial #1 (1 occurrences, last seen 1 month(s) ago) ──────────
   Timestamp:2025-07-29 09:52:29
   Process Title:/usr/sbin/httpd -DFOREGROUND
-  Process Name:httpd
+  Process Name:httpd (Web server process)
   Process ID (PID):4182412
   Source Context:system_u:system_r:httpd_t:s0
 -----------------------------------
   Action:Denied
   Denial Type:Kernel AVC
   Syscall:connect
-  Permission:name_connect
+  Permission:name_connect (Connect to network service)
 -----------------------------------
   Socket Address:saddr_fam=inet laddr=10.233.237.96 lport=9999
   Target Class:tcp_socket
-  Target Context:system_u:object_r:jboss_management_port_t:s0
+  Target Context:system_u:object_r:jboss_management_port_t:s0 (jboss_management_port_t)
   Target Port:9999
 -----------------------------------
 
@@ -348,30 +359,38 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 
 ### Multiple Denials with Field Aggregation (Rich Format)
 ```bash
-$ python3 parse_avc.py --avc-file test_multiple_pids.log
-Pre-processed AVC file provided: 'testAVC/test_multiple_pids.log'
+$ python3 parse_avc.py --file test_multiple_pids.log
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/test_multiple_pids.log directly
 
 Found 2 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
-─────────── Unique Denial #1 • 2 occurrences • last seen 5 day(s) ago ───────────
-2025-09-04 18:19:00 • Kernel AVC
-Denied read, write (Read file content, Write file content) on file via openat
-
-httpd, httpd-worker 1234, 5678 • working from unknown
-system_u:system_r:httpd_t:s0 attempting access to
-unconfined_u:object_r:default_t:s0
+────────── Unique Denial #1 • 2 occurrences • last seen 2 week(s) ago ──────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                         2025-09-04 18:19:00–18:19:00                         │
+│                                  Kernel AVC                                  │
+│  Denied read (Read file content), write (Modify file content) on file via    │
+│  openat                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                    httpd (Web server process) 1234, 5678                     │
+│      system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0       │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Events:
-• PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
-• PID 5678 (httpd-worker) denied 'write' to file /var/www/html/file2.html [Permissive] ⚠ LOGGED
+• PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗
+BLOCKED
+• PID 5678 (httpd-worker) denied 'write' to file /var/www/html/file2.html
+[Permissive] ✓ ALLOWED
 
-Analysis Complete: Processed 2 log blocks and found 1 unique denials.
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
 ### Multiple Denials with Field Aggregation (Field-by-Field Format)
 ```bash
-$ python3 parse_avc.py --avc-file test_multiple_pids.log --fields
-Pre-processed AVC file provided: 'testAVC/test_multiple_pids.log'
+$ python3 parse_avc.py --file test_multiple_pids.log --fields
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/test_multiple_pids.log directly
 
 Found 2 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
