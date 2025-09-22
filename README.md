@@ -36,8 +36,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 ## ✅ Key Features
 
 ### 🎨 **Professional Display**
-- **Rich Terminal Format**: Default responsive formatting with professional styling and correlation events
-- **Field-by-Field View**: Detailed breakdown using `--fields` flag for analysis
+- **Rich Terminal Format**: Default responsive panels with BIONIC reading, professional styling, and correlation events
+- **Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis with syscall details and context information
+- **Field-by-Field View**: Detailed breakdown using `--fields` flag for traditional analysis
 - **JSON Export**: Structured output with semantic fields for automation and integration
 
 ### 🔍 **Advanced Analysis**
@@ -51,6 +52,11 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 - **Multiple Sources**: Raw audit.log, ausearch output, or interactive paste input
 - **Robust Parsing**: Multi-line audit blocks (`AVC`, `USER_AVC`, `SYSCALL`, `CWD`, `PATH`, `PROCTITLE`, `SOCKADDR`)
 - **Comprehensive Validation**: File type, permissions, and content validation with helpful error messages
+
+### 📖 **BIONIC Reading Format**
+- **Enhanced Readability**: Strategic text formatting emphasizes key letter groups for improved scanning speed
+- **Smart Application**: Applied to natural language text while preserving technical data clarity
+- **Professional Appearance**: Maintains color harmony and visual consistency throughout the display
 
 ## 🔮 Upcoming Features
 
@@ -126,12 +132,17 @@ python3 parse_avc.py
 
 ### **Output Formats:**
 
-**Rich Display (Default)**: Professional terminal format with responsive design
+**Rich Display (Default)**: Professional terminal format with responsive panels and BIONIC reading
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log
 ```
 
-**Field-by-Field Display**: Use `--fields` for detailed field breakdown
+**Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log --detailed
+```
+
+**Field-by-Field Display**: Use `--fields` for traditional detailed field breakdown
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 ```
@@ -144,6 +155,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 ## Example Output
 
 ### **Rich Display Format (Default)** ✨
+Professional panels with BIONIC reading for enhanced readability:
 ```bash
 $ python3 parse_avc.py --file file_context_AVC.log
 🔍 Auto-detected: Pre-processed format
@@ -151,16 +163,54 @@ $ python3 parse_avc.py --file file_context_AVC.log
 Found 1 AVC events. Displaying 1 unique denials...
 ────────────────────────────── Parsed Log Summary ──────────────────────────────
 ────────── Unique Denial #1 • 1 occurrences • last seen 1 year(s) ago ──────────
-2024-09-05 02:18:01 • Kernel AVC
-Denied read (Read file content) on file via openat
-
-httpd (Web server process) 1234 • working from /
-system_u:system_r:httpd_t:s0 attempting access to
-unconfined_u:object_r:default_t:s0
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                             2024-09-05 02:18:01                              │
+│                                  Kernel AVC                                  │
+│              Denied read (Read file content) on file via openat              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│               httpd (Web server process) 1234 • working from /               │
+│      system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0       │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Events:
-• PID 1234 (httpd) denied 'read' to file /var/www/html/index.html [Enforcing] ✗
-BLOCKED
+• PID 1234 (httpd) denied 'read' to file /var/www/html/index.html [Enforcing] ✗ BLOCKED
+
+Analysis Complete: Processed 1 log blocks and found 1 unique denials.
+```
+
+### **Enhanced Detailed View** (using `--detailed`)
+Expanded correlation analysis with syscall details and context information:
+```bash
+$ python3 parse_avc.py --file test_multiple_pids.log --detailed
+Found 2 AVC events. Displaying 1 unique denials...
+────────────────────────────── Parsed Log Summary ──────────────────────────────
+────────── Unique Denial #1 • 2 occurrences • last seen 2 week(s) ago ──────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                         2025-09-04 18:19:00–18:19:00                         │
+│                                  Kernel AVC                                  │
+│  Denied read (Read file content), write (Modify file content) on file via    │
+│  openat                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                    httpd (Web server process) 1234, 5678                     │
+│      system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Detailed Events:
+• PID 1234 (httpd) [/usr/sbin/httpd] denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
+  ├─ Syscall: openat | Exit: EACCES | Time: 2025-09-04 18:19:00
+  ├─ Analysis: Web server process attempting to read file content
+  └─ Process Title: /usr/sbin/httpd -DFOREGROUND
+• PID 5678 (httpd-worker) [/usr/sbin/httpd] denied 'write' to file /var/www/html/file2.html [Permissive] ✓ ALLOWED
+  ├─ Syscall: openat | Exit: EACCES | Time: 2025-09-04 18:19:00
+  ├─ Analysis: Web server process attempting to read file content
+  └─ Process Title: /usr/sbin/httpd -DFOREGROUND
+
+Security Context Details:
+  Source: system_u:system_r:httpd_t:s0 (Web server process)
+  Target: unconfined_u:object_r:default_t:s0 (Default file context)
+  Object Class: file
 
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```

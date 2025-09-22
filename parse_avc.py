@@ -20,8 +20,10 @@ import subprocess
 import json
 import signal
 from datetime import datetime
-from rich.console import Console
+from rich.console import Console, Group
 from rich.rule import Rule
+from rich.panel import Panel
+from rich.align import Align
 
 # Configuration constants
 MAX_FILE_SIZE_MB = 100
@@ -947,6 +949,45 @@ def human_time_ago(dt_object: datetime) -> str:  # pylint: disable=too-many-retu
         return f"{max(0, delta.seconds // 60)} minute(s) ago"
 
 
+def format_bionic_text(text: str, base_color: str = "green") -> str:
+    """
+    Apply BIONIC reading format to text for improved readability.
+
+    Args:
+        text (str): The text to format
+        base_color (str): Base color for the text (default: "green")
+
+    Returns:
+        str: Rich markup formatted text with BIONIC reading emphasis
+
+    Note:
+        Emphasizes the first half of words (typically 2-3 characters) to improve
+        reading speed and comprehension. Uses bold for emphasis, dim for rest.
+    """
+    if not text:
+        return text
+
+    words = text.split()
+    formatted_words = []
+
+    for word in words:
+        if len(word) <= 2:
+            # Short words get normal emphasis
+            formatted_words.append(f"[{base_color}]{word}[/{base_color}]")
+        elif len(word) <= 4:
+            # Medium words: emphasize first 2 characters
+            emphasized = word[:2]
+            rest = word[2:]
+            formatted_words.append(f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]")
+        else:
+            # Longer words: emphasize first 3 characters
+            emphasized = word[:3]
+            rest = word[3:]
+            formatted_words.append(f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]")
+
+    return " ".join(formatted_words)
+
+
 def print_summary(console: Console, denial_info: dict, denial_num: int):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Prints a formatted, color-coded summary of an AVC denial with aggregated information.
@@ -1203,7 +1244,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     console.print("-" * 35)
 
 
-def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
+def print_rich_summary(console: Console, denial_info: dict, denial_num: int, detailed: bool = False):
     """
     Print a Rich-formatted summary with correlation events display.
 
@@ -1226,45 +1267,86 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
     last_seen_dt = denial_info['last_seen_obj']
     last_seen_ago = human_time_ago(last_seen_dt)
 
-    # Rich Rule header with responsive design
+    # Rich Rule header with responsive design using BIONIC reading format
     header_text = f"Unique Denial #{denial_num} • {count} occurrences • last seen {last_seen_ago}"
-    console.print(Rule(f"[bold green]{header_text}[/bold green]", style="green"))
+    header_bionic = format_bionic_text(header_text, "green")
+    console.print(Rule(header_bionic, style="cyan"))
 
-    # 1. WHEN - Timestamp and technical type (most critical for incident analysis)
-    timestamp_parts = []
-    if parsed_log.get('datetime_str'):
-        timestamp_parts.append(f"[bold white]{parsed_log['datetime_str']}[/bold white]")
+    # Create WHEN/WHAT panel content
+    when_what_content = []
 
+    # 1. WHEN - Add timestamp as separate line
+    if count > 1 and 'first_seen_obj' in denial_info and denial_info['first_seen_obj'] and last_seen_dt:
+        # Show time range for multiple occurrences
+        first_seen_str = denial_info['first_seen_obj'].strftime('%Y-%m-%d %H:%M:%S')
+        last_seen_str = last_seen_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Check if they're on the same day
+        if denial_info['first_seen_obj'].date() == last_seen_dt.date():
+            # Same day - show date once with time range
+            date_str = denial_info['first_seen_obj'].strftime('%Y-%m-%d')
+            first_time = denial_info['first_seen_obj'].strftime('%H:%M:%S')
+            last_time = last_seen_dt.strftime('%H:%M:%S')
+            timestamp_display = f"{date_str} {first_time}–{last_time}"
+        else:
+            # Different days - show full range
+            timestamp_display = f"{first_seen_str} – {last_seen_str}"
+
+        when_what_content.append(f"[bold white]{timestamp_display}[/bold white]")
+    elif parsed_log.get('datetime_str'):
+        # Single occurrence
+        when_what_content.append(f"[bold white]{parsed_log['datetime_str']}[/bold white]")
+
+    # Add AVC type as separate line
     if parsed_log.get('denial_type'):
         denial_type_display = "Kernel AVC" if parsed_log['denial_type'] == "AVC" else "Userspace AVC" if parsed_log['denial_type'] == "USER_AVC" else parsed_log['denial_type']
-        timestamp_parts.append(f"[bright_green]{denial_type_display}[/bright_green]")
+        when_what_content.append(f"[bright_green]{denial_type_display}[/bright_green]")
 
-    if timestamp_parts:
-        console.print(" • ".join(timestamp_parts))
-
-    # 2. WHAT - Action summary with syscall context (immediately after timestamp)
+    # 2. WHAT - Action summary with syscall context
     permissions_display = get_enhanced_permissions_display(denial_info, parsed_log)
     obj_class = parsed_log.get('class_description', parsed_log.get('tclass', ''))
-    action_line = f"Denied [bright_cyan bold]{permissions_display}[/bright_cyan bold] on [green bold]{obj_class}[/green bold]"
+
+    # Apply BIONIC reading to natural language parts only
+    denied_bionic = format_bionic_text("Denied", "white")
+    on_bionic = format_bionic_text("on", "white")
+
+    action_line = f"{denied_bionic} [bright_cyan bold]{permissions_display}[/bright_cyan bold] {on_bionic} [green bold]{obj_class}[/green bold]"
 
     # Add syscall context to the action line
     if parsed_log.get('syscall'):
-        action_line += f" via [green]{parsed_log['syscall']}[/green]"
+        via_bionic = format_bionic_text("via", "white")
+        action_line += f" {via_bionic} [green]{parsed_log['syscall']}[/green]"
 
-    console.print(action_line)
-    console.print()  # Space after action line
+    when_what_content.append(action_line)
+
+    # Display WHEN/WHAT panel
+    if when_what_content:
+        # Center each line individually for proper alignment
+        centered_lines = [Align.center(line) for line in when_what_content]
+        console.print(Panel(Group(*centered_lines), border_style="dim", padding=(0, 1)))
 
     # 3. WHO & WHERE - Process and location in one flowing line
     details = []
 
-    # Build process info
+    # Build process info with all PIDs from correlations
     if parsed_log.get('comm'):
         if parsed_log.get('source_type_description'):
             process_info = f"[green bold]{parsed_log['comm']}[/green bold] [dim]({parsed_log['source_type_description']})[/dim]"
         else:
             process_info = f"[green bold]{parsed_log['comm']}[/green bold]"
 
-        if parsed_log.get('pid'):
+        # Get all unique PIDs from correlations, fallback to parsed_log PID
+        if 'correlations' in denial_info and denial_info['correlations']:
+            pids = sorted(set(corr.get('pid', '') for corr in denial_info['correlations'] if corr.get('pid')))
+            if pids:
+                if len(pids) == 1:
+                    process_info += f" [cyan]{pids[0]}[/cyan]"
+                else:
+                    # Show multiple PIDs with count
+                    process_info += f" [cyan]{', '.join(pids[:3])}[/cyan]"
+                    if len(pids) > 3:
+                        process_info += f"[dim] (+{len(pids)-3} more)[/dim]"
+        elif parsed_log.get('pid'):
             process_info += f" [cyan]{parsed_log['pid']}[/cyan]"
 
         details.append(process_info)
@@ -1275,20 +1357,36 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
     if parsed_log.get('cwd'):
         details.append(f"working from [dim green]{parsed_log['cwd']}[/dim green]")
 
-    if details:
-        console.print(" • ".join(details))
+    # Create WHO/WHERE panel content
+    who_where_content = []
 
-    # 4. CONTEXT - Security context transition
+    # Add process information
+    if details:
+        process_text = " • ".join(details)
+        who_where_content.append(process_text)
+
+    # Add security context transition
     scontext = str(parsed_log.get('scontext', ''))
     tcontext = str(parsed_log.get('tcontext', ''))
     if scontext and tcontext:
-        console.print(f"[bright_cyan]{scontext}[/bright_cyan] attempting access to [bright_cyan]{tcontext}[/bright_cyan]")
+        context_text = f"[bright_cyan]{scontext}[/bright_cyan] → [bright_cyan]{tcontext}[/bright_cyan]"
+        who_where_content.append(context_text)
+
+    # Display WHO/WHERE panel
+    if who_where_content:
+        # Center each line individually for proper alignment
+        centered_lines = [Align.center(line) for line in who_where_content]
+        console.print(Panel(Group(*centered_lines), border_style="dim", padding=(0, 1)))
 
     console.print()  # Space before events
 
     # Correlation events display
     if 'correlations' in denial_info and denial_info['correlations']:
-        console.print("[bold]Events:[/bold]")
+        if detailed:
+            console.print("[bold]Detailed Events:[/bold]")
+        else:
+            console.print("[bold]Events:[/bold]")
+
         for correlation in denial_info['correlations']:
             pid = correlation.get('pid', 'unknown')
             comm = correlation.get('comm', 'unknown')
@@ -1297,17 +1395,28 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
             dest_port = correlation.get('dest_port', '')
             saddr = correlation.get('saddr', '')
             permissive = correlation.get('permissive', '')
+            timestamp = correlation.get('timestamp', '')
 
-            # Build event description
+            # Build event description with BIONIC reading for natural language parts
             if path:
-                target_desc = f"file {path}"
+                file_bionic = format_bionic_text("file", "white")
+                target_desc = f"{file_bionic} {path}"
+                target_type = "file"
             elif dest_port:
                 port_desc = PermissionSemanticAnalyzer.get_port_description(dest_port)
-                target_desc = f"port {dest_port} ({port_desc})" if port_desc != f"port {dest_port}" else f"port {dest_port}"
+                port_bionic = format_bionic_text("port", "white")
+                if port_desc != f"port {dest_port}":
+                    target_desc = f"{port_bionic} {dest_port} ({port_desc})"
+                else:
+                    target_desc = f"{port_bionic} {dest_port}"
+                target_type = "tcp_socket"
             elif saddr:
-                target_desc = f"socket {saddr}"
+                socket_bionic = format_bionic_text("socket", "white")
+                target_desc = f"{socket_bionic} {saddr}"
+                target_type = "socket"
             else:
-                target_desc = "resource"
+                target_desc = format_bionic_text("resource", "white")
+                target_type = "unknown"
 
             # Determine enforcement status
             if permissive == "1":
@@ -1318,7 +1427,75 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int):
                 mode = "[cyan]Enforcing[/cyan]"
 
             # Display correlation event
-            console.print(f"• PID {pid} ([green]{comm}[/green]) denied '[bright_cyan]{permission}[/bright_cyan]' to {target_desc} [{mode}] {enforcement}")
+            if detailed:
+                # Enhanced detailed view with additional information
+                exe_path = parsed_log.get('exe', '')
+                # Properly escape brackets in Rich markup - use double backslashes
+                if exe_path:
+                    escaped_exe = exe_path.replace('[', '\\[').replace(']', '\\]')
+                    exe_display = f" \\[{escaped_exe}\\]"
+                else:
+                    exe_display = ""
+                denied_bionic = format_bionic_text("denied", "white")
+                to_bionic = format_bionic_text("to", "white")
+                console.print(f"• PID {pid} ([green]{comm}[/green]){exe_display} {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
+
+                # Add detailed sub-information with tree-like structure
+                syscall = parsed_log.get('syscall', '')
+                cwd = parsed_log.get('cwd', '')
+                proctitle = parsed_log.get('proctitle', '')
+
+                if syscall:
+                    console.print(f"  ├─ Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: EACCES | Time: {timestamp}")
+
+                # Add semantic analysis if available
+                if permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis'):
+                    contextual_analysis = parsed_log.get('contextual_analysis', '')
+                    if contextual_analysis:
+                        console.print(f"  ├─ Analysis: [dim]{contextual_analysis}[/dim]")
+
+                if cwd:
+                    console.print(f"  ├─ Working Directory: [dim]{cwd}[/dim]")
+
+                if proctitle and proctitle != comm:
+                    console.print(f"  └─ Process Title: [dim]{proctitle}[/dim]")
+                elif not cwd:  # Need a closing branch
+                    console.print(f"  └─ Process: [dim]{comm}[/dim]")
+
+            else:
+                # Standard compact view
+                denied_bionic = format_bionic_text("denied", "white")
+                to_bionic = format_bionic_text("to", "white")
+                console.print(f"• PID {pid} ([green]{comm}[/green]) {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
+
+    # Add security context details section for detailed view
+    if detailed and scontext and tcontext:
+        console.print()
+        console.print("[bold]Security Context Details:[/bold]")
+
+        # Enhanced context display with descriptions
+        source_desc = ""
+        target_desc = ""
+
+        # Try to get context descriptions from parsed log
+        if hasattr(parsed_log.get('scontext'), 'get_type_description'):
+            source_desc = f" ({parsed_log['scontext'].get_type_description()})"
+        elif 'source_type_description' in parsed_log:
+            source_desc = f" ({parsed_log['source_type_description']})"
+
+        if hasattr(parsed_log.get('tcontext'), 'get_type_description'):
+            target_desc = f" ({parsed_log['tcontext'].get_type_description()})"
+        elif 'target_type_description' in parsed_log:
+            target_desc = f" ({parsed_log['target_type_description']})"
+
+        console.print(f"  Source: [bright_cyan]{scontext}[/bright_cyan]{source_desc}")
+        console.print(f"  Target: [bright_cyan]{tcontext}[/bright_cyan]{target_desc}")
+
+        tclass = parsed_log.get('tclass', '')
+        if tclass:
+            class_desc = PermissionSemanticAnalyzer.get_class_description(tclass)
+            class_display = f" ({class_desc})" if class_desc != tclass else ""
+            console.print(f"  Object Class: [yellow]{tclass}[/yellow]{class_display}")
 
     console.print()  # Space after events
 
@@ -1433,7 +1610,7 @@ def validate_file_with_auto_detection(file_path: str, console: Console, quiet: b
                 console.print(f"   Will process using ausearch: [cyan]{file_path}[/cyan]")
             else:
                 console.print(f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format")
-                console.print(f"   Will parse directly: [cyan]{file_path}[/cyan]")
+                console.print(f"   Will parse the file [cyan]{file_path}[/cyan] directly")
 
         return 'raw_file' if detected_format == 'raw' else 'avc_file'
 
@@ -1624,6 +1801,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "--fields",
         action="store_true",
         help="Use field-by-field display format instead of compact Rich format.")
+    parser.add_argument(
+        "--detailed",
+        action="store_true",
+        help="Show enhanced detailed view with expanded correlation events and context information.")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -1670,8 +1851,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     elif input_type == 'avc_file':
         # Determine the correct file path (could be from --file or --avc-file)
         file_path = args.file if args.file else args.avc_file
-        if not args.json:
-            console.print(f"Pre-processed AVC file provided: '{file_path}'")
+        # File path already shown in auto-detection message
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 log_string = f.read()
@@ -1948,11 +2128,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 else:
                     console.print()  # Space between denials
 
-            # Choose display format based on --fields flag
+            # Choose display format based on flags
             if args.fields:
                 print_summary(console, denial_info, i + 1)
             else:
-                print_rich_summary(console, denial_info, i + 1)
+                print_rich_summary(console, denial_info, i + 1, detailed=args.detailed)
         console.print(
             f"\n[bold green]Analysis Complete:[/bold green] Processed {
                 len(log_blocks)} log blocks and found {
