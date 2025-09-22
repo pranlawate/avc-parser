@@ -121,17 +121,29 @@ correlations = [
 - [x] **Information Hierarchy**: Optimized layout for incident analysis workflow
 - [x] **Smart Multi-PID Display**: Shows all PIDs from correlation data with intelligent time ranges
 
-#### 🔄 **3B: Practical Features** (PLANNED)
-- Smart filtering (process, path, time, context) | Sorting options (recent, count, chronological)
-- Detailed view with enhanced information | Smart resource display based on object class
+#### ✅ **3B-1: High-Impact User Features** (COMPLETED)
+- [x] **dontaudit Detection**: Simple permission-based detection using `noatsecure`, `rlimitinh`, `siginh` indicators
+- [x] **Basic Filtering**: Process (`--process httpd`) and path filtering (`--path /var/www/*`)
+- [x] **Sorting Options**: `--sort recent|count|chrono` for different analysis workflows
+
+#### 🔄 **3B-2: Polish Features** (PLANNED - AFTER TESTING FOUNDATION)
+- [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`)
+- [ ] **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
+- [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
 **Scope Note**: Syscall success indicators moved OUT OF SCOPE (requires complex event assembly)
 
-### 🧪 **PHASE 4: Testing & Quality** (PLANNED)
-**Core Testing** | **Integration & Performance**
-- Unit tests for parsing logic & correlation | Real-world audit log scenario testing
-- Input validation & error handling tests | Cross-platform compatibility verification
-- Regression testing for critical functionality | Memory optimization for large files
+### 🧪 **PHASE 4: Testing & Quality** (PLANNED - REORDERED FOR RELIABILITY)
+
+**4A: Essential Testing Foundation** (BEFORE PHASE 3B-2)
+- [ ] **Unit Tests**: Core parsing logic, correlation accuracy, semantic analysis validation
+- [ ] **Regression Testing**: Ensure existing functionality remains intact during feature additions
+- [ ] **Input Validation**: Edge cases, malformed logs, large files, boundary conditions
+
+**4B: Integration & Performance** (AFTER CORE FEATURES)
+- [ ] **Real-world Scenarios**: Various audit log formats, different Linux distributions
+- [ ] **Cross-platform Compatibility**: Testing across RHEL, Ubuntu, SUSE, Arch distributions
+- [ ] **Memory Optimization**: Large file handling improvements (>500MB audit logs)
 
 ### 📚 **PHASE 5: Documentation** (PLANNED)
 **Enhanced Documentation** | **Architecture & Development**
@@ -193,10 +205,24 @@ correlations = [
 
 #### Compact View (Default):
 ```
-─────────── Unique Denial #1 • 2 occurrences • last seen 2 weeks ago ───────────
+Found 8 AVC events. Displaying 3 unique denials...
+Applied filters: process='httpd'
+Showing 2 of 3 unique denials after filtering.
+────────────────────────────── Parsed Log Summary ──────────────────────────────
 ℹ️  DONTAUDIT DISABLED: Enhanced audit mode detected
-system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0
-Denied read (Read file content), write (Modify file content) on file
+   Found typically suppressed permissions: noatsecure
+
+─────────── Unique Denial #1 • 2 occurrences • last seen 2 weeks ago ───────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                         2025-09-04 18:19:00–18:19:00                         │
+│                                  Kernel AVC                                  │
+│  Denied read (Read file content), write (Modify file content) on file via    │
+│  openat                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│               httpd (Web server process) 1234, 5678                          │
+│      system_u:system_r:httpd_t:s0 → unconfined_u:object_r:default_t:s0       │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Events:
 • PID 1234 (httpd) denied 'read' to file /var/www/html/file1.html [Enforcing] ✗ BLOCKED
@@ -224,12 +250,12 @@ Detailed Events:
   └─ Proctitle: /usr/sbin/httpd -DFOREGROUND
 ```
 
-## Current Implementation Focus
+## Current Implementation Focus (Strategic Priority Order)
 
-**Phase 3B**: Practical display features (filtering, sorting)
-**Phase 4**: Testing & Quality Assurance
+**Phase 4A**: Essential testing foundation (unit tests, regression testing, input validation) - NEXT
+**Phase 3B-2**: Polish features (advanced filtering, smart resource display, JSON normalization for tool integration)
+**Phase 4B**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
-**Phase 7**: Advanced features and extensions
 
 ## Key Benefits Expected (Scope-Compliant)
 
@@ -254,14 +280,15 @@ Detailed Events:
 - Phase 2A: Simple Correlation Storage (lightweight approach)
 - Phase 2B: Permission Semantic Analysis
 - Phase 3A: Rich Rule Display Format with BIONIC Reading & Professional Panels (terminal-focused)
+- Phase 3B-1: High-Impact User Features (dontaudit detection, basic filtering, sorting)
 - Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
 
 **🔄 WITHIN SCOPE & NEXT:**
-- Phase 3B: Practical Display Features (filtering, sorting)
-- Phase 4: Testing & Quality Assurance
+- Phase 4A: Essential Testing Foundation (unit tests, regression testing, input validation)
+- Phase 3B-2: Polish Features (advanced filtering, smart resource display, JSON normalization)
 
 **✅ WITHIN SCOPE & PLANNED:**
-- Phase 4: Testing & Quality Assurance
+- Phase 4B: Integration & Performance Testing
 - Phase 5: Enhanced Documentation & Architecture Overview
 
 **❌ OUT OF SCOPE (Moved to Future Research):**

@@ -8,8 +8,8 @@ deduplication and clear correlation tracking. This tool specializes in
 post-incident SELinux audit log analysis for complex denial patterns.
 
 Author: Pranav Lawate
-License: [License Type]
-Version: 1.1.0
+License: MIT
+Version: 1.2.0
 """
 
 import argparse
@@ -988,6 +988,213 @@ def format_bionic_text(text: str, base_color: str = "green") -> str:
     return " ".join(formatted_words)
 
 
+def has_permissive_denials(denial_info: dict) -> bool:
+    """
+    Check if a specific denial contains permissive mode events.
+
+    Args:
+        denial_info (dict): Individual denial dictionary
+
+    Returns:
+        bool: True if denial contains permissive mode events
+    """
+    # Check aggregated permissive values if available
+    if 'permissives' in denial_info and denial_info['permissives']:
+        return '1' in denial_info['permissives']
+
+    # Also check individual permissive field
+    parsed_log = denial_info.get('log', {})
+    permissive = parsed_log.get('permissive', '0')
+    return permissive == '1'
+
+
+def detect_permissive_mode(unique_denials: list) -> tuple[bool, int, int]:
+    """
+    Detect permissive mode denials in the dataset.
+
+    Args:
+        unique_denials (list): List of unique denial dictionaries
+
+    Returns:
+        tuple[bool, int, int]: (has_permissive, permissive_count, total_count)
+    """
+    permissive_count = 0
+    total_count = 0
+
+    for denial_info in unique_denials:
+        denial_count = denial_info.get('count', 1)
+        total_count += denial_count
+
+        if has_permissive_denials(denial_info):
+            permissive_count += denial_count
+
+    return permissive_count > 0, permissive_count, total_count
+
+
+def has_dontaudit_permissions(denial_info: dict) -> tuple[bool, list[str]]:
+    """
+    Check if a specific denial contains dontaudit indicator permissions.
+
+    Args:
+        denial_info (dict): Individual denial dictionary
+
+    Returns:
+        tuple[bool, list[str]]: (has_indicators, list of found indicators)
+    """
+    dontaudit_indicators = ['noatsecure', 'rlimitinh', 'siginh']
+    found_indicators = set()
+
+    # Check aggregated permissions set if available
+    if 'permissions' in denial_info and denial_info['permissions']:
+        for perm in denial_info['permissions']:
+            if perm.lower().strip() in dontaudit_indicators:
+                found_indicators.add(perm.lower().strip())
+
+    # Also check individual permission field
+    parsed_log = denial_info.get('log', {})
+    permission = parsed_log.get('permission', '').lower().strip()
+    if permission in dontaudit_indicators:
+        found_indicators.add(permission)
+
+    found_indicators_list = sorted(list(found_indicators))
+    return len(found_indicators_list) > 0, found_indicators_list
+
+
+def detect_dontaudit_disabled(unique_denials: list) -> tuple[bool, list[str]]:
+    """
+    Detect if dontaudit rules are disabled based on presence of commonly suppressed permissions.
+
+    Args:
+        unique_denials (list): List of unique denial dictionaries
+
+    Returns:
+        tuple[bool, list[str]]: (detected, list of found indicators)
+
+    Note:
+        These permissions are almost always suppressed by dontaudit rules in normal systems.
+        If they appear in audit logs, it strongly indicates enhanced audit mode is active.
+    """
+    dontaudit_indicators = ['noatsecure', 'rlimitinh', 'siginh']
+    found_indicators = set()
+
+    for denial_info in unique_denials:
+        # Check aggregated permissions set if available (for denials with multiple permissions)
+        if 'permissions' in denial_info and denial_info['permissions']:
+            for perm in denial_info['permissions']:
+                if perm.lower().strip() in dontaudit_indicators:
+                    found_indicators.add(perm.lower().strip())
+
+        # Also check individual permission field for single-permission denials
+        parsed_log = denial_info.get('log', {})
+        permission = parsed_log.get('permission', '').lower().strip()
+        if permission in dontaudit_indicators:
+            found_indicators.add(permission)
+
+    found_indicators_list = sorted(list(found_indicators))
+    return len(found_indicators_list) > 0, found_indicators_list
+
+
+def filter_denials(denials: list, process_filter: str = None, path_filter: str = None) -> list:
+    """
+    Filter denials based on process name and/or path criteria.
+
+    Args:
+        denials (list): List of denial dictionaries to filter
+        process_filter (str): Process name to filter by (case-insensitive partial match)
+        path_filter (str): Path pattern to filter by (supports basic wildcards)
+
+    Returns:
+        list: Filtered list of denials
+    """
+    if not process_filter and not path_filter:
+        return denials
+
+    filtered_denials = []
+
+    for denial_info in denials:
+        parsed_log = denial_info.get('log', {})
+        include_denial = True
+
+        # Process filtering
+        if process_filter:
+            comm = parsed_log.get('comm', '').lower()
+            if process_filter.lower() not in comm:
+                include_denial = False
+
+        # Path filtering
+        if path_filter and include_denial:
+            path_found = False
+
+            # Check main path
+            path = parsed_log.get('path', '')
+            if path and _path_matches(path, path_filter):
+                path_found = True
+
+            # Check correlation events for paths
+            if not path_found and 'correlations' in denial_info:
+                for correlation in denial_info['correlations']:
+                    corr_path = correlation.get('path', '')
+                    if corr_path and _path_matches(corr_path, path_filter):
+                        path_found = True
+                        break
+
+            if not path_found:
+                include_denial = False
+
+        if include_denial:
+            filtered_denials.append(denial_info)
+
+    return filtered_denials
+
+
+def _path_matches(path: str, pattern: str) -> bool:
+    """
+    Check if a path matches a pattern with basic wildcard support.
+
+    Args:
+        path (str): The file path to check
+        pattern (str): The pattern (supports * wildcards)
+
+    Returns:
+        bool: True if path matches pattern
+    """
+    import fnmatch
+    return fnmatch.fnmatch(path, pattern)
+
+
+def sort_denials(denials: list, sort_order: str) -> list:
+    """
+    Sort denials based on the specified sort order.
+
+    Args:
+        denials (list): List of denial dictionaries to sort
+        sort_order (str): Sort order - 'recent', 'count', or 'chrono'
+
+    Returns:
+        list: Sorted list of denials
+    """
+    if sort_order == "recent":
+        # Most recent first, then latest-starting as tiebreaker (reverse chronological for both)
+        return sorted(denials,
+                     key=lambda x: (x.get('last_seen_obj') or datetime.fromtimestamp(0),
+                                  x.get('first_seen_obj') or datetime.fromtimestamp(0)),
+                     reverse=True)
+    elif sort_order == "count":
+        # Highest count first, then by most recent as tiebreaker
+        return sorted(denials,
+                     key=lambda x: (x.get('count', 0), x.get('last_seen_obj') or datetime.fromtimestamp(0)),
+                     reverse=True)
+    elif sort_order == "chrono":
+        # Chronological order (oldest first) using first_seen
+        return sorted(denials,
+                     key=lambda x: x.get('first_seen_obj') or datetime.fromtimestamp(0))
+    else:
+        # Default to recent if unknown sort order
+        return sorted(denials,
+                     key=lambda x: x.get('last_seen_obj') or datetime.fromtimestamp(0),
+                     reverse=True)
+
+
 def print_summary(console: Console, denial_info: dict, denial_num: int):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Prints a formatted, color-coded summary of an AVC denial with aggregated information.
@@ -1013,8 +1220,16 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     last_seen_dt = denial_info['last_seen_obj']
     last_seen_ago = human_time_ago(last_seen_dt)
 
+    # Check if this denial contains dontaudit permissions and add indicator
+    has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
+    dontaudit_indicator = " [bright_yellow]⚠️ enhanced audit[/bright_yellow]" if has_dontaudit else ""
+
+    # Check if this denial contains permissive mode events and add indicator
+    has_permissive = has_permissive_denials(denial_info)
+    permissive_indicator = " [bright_blue]🛡️ permissive[/bright_blue]" if has_permissive else ""
+
     header = f"[bold green]Unique Denial #{
-        denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago})"
+        denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago}){dontaudit_indicator}{permissive_indicator}"
     console.print(Rule(header))
 
     if not parsed_log:
@@ -1270,6 +1485,19 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
     # Rich Rule header with responsive design using BIONIC reading format
     header_text = f"Unique Denial #{denial_num} • {count} occurrences • last seen {last_seen_ago}"
     header_bionic = format_bionic_text(header_text, "green")
+
+    # Check if this denial contains dontaudit permissions and add indicator after BIONIC formatting
+    has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
+    if has_dontaudit:
+        dontaudit_indicator = " • [bright_yellow]⚠️ enhanced audit[/bright_yellow]"
+        header_bionic += dontaudit_indicator
+
+    # Check if this denial contains permissive mode events and add indicator
+    has_permissive = has_permissive_denials(denial_info)
+    if has_permissive:
+        permissive_indicator = " • [bright_blue]🛡️ permissive[/bright_blue]"
+        header_bionic += permissive_indicator
+
     console.print(Rule(header_bionic, style="cyan"))
 
     # Create WHEN/WHAT panel content
@@ -1805,6 +2033,20 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "--detailed",
         action="store_true",
         help="Show enhanced detailed view with expanded correlation events and context information.")
+    parser.add_argument(
+        "--process",
+        type=str,
+        help="Filter denials by process name (e.g., --process httpd).")
+    parser.add_argument(
+        "--path",
+        type=str,
+        help="Filter denials by file path (supports wildcards, e.g., --path '/var/www/*').")
+    parser.add_argument(
+        "--sort",
+        type=str,
+        choices=["recent", "count", "chrono"],
+        default="recent",
+        help="Sort order: 'recent' (newest first, default), 'count' (highest count first), 'chrono' (oldest first).")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -2020,7 +2262,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             unique_denials[signature][field_key].add(parsed_log[field])
 
                     unique_denials[signature]['count'] += 1
-                    # Only update last_seen_obj if this timestamp is newer
+                    # Update first_seen_obj if this timestamp is older
+                    if dt_obj and (
+                            not unique_denials[signature]['first_seen_obj'] or dt_obj < unique_denials[signature]['first_seen_obj']):
+                        unique_denials[signature]['first_seen_obj'] = dt_obj
+                    # Update last_seen_obj if this timestamp is newer
                     if dt_obj and (
                             not unique_denials[signature]['last_seen_obj'] or dt_obj > unique_denials[signature]['last_seen_obj']):
                         unique_denials[signature]['last_seen_obj'] = dt_obj
@@ -2117,11 +2363,87 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         console.print(
             f"\nFound {total_events} AVC events. Displaying {
                 len(unique_denials)} unique denials...")
-        sorted_denials = sorted(unique_denials.values(),
-                                key=lambda x: x['first_seen_obj'] or datetime.fromtimestamp(0))
-        if sorted_denials:
+        # Apply sorting based on user preference
+        sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
+
+        # Apply filtering if specified
+        filtered_denials = filter_denials(sorted_denials, args.process, args.path)
+
+        # Check for dontaudit detection (on full results before filtering for complete context)
+        dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
+
+        # Check for permissive mode detection (on full results before filtering for complete context)
+        permissive_detected, permissive_count, total_events = detect_permissive_mode(sorted_denials)
+
+        # Update display message to reflect filtering
+        if args.process or args.path:
+            filter_msg = []
+            if args.process:
+                filter_msg.append(f"process='{args.process}'")
+            if args.path:
+                filter_msg.append(f"path='{args.path}'")
+            filter_str = ", ".join(filter_msg)
+            console.print(f"Applied filters: {filter_str}")
+            console.print(f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering.")
+
+        if filtered_denials:
             console.print(Rule("[dim]Parsed Log Summary[/dim]"))
-        for i, denial_info in enumerate(sorted_denials):
+
+            # Display prominent dontaudit detection warning if found
+            if dontaudit_detected:
+                indicators_str = ", ".join(found_indicators)
+                # Create a prominent warning panel that won't be missed
+                from rich.panel import Panel
+                from rich.align import Align
+                from rich.console import Group
+
+                # Create individual centered lines using Group
+                warning_lines = [
+                    Align.center("[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[yellow]Enhanced audit mode is active on this system.[/yellow]"),
+                    Align.center(f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[dim]This means you're seeing permissions that are normally hidden.[/dim]")
+                ]
+
+                warning_panel = Panel(
+                    Group(*warning_lines),
+                    title="[bold red]Security Notice[/bold red]",
+                    border_style="bright_yellow",
+                    padding=(1, 2)
+                )
+                console.print(warning_panel)
+                console.print()
+
+            # Display permissive mode warning if found
+            if permissive_detected:
+                from rich.panel import Panel
+                from rich.align import Align
+                from rich.console import Group
+
+                # Calculate percentage for context
+                permissive_percentage = round((permissive_count / total_events) * 100) if total_events > 0 else 0
+
+                # Create individual centered lines using Group
+                permissive_lines = [
+                    Align.center("[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[blue]Some denials are being allowed but logged.[/blue]"),
+                    Align.center(f"[dim]Permissive events: [bright_blue]{permissive_count}[/bright_blue] of {total_events} ({permissive_percentage}%)[/dim]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[dim]These actions succeeded despite policy violations.[/dim]")
+                ]
+
+                permissive_panel = Panel(
+                    Group(*permissive_lines),
+                    title="[bold blue]Security Notice[/bold blue]",
+                    border_style="bright_blue",
+                    padding=(1, 2)
+                )
+                console.print(permissive_panel)
+                console.print()
+        for i, denial_info in enumerate(filtered_denials):
             if i > 0:
                 if args.fields:
                     console.print(Rule(style="dim"))
@@ -2133,10 +2455,18 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 print_summary(console, denial_info, i + 1)
             else:
                 print_rich_summary(console, denial_info, i + 1, detailed=args.detailed)
-        console.print(
-            f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                len(log_blocks)} log blocks and found {
-                len(unique_denials)} unique denials.")
+        # Show filtering info in final summary if applicable
+        if args.process or args.path:
+            console.print(
+                f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                    len(log_blocks)} log blocks and found {
+                    len(unique_denials)} unique denials. Displayed {
+                    len(filtered_denials)} after filtering.")
+        else:
+            console.print(
+                f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                    len(log_blocks)} log blocks and found {
+                    len(unique_denials)} unique denials.")
 
         # --- Added: Print the list of unparsed types found ---
         if all_unparsed_types:

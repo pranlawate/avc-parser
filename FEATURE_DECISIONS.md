@@ -36,6 +36,38 @@ This document maintains a comprehensive record of all feature decisions, includi
 
 ---
 
+## Filtering and Search Decisions
+
+### ✅ ACCEPTED: Basic Process and Path Filtering
+**Proposal**: Add `--process` and `--path` flags for basic filtering capabilities
+**Reason**: High-value features for daily forensic workflows, simple implementation
+**Date**: 2025-09-22 (Phase 3B-1)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: Sorting Options
+**Proposal**: Add `--sort recent|count|chrono` for different analysis workflows
+**Reason**: Different use cases require different sorting (recent for daily use, count for admins, chrono for audit analysis)
+**Date**: 2025-09-22 (Phase 3B-1)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: Advanced Time and Context Filtering
+**Proposal**: Time range filtering (`--since`, `--until`) and context filtering (`--source`, `--target`)
+**Reason**: Advanced filtering capabilities for complex forensic analysis
+**Date**: 2025-09-22 (Phase 3B-2)
+**Status**: PLANNED AFTER TESTING FOUNDATION
+
+### ❌ REJECTED: Complex Query Language
+**Proposal**: SQL-like or regex-based query language for advanced filtering
+**Reason**: Adds significant complexity, command-line flags sufficient for target use cases
+**Date**: 2025-09-22
+
+### ❌ REJECTED: Real-time Filtering During Audit Stream Processing
+**Proposal**: Real-time filtering capabilities for live audit streams
+**Reason**: Outside forensic analysis scope, tool focuses on static log analysis
+**Date**: 2025-09-22
+
+---
+
 ## Input/Output Format Decisions
 
 ### ✅ ACCEPTED: Single --file Flag with Auto-Detection
@@ -167,10 +199,13 @@ This document maintains a comprehensive record of all feature decisions, includi
 **Reason**: System behavior tracking outside scope, requires event assembly
 **Date**: 2025-09-21
 
-### ❌ REJECTED: dontaudit Detection Logic
-**Proposal**: Detect when dontaudit rules are disabled based on record patterns
-**Reason**: Complex system behavior analysis outside forensic scope
-**Date**: 2025-09-21
+### 🔄 REVISED: dontaudit Detection Logic
+**Original Proposal**: Complex system behavior analysis for dontaudit rule detection
+**Revision**: Simple permission-based detection using specific indicators
+**Reason**: Simple detection using `noatsecure`, `rlimitinh`, `siginh` permissions provides high forensic value with minimal complexity
+**Implementation**: Check for presence of commonly suppressed permissions that indicate enhanced audit mode
+**Date**: 2025-09-22 (Revised from original 2025-09-21 rejection)
+**Status**: ACCEPTED FOR PHASE 3B-1
 
 ### ❌ REJECTED: Performance Impact Analysis
 **Proposal**: Analyze performance implications of denials on system behavior
@@ -417,6 +452,21 @@ This document maintains a comprehensive record of all feature decisions, includi
 **Reason**: Provides architectural clarity while maintaining minimal dependencies and scope compliance
 **Date**: 2025-09-21
 **Status**: PLANNED (Phase 5)
+
+### ✅ ACCEPTED: JSON Field Normalization for Tool Integration
+**Proposal**: Standardize JSON output field formats (paths, ports, contexts) to enable reliable integration with external tools like selinux-ai-tool
+**Scope Check**: ✅ Within "Professional terminal & JSON output" and "Human-readable semantic analysis" boundaries
+**Complexity Assessment**: ✅ LOW - Enhancement to existing parsing logic
+**Dependency Analysis**: ✅ No new dependencies required
+**Value Assessment**: ✅ HIGH - Improves data quality for both human analysis and tool consumption
+**Implementation**:
+- Standardized path formats (absolute paths, consistent separators)
+- Clean port number extraction and formatting
+- Normalized SELinux context field structures
+- Reliable field presence and data types for automation
+**Reason**: High ROI enhancement that makes our JSON universally consumable while staying within forensic analysis scope
+**Date**: 2025-09-22 (Phase 3B-2)
+**Status**: PLANNED
 
 ---
 
