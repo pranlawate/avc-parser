@@ -514,7 +514,7 @@ This document maintains a comprehensive record of all feature decisions, includi
 - User Control: `--legacy-signatures` flag for regression testing and edge cases
 **Data Sources Analyzed**: testRAW audit logs (79K+ events), selinux-policy access_vectors, setroubleshoot signature logic
 **Date**: 2025-09-23 (Phase 3B-2)
-**Status**: PLANNED
+**Status**: COMPLETED
 
 ### ✅ ACCEPTED: Smart Event Grouping by Directory Paths
 **Proposal**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs
@@ -531,7 +531,65 @@ This document maintains a comprehensive record of all feature decisions, includi
 - Preserves existing functionality
 **Reason**: Solves real usability problem identified in production usage without scope creep
 **Date**: 2025-09-23 (Phase 3B-2)
+**Status**: COMPLETED
+
+### ✅ ACCEPTED: Pipe Compatibility Fix
+**Proposal**: Handle broken pipe errors when output is redirected to `head`, `less`, and similar terminal utilities
+**Problem**: Rich Console throws BrokenPipeError when output is piped to tools that close early (like `head`)
+**Solution**:
+- Add signal.SIGPIPE handling to gracefully exit on broken pipes
+- Wrap console operations with try/catch for BrokenPipeError
+- Ensure clean exit without error traces
+**Technical Approach**:
+- Signal handler for SIGPIPE (signal 13)
+- Exception handling around Rich Console operations
+- Graceful degradation when pipe is broken
+**Benefits**:
+- Fixes critical usability issue affecting daily workflows
+- Enables standard Unix pipe patterns: `tool | head`, `tool | less`
+- Maintains professional behavior consistent with other CLI tools
+**Reason**: Critical usability fix for standard terminal operations
+**Date**: 2025-09-24 (Phase 4B)
 **Status**: PLANNED
+
+### ✅ ACCEPTED: Interactive Pager Mode
+**Proposal**: Built-in `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
+**Problem**: Large audit log outputs are difficult to navigate in terminal without external paging tools
+**Solution**:
+- Add `--pager` or `--interactive` command-line flag
+- Implement keyboard navigation (arrow keys, page up/down, home/end)
+- Add 'q' key to quit, '/' for search functionality
+- Display status line with current position and total items
+**Technical Approach**:
+- Use `termios` for raw terminal input handling
+- Buffer output content for pagination
+- Implement screen drawing with terminal control sequences
+- Handle terminal resize events gracefully
+**Benefits**:
+- Enhanced user experience for large outputs
+- Reduces dependency on external paging tools
+- Professional interactive interface for forensic analysis
+- Integrates seamlessly with existing output formats
+**Reason**: Significantly improves usability for large audit files
+**Date**: 2025-09-24 (Phase 4B)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: PID Event Count Display
+**Proposal**: Show event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for better correlation understanding
+**Problem**: In compact view, deduplication hides how many events each PID generated, making correlation analysis difficult
+**Solution**:
+- Display event count only when PID has multiple events: `PID 1234 (3x)`
+- No count for single events: `PID 5678` (clean display)
+- Apply only to compact view where deduplication occurs
+- No count in expand-groups view where individual events are already shown
+**Benefits**:
+- Immediate visibility into event frequency without expanding details
+- Clean display that only shows counts when meaningful
+- Better correlation analysis in default view
+- No clutter in detailed views
+**Reason**: High value, minimal complexity, improves core forensic analysis capability
+**Date**: 2025-09-24 (Phase 4A)
+**Status**: COMPLETED
 
 ---
 

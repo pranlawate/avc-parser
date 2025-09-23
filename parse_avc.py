@@ -9,7 +9,7 @@ post-incident SELinux audit log analysis for complex denial patterns.
 
 Author: Pranav Lawate
 License: MIT
-Version: 1.2.0
+Version: 1.3.0
 """
 
 import argparse
@@ -334,7 +334,6 @@ class PermissionSemanticAnalyzer:
             '9999': 'JBoss management',
             '25': 'SMTP mail service',
             '53': 'DNS service',
-            '443': 'HTTPS service',
             '993': 'IMAPS mail service',
             '995': 'POP3S mail service',
         }
@@ -640,6 +639,8 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
         "SYSCALL": {
             "syscall": r"syscall=([\w\d]+)",       # System call name/number
             "exe": r"exe=\"([^\"]+)\"",             # Executable path
+            "exit": r"exit=([^\s(]+)",              # Exit code (EACCES, 0, etc.) - stop at parentheses
+            "success": r"success=(yes|no)",         # Success flag
         },
         "PROCTITLE": {"proctitle": r"proctitle=(.+)"},  # Process command line
         "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}"}     # Socket address info
@@ -918,7 +919,10 @@ def build_correlation_event(parsed_log: dict, permission: str) -> dict:
         'permissive': parsed_log.get('permissive'),
         'timestamp': parsed_log.get('datetime_str'),
         'dest_port': parsed_log.get('dest_port'),
-        'saddr': parsed_log.get('saddr')
+        'saddr': parsed_log.get('saddr'),
+        'tclass': parsed_log.get('tclass'),
+        'exit': parsed_log.get('exit'),
+        'success': parsed_log.get('success')
     }
     # Only store non-null values to keep correlations clean
     return {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
@@ -1469,6 +1473,114 @@ def has_permissive_denials(denial_info: dict) -> bool:
     return permissive == '1'
 
 
+def has_container_issues(denial_info: dict) -> tuple[bool, list[str], list[str]]:
+    """
+    Check if a specific denial contains container-related policy issues.
+
+    Args:
+        denial_info (dict): Individual denial dictionary
+
+    Returns:
+        tuple[bool, list[str], list[str]]: (has_issues, container_patterns, sample_paths)
+    """
+    container_patterns = [
+        '/containers/storage/overlay/',  # Podman/Docker overlay storage
+        '/.local/share/containers/',     # User container storage
+        '/var/lib/containers/',          # System container storage
+        '/var/lib/docker/',              # Docker storage
+    ]
+
+    found_patterns = set()
+    sample_paths = []
+
+    # Check main path in denial
+    parsed_log = denial_info.get('log', {})
+    main_path = parsed_log.get('path', '')
+    if main_path:
+        for pattern in container_patterns:
+            if pattern in main_path:
+                found_patterns.add(pattern.strip('/'))
+                if len(sample_paths) < 3:  # Keep sample paths for display
+                    sample_paths.append(main_path)
+
+    # Check correlation events for paths
+    if 'correlations' in denial_info:
+        for correlation in denial_info['correlations']:
+            corr_path = correlation.get('path', '')
+            if corr_path:
+                for pattern in container_patterns:
+                    if pattern in corr_path:
+                        found_patterns.add(pattern.strip('/'))
+                        if len(sample_paths) < 3:
+                            sample_paths.append(corr_path)
+
+    # Check aggregated paths if available
+    if 'paths' in denial_info and denial_info['paths']:
+        for path in denial_info['paths']:
+            for pattern in container_patterns:
+                if pattern in path:
+                    found_patterns.add(pattern.strip('/'))
+                    if len(sample_paths) < 3:
+                        sample_paths.append(path)
+
+    found_patterns_list = sorted(list(found_patterns))
+    return len(found_patterns_list) > 0, found_patterns_list, sample_paths[:3]
+
+
+def has_custom_paths(denial_info: dict) -> tuple[bool, list[str]]:
+    """
+    Check if a specific denial contains custom/non-standard paths that may indicate policy issues.
+
+    Args:
+        denial_info (dict): Individual denial dictionary
+
+    Returns:
+        tuple[bool, list[str]]: (has_custom_paths, list of detected custom path patterns)
+    """
+    custom_path_patterns = [
+        '/usr/local',      # Non-standard local installations
+        '/opt',            # Optional software packages
+        '/home/',          # User home directories (when not user_home_t)
+        '/srv',            # Service data directories
+        '/data',           # Custom data directories
+        '/app',            # Application directories
+        '/apps',           # Application directories
+        '/software',       # Software installation directories
+        '/custom',         # Custom directories
+        '/local',          # Local directories outside /usr/local
+        '/var/local',      # Non-standard local variable data
+    ]
+
+    found_patterns = set()
+
+    # Check main path in denial
+    parsed_log = denial_info.get('log', {})
+    main_path = parsed_log.get('path', '')
+    if main_path:
+        for pattern in custom_path_patterns:
+            if main_path.startswith(pattern):
+                found_patterns.add(pattern)
+
+    # Check correlation events for paths
+    if 'correlations' in denial_info:
+        for correlation in denial_info['correlations']:
+            corr_path = correlation.get('path', '')
+            if corr_path:
+                for pattern in custom_path_patterns:
+                    if corr_path.startswith(pattern):
+                        found_patterns.add(pattern)
+
+    # Check aggregated paths if available
+    if 'paths' in denial_info and denial_info['paths']:
+        for path in denial_info['paths']:
+            for pattern in custom_path_patterns:
+                if path.startswith(pattern):
+                    found_patterns.add(pattern)
+
+    found_patterns_list = sorted(list(found_patterns))
+    return len(found_patterns_list) > 0, found_patterns_list
+
+
 def detect_permissive_mode(unique_denials: list) -> tuple[bool, int, int]:
     """
     Detect permissive mode denials in the dataset.
@@ -1683,11 +1795,11 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
 
     # Check if this denial contains dontaudit permissions and add indicator
     has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
-    dontaudit_indicator = " [bright_yellow]⚠️ enhanced audit[/bright_yellow]" if has_dontaudit else ""
+    dontaudit_indicator = " [bright_yellow]⚠️ Enhanced Audit[/bright_yellow]" if has_dontaudit else ""
 
     # Check if this denial contains permissive mode events and add indicator
     has_permissive = has_permissive_denials(denial_info)
-    permissive_indicator = " [bright_blue]🛡️ permissive[/bright_blue]" if has_permissive else ""
+    permissive_indicator = " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
 
     header = f"[bold green]Unique Denial #{
         denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago}){dontaudit_indicator}{permissive_indicator}"
@@ -1920,7 +2032,130 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     console.print("-" * 35)
 
 
-def print_rich_summary(console: Console, denial_info: dict, denial_num: int, detailed: bool = False):
+def group_events_by_resource(correlations: list, expand_groups: bool = False) -> dict:
+    """
+    Group correlation events by exact resource (file path, port, etc.) for smart event grouping.
+
+    Args:
+        correlations (list): List of correlation event dictionaries
+        expand_groups (bool): If True, disable grouping and return individual events
+
+    Returns:
+        dict: Grouped events with structure:
+            {
+                'grouped': [
+                    {
+                        'type': 'resource_group',
+                        'resource': '/var/www/html/config.php',
+                        'resource_type': 'file',
+                        'count': 3,
+                        'permissions': ['read'],
+                        'pids': ['1234', '1235', '1236'],
+                        'comms': ['httpd'],
+                        'all_events': [...]
+                    }
+                ],
+                'individual': [
+                    {
+                        'type': 'individual_event',
+                        'event': {...}
+                    }
+                ]
+            }
+    """
+    if expand_groups:
+        # Return all events as individual when grouping is disabled
+        return {
+            'grouped': [],
+            'individual': [{'type': 'individual_event', 'event': event} for event in correlations]
+        }
+
+    # Group events by exact resource (file path, port, socket address, etc.)
+    resource_groups = {}
+    individual_events = []
+
+    for event in correlations:
+        # Determine the resource identifier for grouping
+        resource_key = None
+        resource_type = None
+
+        # Check for file/directory path
+        path = event.get('path', '')
+        if path:
+            resource_key = path
+            # Determine if it's a directory or file based on various indicators
+            if (path.startswith('...') or  # Partial directory paths like ".../sterling"
+                path.endswith('/') or      # Explicit directory paths ending with /
+                event.get('tclass') == 'dir'):  # SELinux object class indicates directory
+                resource_type = 'directory'
+            else:
+                resource_type = 'file'
+        # Check for network port
+        elif event.get('dest_port'):
+            resource_key = f"port:{event.get('dest_port')}"
+            resource_type = 'port'
+        # Check for socket address
+        elif event.get('saddr'):
+            resource_key = f"socket:{event.get('saddr')}"
+            resource_type = 'socket'
+        # Check for other object classes without specific resources (like security keys)
+        elif event.get('tclass'):
+            tclass = event.get('tclass')
+            permission = event.get('permission', '')
+            # Group by object class + permission for resources without specific identifiers
+            resource_key = f"{tclass}:{permission}"
+            resource_type = tclass
+
+        # If we found a resource to group by
+        if resource_key:
+            if resource_key not in resource_groups:
+                resource_groups[resource_key] = {
+                    'type': 'resource_group',
+                    'resource': resource_key,
+                    'resource_type': resource_type,
+                    'events': [],
+                    'permissions': set(),
+                    'pids': set(),
+                    'comms': set()
+                }
+
+            resource_groups[resource_key]['events'].append(event)
+            resource_groups[resource_key]['permissions'].add(event.get('permission', ''))
+            resource_groups[resource_key]['pids'].add(event.get('pid', ''))
+            resource_groups[resource_key]['comms'].add(event.get('comm', ''))
+        else:
+            # No groupable resource found - treat as individual
+            individual_events.append({'type': 'individual_event', 'event': event})
+
+    # Convert resource groups to final format
+    grouped_events = []
+    for resource_key, group_data in resource_groups.items():
+        events = group_data['events']
+
+        # Group if we have multiple PIDs accessing the same exact resource (2+ events)
+        if len(events) >= 2:
+            grouped_events.append({
+                'type': 'resource_group',
+                'resource': resource_key,
+                'resource_type': group_data['resource_type'],
+                'count': len(events),
+                'permissions': sorted(list(group_data['permissions'])),
+                'pids': sorted(list(group_data['pids'])),
+                'comms': sorted(list(group_data['comms'])),
+                'all_events': events
+            })
+        else:
+            # Single event for this resource - treat as individual
+            for event in events:
+                individual_events.append({'type': 'individual_event', 'event': event})
+
+    return {
+        'grouped': grouped_events,
+        'individual': individual_events
+    }
+
+
+def print_rich_summary(console: Console, denial_info: dict, denial_num: int, detailed: bool = False, expand_groups: bool = False):
     """
     Print a Rich-formatted summary with correlation events display.
 
@@ -1950,21 +2185,43 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
     # Check if this denial contains dontaudit permissions and add indicator after BIONIC formatting
     has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
     if has_dontaudit:
-        dontaudit_indicator = " • [bright_yellow]⚠️ enhanced audit[/bright_yellow]"
+        dontaudit_indicator = " • [bright_yellow]⚠️ Enhanced Audit[/bright_yellow]"
         header_bionic += dontaudit_indicator
 
     # Check if this denial contains permissive mode events and add indicator
     has_permissive = has_permissive_denials(denial_info)
     if has_permissive:
-        permissive_indicator = " • [bright_blue]🛡️ permissive[/bright_blue]"
+        permissive_indicator = " • [bright_blue]🛡️ Permissive[/bright_blue]"
         header_bionic += permissive_indicator
+
+    # Check if this denial contains custom paths and add indicator
+    has_custom, custom_patterns = has_custom_paths(denial_info)
+    if has_custom:
+        # Show primary pattern or "custom paths" if multiple
+        if len(custom_patterns) == 1:
+            custom_indicator = f" • [bright_magenta]📁 {custom_patterns[0]}[/bright_magenta]"
+        else:
+            custom_indicator = f" • [bright_magenta]📁 custom paths[/bright_magenta]"
+        header_bionic += custom_indicator
+
+    # Check if this denial contains container issues and add indicator
+    has_container, container_patterns, sample_paths = has_container_issues(denial_info)
+    if has_container:
+        container_indicator = f" • [bright_cyan]🐳 container[/bright_cyan]"
+        header_bionic += container_indicator
 
     console.print(Rule(header_bionic, style="cyan"))
 
     # Create WHEN/WHAT panel content
     when_what_content = []
 
-    # 1. WHEN - Add timestamp as separate line
+    # 1. WHEN - Add timestamp with AVC type on same line
+    # Get AVC type first
+    avc_type_suffix = ""
+    if parsed_log.get('denial_type'):
+        denial_type_display = "Kernel AVC" if parsed_log['denial_type'] == "AVC" else "Userspace AVC" if parsed_log['denial_type'] == "USER_AVC" else parsed_log['denial_type']
+        avc_type_suffix = f" • [bright_green]{denial_type_display}[/bright_green]"
+
     if count > 1 and 'first_seen_obj' in denial_info and denial_info['first_seen_obj'] and last_seen_dt:
         # Show time range for multiple occurrences
         first_seen_str = denial_info['first_seen_obj'].strftime('%Y-%m-%d %H:%M:%S')
@@ -1981,15 +2238,10 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
             # Different days - show full range
             timestamp_display = f"{first_seen_str} – {last_seen_str}"
 
-        when_what_content.append(f"[bold white]{timestamp_display}[/bold white]")
+        when_what_content.append(f"[bold white]{timestamp_display}[/bold white]{avc_type_suffix}")
     elif parsed_log.get('datetime_str'):
         # Single occurrence
-        when_what_content.append(f"[bold white]{parsed_log['datetime_str']}[/bold white]")
-
-    # Add AVC type as separate line
-    if parsed_log.get('denial_type'):
-        denial_type_display = "Kernel AVC" if parsed_log['denial_type'] == "AVC" else "Userspace AVC" if parsed_log['denial_type'] == "USER_AVC" else parsed_log['denial_type']
-        when_what_content.append(f"[bright_green]{denial_type_display}[/bright_green]")
+        when_what_content.append(f"[bold white]{parsed_log['datetime_str']}[/bold white]{avc_type_suffix}")
 
     # 2. WHAT - Action summary with syscall context
     permissions_display = get_enhanced_permissions_display(denial_info, parsed_log)
@@ -2012,71 +2264,259 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
     if when_what_content:
         # Center each line individually for proper alignment
         centered_lines = [Align.center(line) for line in when_what_content]
-        console.print(Panel(Group(*centered_lines), border_style="dim", padding=(0, 1)))
+        panel_content = Panel(Group(*centered_lines), border_style="dim", padding=(0, 3))
+        # Responsive width: minimum 60% of screen, maximum 120 characters
+        panel_width = min(max(int(console.width * 0.6), 60), 120)
+        console.print(Align.center(panel_content, width=panel_width))
 
-    # 3. WHO & WHERE - Process and location in one flowing line
-    details = []
-
-    # Build process info with all PIDs from correlations
-    if parsed_log.get('comm'):
-        if parsed_log.get('source_type_description'):
-            process_info = f"[green bold]{parsed_log['comm']}[/green bold] [dim]({parsed_log['source_type_description']})[/dim]"
-        else:
-            process_info = f"[green bold]{parsed_log['comm']}[/green bold]"
-
-        # Get all unique PIDs from correlations, fallback to parsed_log PID
-        if 'correlations' in denial_info and denial_info['correlations']:
-            pids = sorted(set(corr.get('pid', '') for corr in denial_info['correlations'] if corr.get('pid')))
-            if pids:
-                if len(pids) == 1:
-                    process_info += f" [cyan]{pids[0]}[/cyan]"
-                else:
-                    # Show multiple PIDs with count
-                    process_info += f" [cyan]{', '.join(pids[:3])}[/cyan]"
-                    if len(pids) > 3:
-                        process_info += f"[dim] (+{len(pids)-3} more)[/dim]"
-        elif parsed_log.get('pid'):
-            process_info += f" [cyan]{parsed_log['pid']}[/cyan]"
-
-        details.append(process_info)
-    elif parsed_log.get('pid'):
-        details.append(f"PID [cyan]{parsed_log['pid']}[/cyan]")
-
-    # Add working directory if available
-    if parsed_log.get('cwd'):
-        details.append(f"working from [dim green]{parsed_log['cwd']}[/dim green]")
-
-    # Create WHO/WHERE panel content
-    who_where_content = []
-
-    # Add process information
-    if details:
-        process_text = " • ".join(details)
-        who_where_content.append(process_text)
-
-    # Add security context transition
+    # 3. Security Context - Simplified panel showing only context transition
     scontext = str(parsed_log.get('scontext', ''))
     tcontext = str(parsed_log.get('tcontext', ''))
     if scontext and tcontext:
         context_text = f"[bright_cyan]{scontext}[/bright_cyan] → [bright_cyan]{tcontext}[/bright_cyan]"
-        who_where_content.append(context_text)
-
-    # Display WHO/WHERE panel
-    if who_where_content:
-        # Center each line individually for proper alignment
-        centered_lines = [Align.center(line) for line in who_where_content]
-        console.print(Panel(Group(*centered_lines), border_style="dim", padding=(0, 1)))
+        centered_context = Align.center(context_text)
+        context_panel = Panel(centered_context, border_style="dim", padding=(0, 3))
+        # Responsive width: minimum 60% of screen, maximum 120 characters
+        panel_width = min(max(int(console.width * 0.6), 60), 120)
+        console.print(Align.center(context_panel, width=panel_width))
 
     console.print()  # Space before events
 
-    # Correlation events display
+    # Correlation events display with smart grouping
     if 'correlations' in denial_info and denial_info['correlations']:
         if detailed:
             console.print("[bold]Detailed Events:[/bold]")
         else:
             console.print("[bold]Events:[/bold]")
 
-        for correlation in denial_info['correlations']:
+        # Apply smart event grouping by exact resource
+        grouped_events = group_events_by_resource(denial_info['correlations'], expand_groups)
+
+        # Display grouped events first (multiple PIDs accessing same exact resource)
+        for group in grouped_events['grouped']:
+            resource = group['resource']
+            resource_type = group['resource_type']
+            count = group['count']
+            permissions = group['permissions']
+            pids = group['pids']
+            comms = group['comms']
+
+            # Format permissions
+            perm_display = permissions[0] if len(permissions) == 1 else ", ".join(permissions)
+
+            # Get process name and description
+            process_name = comms[0] if comms else 'unknown'
+            process_desc = parsed_log.get('source_type_description', '')
+            if process_desc:
+                process_display = f"[green]{process_name}[/green] [dim]({process_desc})[/dim]"
+            else:
+                process_display = f"[green]{process_name}[/green]"
+
+            # Format resource display based on type
+            if resource_type == 'file':
+                # Check if this is a container file
+                is_container_file = any(pattern in resource for pattern in [
+                    '/containers/storage/overlay/',
+                    '/.local/share/containers/',
+                    '/var/lib/containers/',
+                    '/var/lib/docker/'
+                ])
+
+                if is_container_file:
+                    # For container files, show meaningful container context
+                    if '/containers/storage/overlay/' in resource:
+                        # Extract container path: .../overlay/[container-id]/diff/path/to/file
+                        parts = resource.split('/containers/storage/overlay/')
+                        if len(parts) > 1:
+                            overlay_part = parts[1]
+                            # Get container ID and internal path
+                            overlay_parts = overlay_part.split('/')
+                            if len(overlay_parts) >= 3:  # container-id/diff/internal/path
+                                container_id = overlay_parts[0][:12]  # First 12 chars of container ID
+                                internal_path = '/'.join(overlay_parts[2:])  # Skip 'diff' part
+                                resource_display = f"[cyan]container file[/cyan] [bright_white]{internal_path}[/bright_white] [dim](container [bright_cyan]{container_id}[/bright_cyan])[/dim]"
+                            else:
+                                filename = resource.split('/')[-1]
+                                resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                        else:
+                            filename = resource.split('/')[-1]
+                            resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                    elif '/.local/share/containers/' in resource:
+                        # Handle user container storage
+                        parts = resource.split('/.local/share/containers/')
+                        if len(parts) > 1:
+                            container_part = parts[1]
+                            # Extract meaningful part after containers/
+                            if '/overlay/' in container_part:
+                                overlay_parts = container_part.split('/overlay/')
+                                if len(overlay_parts) > 1:
+                                    overlay_subpart = overlay_parts[1].split('/')
+                                    if len(overlay_subpart) >= 3:  # container-id/diff/internal/path
+                                        container_id = overlay_subpart[0][:12]
+                                        internal_path = '/'.join(overlay_subpart[2:])
+                                        resource_display = f"[cyan]container file[/cyan] [bright_white]{internal_path}[/bright_white] [dim](container [bright_cyan]{container_id}[/bright_cyan])[/dim]"
+                                    else:
+                                        filename = resource.split('/')[-1]
+                                        resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                                else:
+                                    filename = resource.split('/')[-1]
+                                    resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                            else:
+                                filename = resource.split('/')[-1]
+                                resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                        else:
+                            filename = resource.split('/')[-1]
+                            resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                    else:
+                        # Fallback for other container patterns
+                        if '/' in resource and len(resource) > 60:
+                            filename = resource.split('/')[-1]
+                            resource_display = f"[cyan]container file[/cyan] [bright_white]{filename}[/bright_white]"
+                        else:
+                            resource_display = f"[cyan]container file[/cyan] [bright_white]{resource}[/bright_white]"
+                else:
+                    # Regular file handling
+                    if '/' in resource and len(resource) > 60:
+                        filename = resource.split('/')[-1]
+                        resource_display = f"file {filename}"
+                    else:
+                        resource_display = f"file {resource}"
+            elif resource_type == 'directory':
+                resource_display = f"directory {resource}"
+            elif resource_type == 'port':
+                port_num = resource.replace('port:', '')
+                port_desc = PermissionSemanticAnalyzer.get_port_description(port_num)
+                if port_desc != f"port {port_num}":
+                    resource_display = f"port {port_num} ({port_desc})"
+                else:
+                    resource_display = f"port {port_num}"
+            elif resource_type == 'socket':
+                socket_addr = resource.replace('socket:', '')
+                resource_display = f"socket {socket_addr}"
+            elif resource_type in ['key', 'capability', 'process', 'dbus']:
+                # For object classes without specific resource identifiers
+                class_desc = PermissionSemanticAnalyzer.get_class_description(resource_type)
+                resource_display = f"{class_desc} resource"
+            else:
+                resource_display = resource
+
+            denied_bionic = format_bionic_text("denied", "white")
+            to_bionic = format_bionic_text("to", "white")
+
+            # Use tree structure only for multiple PIDs, simple format for single PID
+            pid_count = len(pids)
+            pid_label = "PID" if pid_count == 1 else "PIDs"
+
+            if pid_count == 1:
+                # Simple format for single PID - no tree structure needed
+                single_pid = list(pids)[0]
+                # Count events for this specific PID in this group
+                pid_events_count = len([event for event in group['all_events'] if event.get('pid') == single_pid])
+                pid_count_display = f" ({pid_events_count}x)" if pid_events_count > 1 else ""
+                console.print(f"• {pid_label} {single_pid}{pid_count_display} ({process_display})")
+                console.print(f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} [Enforcing] [red]✗ BLOCKED[/red]")
+            else:
+                # Tree structure for multiple PIDs
+                console.print(f"• {pid_count} {pid_label} ({process_display})")
+
+                # Tree structure for PID list (8 PIDs per line)
+                pid_chunks = [pids[i:i+8] for i in range(0, len(pids), 8)]
+                for i, chunk in enumerate(pid_chunks):
+                    is_last_chunk = (i == len(pid_chunks) - 1)
+                    tree_symbol = "└─" if is_last_chunk else "├─"
+                    console.print(f"  {tree_symbol} {', '.join(chunk)}")
+
+                # Denial action line
+                console.print(f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} [Enforcing] [red]✗ BLOCKED[/red]")
+
+            if detailed:
+                # Group events by PID for multi-level tree display
+                events_by_pid = {}
+                for event in group['all_events']:
+                    pid = event.get('pid', 'unknown')
+                    if pid not in events_by_pid:
+                        events_by_pid[pid] = []
+                    events_by_pid[pid].append(event)
+
+                # Show multi-level tree: Resource -> PID -> Events -> Context
+                pid_count = 0
+                for pid, pid_events in events_by_pid.items():
+                    pid_count += 1
+                    is_last_pid = pid_count == len(events_by_pid)
+
+                    # PID level header
+                    event_count = len(pid_events)
+                    pid_branch = "└─" if is_last_pid else "├─"
+                    console.print(f"  {pid_branch} PID {pid} ({event_count} event{'s' if event_count != 1 else ''}):")
+
+                    # Consolidate identical events for this PID
+                    consolidated_events = {}
+                    for event in pid_events:
+                        permission = event.get('permission', '')
+                        timestamp = event.get('timestamp', '')
+                        syscall = event.get('syscall', parsed_log.get('syscall', 'unknown'))
+                        exit_code = event.get('exit', 'unknown')
+
+                        # Create key for identical events (ignore microsecond differences)
+                        time_key = timestamp.split('.')[0] if '.' in timestamp else timestamp  # Remove microseconds
+                        event_key = (permission, time_key, syscall, exit_code)
+
+                        if event_key not in consolidated_events:
+                            consolidated_events[event_key] = {
+                                'permission': permission,
+                                'timestamp': timestamp,
+                                'syscall': syscall,
+                                'exit_code': exit_code,
+                                'count': 0
+                            }
+                        consolidated_events[event_key]['count'] += 1
+
+                    # Display consolidated events
+                    consolidated_list = list(consolidated_events.values())
+                    display_events = consolidated_list[:3]  # Limit to 3 unique event types per PID
+
+                    for i, consolidated_event in enumerate(display_events):
+                        permission = consolidated_event['permission']
+                        timestamp = consolidated_event['timestamp']
+                        syscall = consolidated_event['syscall']
+                        exit_code = consolidated_event['exit_code']
+                        count = consolidated_event['count']
+
+                        is_last_event = i == len(display_events) - 1 and len(consolidated_list) <= 3
+                        event_branch = "└─" if is_last_event and is_last_pid else "├─"
+                        pid_prefix = "   " if is_last_pid else "│  "
+
+                        # Format with count if more than 1 identical event
+                        if count > 1:
+                            count_text = f" ({count}x)"
+                        else:
+                            count_text = ""
+
+                        console.print(f"  {pid_prefix} {event_branch} [bright_cyan]{permission}[/bright_cyan]{count_text} | Time: {timestamp} | Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: {exit_code}")
+
+                    # Show truncation if needed
+                    if len(consolidated_list) > 3:
+                        pid_prefix = "   " if is_last_pid else "│  "
+                        remaining_count = len(consolidated_list) - 3
+                        console.print(f"  {pid_prefix} └─ ... and {remaining_count} more event type{'s' if remaining_count != 1 else ''}")
+
+                # Add process context at the bottom
+                exe_path = parsed_log.get('exe', '')
+                proctitle = parsed_log.get('proctitle', '')
+                contextual_analysis = parsed_log.get('contextual_analysis', '')
+
+                if exe_path or proctitle or contextual_analysis:
+                    console.print(f"  └─ Process Context:")
+                    if exe_path:
+                        console.print(f"     ├─ Executable: [dim]{exe_path}[/dim]")
+                    if contextual_analysis:
+                        console.print(f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]")
+                    if proctitle and proctitle != parsed_log.get('comm', ''):
+                        console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
+
+        # Display individual events (single PID per resource)
+        for item in grouped_events['individual']:
+            correlation = item['event']
             pid = correlation.get('pid', 'unknown')
             comm = correlation.get('comm', 'unknown')
             permission = correlation.get('permission', '')
@@ -2085,6 +2525,7 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
             saddr = correlation.get('saddr', '')
             permissive = correlation.get('permissive', '')
             timestamp = correlation.get('timestamp', '')
+
 
             # Build event description with BIONIC reading for natural language parts
             if path:
@@ -2154,7 +2595,9 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
                     exe_display = ""
                 denied_bionic = format_bionic_text("denied", "white")
                 to_bionic = format_bionic_text("to", "white")
-                console.print(f"• PID {pid} ([green]{comm}[/green]){exe_display} {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
+                # Split into two lines: PID+process line and denial action line
+                console.print(f"• PID {pid} ([green]{comm}[/green]){exe_display}")
+                console.print(f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
 
                 # Add detailed sub-information with tree-like structure
                 syscall = parsed_log.get('syscall', '')
@@ -2162,56 +2605,40 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
                 proctitle = parsed_log.get('proctitle', '')
 
                 if syscall:
-                    console.print(f"  ├─ Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: EACCES | Time: {timestamp}")
+                    # Get actual exit code from the correlation event
+                    exit_code = correlation.get('exit', 'unknown')
+                    console.print(f"  ├─ [bright_cyan]{permission}[/bright_cyan] | Time: {timestamp} | Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: {exit_code}")
 
-                # Add semantic analysis if available
-                if permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis'):
-                    contextual_analysis = parsed_log.get('contextual_analysis', '')
-                    if contextual_analysis:
-                        console.print(f"  ├─ Analysis: [dim]{contextual_analysis}[/dim]")
-
+                # Add process context information
                 if cwd:
                     console.print(f"  ├─ Working Directory: [dim]{cwd}[/dim]")
 
                 if proctitle and proctitle != comm:
-                    console.print(f"  └─ Process Title: [dim]{proctitle}[/dim]")
-                elif not cwd:  # Need a closing branch
+                    # Determine if this should be the last item for proper tree branching
+                    has_analysis = (permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis')
+                                   and parsed_log.get('contextual_analysis', ''))
+                    branch = "├─" if has_analysis else "└─"
+                    console.print(f"  {branch} Process Title: [dim]{proctitle}[/dim]")
+
+                # Add semantic analysis last as it provides interpretive context
+                if permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis'):
+                    contextual_analysis = parsed_log.get('contextual_analysis', '')
+                    if contextual_analysis:
+                        console.print(f"  └─ Analysis: [dim]{contextual_analysis}[/dim]")
+
+                # Fallback closing branch if no other context is available
+                if not (cwd or (proctitle and proctitle != comm) or
+                       (permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis')
+                        and parsed_log.get('contextual_analysis', ''))):
                     console.print(f"  └─ Process: [dim]{comm}[/dim]")
 
             else:
                 # Standard compact view
                 denied_bionic = format_bionic_text("denied", "white")
                 to_bionic = format_bionic_text("to", "white")
-                console.print(f"• PID {pid} ([green]{comm}[/green]) {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
-
-    # Add security context details section for detailed view
-    if detailed and scontext and tcontext:
-        console.print()
-        console.print("[bold]Security Context Details:[/bold]")
-
-        # Enhanced context display with descriptions
-        source_desc = ""
-        target_desc = ""
-
-        # Try to get context descriptions from parsed log
-        if hasattr(parsed_log.get('scontext'), 'get_type_description'):
-            source_desc = f" ({parsed_log['scontext'].get_type_description()})"
-        elif 'source_type_description' in parsed_log:
-            source_desc = f" ({parsed_log['source_type_description']})"
-
-        if hasattr(parsed_log.get('tcontext'), 'get_type_description'):
-            target_desc = f" ({parsed_log['tcontext'].get_type_description()})"
-        elif 'target_type_description' in parsed_log:
-            target_desc = f" ({parsed_log['target_type_description']})"
-
-        console.print(f"  Source: [bright_cyan]{scontext}[/bright_cyan]{source_desc}")
-        console.print(f"  Target: [bright_cyan]{tcontext}[/bright_cyan]{target_desc}")
-
-        tclass = parsed_log.get('tclass', '')
-        if tclass:
-            class_desc = PermissionSemanticAnalyzer.get_class_description(tclass)
-            class_display = f" ({class_desc})" if class_desc != tclass else ""
-            console.print(f"  Object Class: [yellow]{tclass}[/yellow]{class_display}")
+                # Split into two lines: PID+process line and denial action line
+                console.print(f"• PID {pid} ([green]{comm}[/green])")
+                console.print(f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}")
 
     console.print()  # Space after events
 
@@ -2539,6 +2966,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "--legacy-signatures",
         action="store_true",
         help="Use legacy signature logic for regression testing (disables smart deduplication).")
+    parser.add_argument(
+        "--expand-groups",
+        action="store_true",
+        help="Show individual events instead of resource-based groupings (disables smart event grouping).")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -2828,6 +3259,28 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         # Check for permissive mode detection (on full results before filtering for complete context)
         permissive_detected, permissive_count, total_events = detect_permissive_mode(sorted_denials)
 
+        # Check for custom paths detection (on full results before filtering for complete context)
+        custom_paths_detected, found_custom_patterns = False, []
+        for denial_info in sorted_denials:
+            has_custom, custom_patterns = has_custom_paths(denial_info)
+            if has_custom:
+                custom_paths_detected = True
+                found_custom_patterns.extend(custom_patterns)
+        # Remove duplicates and sort
+        found_custom_patterns = sorted(list(set(found_custom_patterns)))
+
+        # Check for container issues detection (on full results before filtering for complete context)
+        container_issues_detected, found_container_patterns, container_sample_paths = False, [], []
+        for denial_info in sorted_denials:
+            has_container, container_patterns, sample_paths = has_container_issues(denial_info)
+            if has_container:
+                container_issues_detected = True
+                found_container_patterns.extend(container_patterns)
+                container_sample_paths.extend(sample_paths)
+        # Remove duplicates and sort
+        found_container_patterns = sorted(list(set(found_container_patterns)))
+        container_sample_paths = list(dict.fromkeys(container_sample_paths))[:3]  # Keep first 3 unique
+
         # Update display message to reflect filtering
         if args.process or args.path:
             filter_msg = []
@@ -2864,9 +3317,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     Group(*warning_lines),
                     title="[bold red]Security Notice[/bold red]",
                     border_style="bright_yellow",
-                    padding=(1, 2)
+                    padding=(1, 4)
                 )
-                console.print(warning_panel)
+                # Responsive width: minimum 60% of screen, maximum 120 characters
+                panel_width = min(max(int(console.width * 0.6), 60), 120)
+                console.print(Align.center(warning_panel, width=panel_width))
                 console.print()
 
             # Display permissive mode warning if found
@@ -2892,9 +3347,142 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     Group(*permissive_lines),
                     title="[bold blue]Security Notice[/bold blue]",
                     border_style="bright_blue",
-                    padding=(1, 2)
+                    padding=(1, 4)
                 )
-                console.print(permissive_panel)
+                # Responsive width: minimum 60% of screen, maximum 120 characters
+                panel_width = min(max(int(console.width * 0.6), 60), 120)
+                console.print(Align.center(permissive_panel, width=panel_width))
+                console.print()
+
+            # Display custom paths warning if found
+            if custom_paths_detected:
+                from rich.panel import Panel
+                from rich.align import Align
+                from rich.console import Group
+
+                # Format patterns list for display
+                if len(found_custom_patterns) == 1:
+                    patterns_str = found_custom_patterns[0]
+                elif len(found_custom_patterns) <= 3:
+                    patterns_str = ", ".join(found_custom_patterns)
+                else:
+                    # Show first 3 and indicate there are more
+                    patterns_str = ", ".join(found_custom_patterns[:3]) + f" (+{len(found_custom_patterns)-3} more)"
+
+                # Create individual centered lines using Group
+                custom_lines = [
+                    Align.center("[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[magenta]Non-standard directory paths found in denials.[/magenta]"),
+                    Align.center(f"[dim]Custom paths: [bright_magenta]{patterns_str}[/bright_magenta][/dim]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[dim]These may require custom SELinux policy configuration.[/dim]")
+                ]
+
+                custom_panel = Panel(
+                    Group(*custom_lines),
+                    title="[bold magenta]Policy Notice[/bold magenta]",
+                    border_style="bright_magenta",
+                    padding=(1, 4)
+                )
+                # Responsive width: minimum 60% of screen, maximum 120 characters
+                panel_width = min(max(int(console.width * 0.6), 60), 120)
+                console.print(Align.center(custom_panel, width=panel_width))
+                console.print()
+
+            # Display container issues warning if found
+            if container_issues_detected:
+                from rich.panel import Panel
+                from rich.align import Align
+                from rich.console import Group
+
+                # Format patterns list for display
+                if len(found_container_patterns) == 1:
+                    patterns_str = found_container_patterns[0]
+                elif len(found_container_patterns) <= 3:
+                    patterns_str = ", ".join(found_container_patterns)
+                else:
+                    # Show first 3 and indicate there are more
+                    patterns_str = ", ".join(found_container_patterns[:3]) + f" (+{len(found_container_patterns)-3} more)"
+
+                # Show sample path to help users understand the issue
+                sample_path_line = ""
+                if container_sample_paths:
+                    # Get the first sample path and show a meaningful portion
+                    sample_path = container_sample_paths[0]
+                    if len(sample_path) > 80:
+                        # Show beginning and end with ellipsis
+                        sample_display = f"{sample_path[:40]}...{sample_path[-30:]}"
+                    else:
+                        sample_display = sample_path
+                    sample_path_line = f"[dim]Example path: [bright_cyan]{sample_display}[/bright_cyan][/dim]"
+
+                # Show generic container storage patterns without specific system paths
+                sample_path_lines = []
+                if container_sample_paths:
+                    # Show generic patterns based on detected container storage types
+                    sample_path = container_sample_paths[0]
+
+                    # Determine container storage type and show generic patterns
+                    if '/containers/storage/overlay/' in sample_path:
+                        # Extract the actual base path up to /containers/storage/overlay/
+                        parts = sample_path.split('/containers/storage/overlay/')
+                        if len(parts) == 2:
+                            actual_base = parts[0] + '/containers/storage/overlay/'
+                            sample_path_lines = [
+                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                            ]
+                    elif '/.local/share/containers/' in sample_path:
+                        # Extract the actual base path up to /.local/share/containers/storage/overlay/
+                        parts = sample_path.split('/.local/share/containers/')
+                        if len(parts) == 2:
+                            actual_base = parts[0] + '/.local/share/containers/storage/overlay/'
+                            sample_path_lines = [
+                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                            ]
+                    elif '/var/lib/containers/' in sample_path:
+                        # System container storage (alternative location)
+                        sample_path_lines = [
+                            f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
+                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                        ]
+
+                    # Fallback for other container patterns
+                    if not sample_path_lines:
+                        sample_path_lines = [
+                            f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
+                        ]
+
+                # Create individual centered lines using Group
+                container_lines = [
+                    Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[cyan]SELinux denials accessing container overlay storage.[/cyan]"),
+                    Align.center(""),  # Empty line
+                    Align.center("[dim]Complete path = Base path + Container path:[/dim]"),
+                ]
+
+                # Add the sample path lines if available
+                if sample_path_lines:
+                    for path_line in sample_path_lines:
+                        container_lines.append(Align.center(path_line))
+
+                container_lines.extend([
+                    Align.center(""),  # Empty line
+                    Align.center("[dim]Recommendation: container-selinux policy package[/dim]")
+                ])
+
+                container_panel = Panel(
+                    Group(*container_lines),
+                    title="[bold cyan]Container Notice[/bold cyan]",
+                    border_style="bright_cyan",
+                    padding=(1, 4)
+                )
+                # Responsive width: minimum 60% of screen, maximum 120 characters
+                panel_width = min(max(int(console.width * 0.6), 60), 120)
+                console.print(Align.center(container_panel, width=panel_width))
                 console.print()
         for i, denial_info in enumerate(filtered_denials):
             if i > 0:
@@ -2907,7 +3495,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             if args.fields:
                 print_summary(console, denial_info, i + 1)
             else:
-                print_rich_summary(console, denial_info, i + 1, detailed=args.detailed)
+                print_rich_summary(console, denial_info, i + 1, detailed=args.detailed, expand_groups=args.expand_groups)
         # Show filtering info in final summary if applicable
         if args.process or args.path:
             console.print(

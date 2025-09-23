@@ -126,23 +126,30 @@ correlations = [
 - [x] **Basic Filtering**: Process (`--process httpd`) and path filtering (`--path /var/www/*`)
 - [x] **Sorting Options**: `--sort recent|count|chrono` for different analysis workflows
 
-#### 🔄 **3B-2: Polish Features** (CURRENT PHASE - AFTER TESTING FOUNDATION)
-- [ ] **Smart Deduplication Logic**: SELinux remediation-aware signature generation to properly distinguish services while grouping related permissions for optimal `semanage` command correlation
-- [ ] **Smart Event Grouping**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs (builds on improved signatures)
-- [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`)
-- [ ] **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
-- [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
+#### ✅ **3B-2: Polish Features** (COMPLETED)
+- [x] **Smart Deduplication Logic**: SELinux remediation-aware signature generation to properly distinguish services while grouping related permissions for optimal `semanage` command correlation
+- [x] **Smart Event Grouping**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs (builds on improved signatures)
 
 **Scope Note**: Syscall success indicators moved OUT OF SCOPE (requires complex event assembly)
 
-### 🧪 **PHASE 4: Testing & Quality** (PLANNED - REORDERED FOR RELIABILITY)
+### ✅ **PHASE 4A: Testing Foundation** (COMPLETED)
+- [x] **Unit Tests**: Core parsing logic, correlation accuracy, semantic analysis validation (107 comprehensive tests)
+- [x] **Regression Testing**: Ensure existing functionality remains intact during feature additions
+- [x] **Input Validation**: Edge cases, malformed logs, large files, boundary conditions
+- [x] **Quality Analysis**: Comprehensive code review, bug detection, and critical fix implementation
+- [x] **PID Event Counting**: Display event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for improved correlation clarity
 
-**4A: Essential Testing Foundation** (BEFORE PHASE 3B-2)
-- [ ] **Unit Tests**: Core parsing logic, correlation accuracy, semantic analysis validation
-- [ ] **Regression Testing**: Ensure existing functionality remains intact during feature additions
-- [ ] **Input Validation**: Edge cases, malformed logs, large files, boundary conditions
+### 🔄 **PHASE 4B: Critical Usability Features** (CURRENT PHASE - HIGH ROI)
+- [ ] **Pipe Compatibility Fix**: Handle broken pipe errors when output is redirected to `head`, `less`, etc. (Critical daily workflow fix)
+- [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`) (High forensic value)
+- [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
-**4B: Integration & Performance** (AFTER CORE FEATURES)
+### 🎨 **PHASE 4C: Enhanced User Experience** (AFTER CRITICAL FIXES)
+- [ ] **Interactive Pager Mode**: Built-in `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
+- [ ] **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
+- [ ] **Terminal Integration**: Enhanced output formatting for various terminal environments
+
+### 🧪 **PHASE 4D: Integration & Performance** (QUALITY ASSURANCE)
 - [ ] **Real-world Scenarios**: Various audit log formats, different Linux distributions
 - [ ] **Cross-platform Compatibility**: Testing across RHEL, Ubuntu, SUSE, Arch distributions
 - [ ] **Memory Optimization**: Large file handling improvements (>500MB audit logs)
@@ -252,10 +259,11 @@ Detailed Events:
   └─ Proctitle: /usr/sbin/httpd -DFOREGROUND
 ```
 
-## Current Implementation Focus (Strategic Priority Order)
+## Current Implementation Focus (ROI-Optimized Priority Order)
 
-**Phase 3B-2**: Polish Features (smart deduplication logic, smart event grouping, advanced filtering, smart resource display, JSON normalization) - CURRENT
-**Phase 4B**: Integration & performance testing
+**Phase 4B**: Critical Usability Features (pipe compatibility fix, advanced filtering, JSON normalization) - CURRENT HIGH ROI
+**Phase 4C**: Enhanced User Experience (interactive pager mode, smart resource display, terminal integration)
+**Phase 4D**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
 
 ## Key Benefits Expected (Scope-Compliant)
@@ -282,13 +290,15 @@ Detailed Events:
 - Phase 2B: Permission Semantic Analysis
 - Phase 3A: Rich Rule Display Format with BIONIC Reading & Professional Panels (terminal-focused)
 - Phase 3B-1: High-Impact User Features (dontaudit detection, basic filtering, sorting)
+- Phase 3B-2: Polish Features (smart deduplication logic, smart event grouping)
+- Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting)
 - Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
 
 **🔄 WITHIN SCOPE & CURRENT:**
-- Phase 3B-2: Polish Features (smart deduplication logic, smart event grouping, advanced filtering, smart resource display, JSON normalization)
+- Phase 4B: User Experience Enhancements (pipe compatibility fix, interactive pager mode, terminal integration)
 
 **✅ WITHIN SCOPE & PLANNED:**
-- Phase 4B: Integration & Performance Testing
+- Phase 4C: Integration & Performance Testing
 - Phase 5: Enhanced Documentation & Architecture Overview
 
 **❌ OUT OF SCOPE (Moved to Future Research):**
