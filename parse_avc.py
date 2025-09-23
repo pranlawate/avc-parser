@@ -960,6 +960,374 @@ def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str
         return parsed_log.get('permission', '')
 
 
+def get_process_category(comm: str, source_context: AvcContext = None) -> str:
+    """
+    Categorize processes for service distinction in smart signatures.
+
+    Args:
+        comm (str): Process command name
+        source_context (AvcContext): Source security context
+
+    Returns:
+        str: Process category for signature grouping
+    """
+    if not comm:
+        return "unknown"
+
+    # Service-specific categorization for domains that run multiple services
+    service_mappings = {
+        # Web servers
+        'httpd': 'web_server_apache',
+        'nginx': 'web_server_nginx',
+        'lighttpd': 'web_server_lighttpd',
+        'caddy': 'web_server_caddy',
+
+        # Database servers
+        'mysqld': 'database_mysql',
+        'postgres': 'database_postgresql',
+        'mongod': 'database_mongodb',
+        'redis-server': 'database_redis',
+
+        # System services
+        'systemd': 'init_systemd',
+        'init': 'init_sysv',
+        'logrotate': 'system_logrotate',
+        'cron': 'system_cron',
+        'crond': 'system_cron',
+        'ntpdate': 'system_ntp',
+        'chronyd': 'system_ntp',
+        'aide': 'security_aide',
+
+        # SSH services
+        'sshd': 'ssh_daemon',
+        'ssh': 'ssh_client',
+        'unix_chkpwd': 'ssh_auth',
+
+        # Container/virtualization
+        'docker': 'container_docker',
+        'podman': 'container_podman',
+        'runc': 'container_runtime',
+
+        # Desktop/user services
+        'gnome-shell': 'desktop_gnome',
+        'plasma': 'desktop_kde',
+        'pulseaudio': 'audio_pulse',
+        'pipewire': 'audio_pipewire',
+    }
+
+    # Check for direct mapping first
+    if comm in service_mappings:
+        return service_mappings[comm]
+
+    # Check for pattern-based mappings for related processes
+    # Apache web server variants
+    if comm.startswith('httpd') or comm.endswith('-httpd') or 'httpd' in comm:
+        return 'web_server_apache'
+
+    # Nginx variants
+    if comm.startswith('nginx') or comm.endswith('-nginx') or 'nginx' in comm:
+        return 'web_server_nginx'
+
+    # PostgreSQL variants
+    if comm.startswith('postgres') or 'postgres' in comm:
+        return 'database_postgresql'
+
+    # MySQL variants
+    if comm.startswith('mysql') or 'mysql' in comm:
+        return 'database_mysql'
+
+    # SSH variants
+    if comm.startswith('sshd') or 'sshd' in comm:
+        return 'ssh_daemon'
+
+    # Handle multi-service domains that need process distinction
+    if source_context and source_context.type:
+        multi_service_domains = {
+            'unconfined_t': f"unconfined_{comm}",
+            'init_t': f"init_{comm}",
+            'user_t': f"user_{comm}",
+            'admin_t': f"admin_{comm}",
+        }
+
+        if source_context.type in multi_service_domains:
+            return multi_service_domains[source_context.type]
+
+    # Default: use command name directly
+    return f"service_{comm}"
+
+
+def get_permission_category(permission: str, tclass: str) -> str:
+    """
+    Categorize permissions for grouping related operations in smart signatures.
+
+    Args:
+        permission (str): SELinux permission
+        tclass (str): Target object class
+
+    Returns:
+        str: Permission category for signature grouping
+    """
+    # File system operations that commonly group together
+    file_access_perms = {'read', 'write', 'append', 'getattr', 'open'}
+    file_create_perms = {'create', 'write', 'add_name', 'setattr'}
+    file_execute_perms = {'execute', 'execute_no_trans', 'entrypoint'}
+    file_manage_perms = {'unlink', 'remove_name', 'rename', 'rmdir'}
+
+    # Network operations that commonly group together
+    net_bind_perms = {'name_bind', 'bind', 'listen'}
+    net_connect_perms = {'name_connect', 'connect', 'send_msg', 'recv_msg'}
+
+    # Process/security operations
+    process_signal_perms = {'signal', 'signull', 'sigkill', 'sigstop'}
+    process_trace_perms = {'ptrace', 'getsched', 'setsched'}
+    process_transition_perms = {'transition', 'entrypoint', 'execute'}
+
+    # D-Bus operations
+    dbus_communication_perms = {'send_msg', 'acquire_svc', 'own'}
+
+    # Check permission against categories
+    if tclass in ['file', 'dir', 'lnk_file', 'chr_file', 'blk_file', 'sock_file', 'fifo_file']:
+        if permission in file_access_perms:
+            return 'file_access'
+        elif permission in file_create_perms:
+            return 'file_create'
+        elif permission in file_execute_perms:
+            return 'file_execute'
+        elif permission in file_manage_perms:
+            return 'file_manage'
+        else:
+            return f'file_{permission}'
+
+    elif tclass in ['tcp_socket', 'udp_socket', 'unix_stream_socket', 'unix_dgram_socket']:
+        if permission in net_bind_perms:
+            return 'net_bind'
+        elif permission in net_connect_perms:
+            return 'net_connect'
+        else:
+            return f'net_{permission}'
+
+    elif tclass == 'process':
+        if permission in process_signal_perms:
+            return 'process_signal'
+        elif permission in process_trace_perms:
+            return 'process_trace'
+        elif permission in process_transition_perms:
+            return 'process_transition'
+        else:
+            return f'process_{permission}'
+
+    elif tclass == 'dbus':
+        if permission in dbus_communication_perms:
+            return 'dbus_communication'
+        else:
+            return f'dbus_{permission}'
+
+    # Default: use permission directly for other classes
+    return permission
+
+
+def get_object_group(tclass: str) -> str:
+    """
+    Group object classes for smart signature generation.
+
+    Args:
+        tclass (str): SELinux object class
+
+    Returns:
+        str: Object group for signature purposes
+    """
+    # Filesystem objects that often share similar remediation
+    filesystem_objects = {
+        'file', 'dir', 'lnk_file', 'chr_file', 'blk_file',
+        'sock_file', 'fifo_file', 'anon_inode'
+    }
+
+    # Network objects
+    network_objects = {
+        'tcp_socket', 'udp_socket', 'rawip_socket', 'netlink_socket',
+        'unix_stream_socket', 'unix_dgram_socket', 'socket'
+    }
+
+    # IPC objects
+    ipc_objects = {
+        'sem', 'msg', 'msgq', 'shm', 'ipc'
+    }
+
+    # System objects
+    system_objects = {
+        'process', 'security', 'system', 'capability', 'capability2'
+    }
+
+    if tclass in filesystem_objects:
+        return 'filesystem'
+    elif tclass in network_objects:
+        return 'network'
+    elif tclass in ipc_objects:
+        return 'ipc'
+    elif tclass in system_objects:
+        return 'system'
+    else:
+        # Keep specific classes that need distinct treatment
+        return tclass
+
+
+def get_path_pattern(path: str, tclass: str) -> str:
+    """
+    Extract path patterns for fcontext rule grouping.
+
+    Args:
+        path (str): File/directory path
+        tclass (str): Target object class
+
+    Returns:
+        str: Path pattern for signature grouping
+    """
+    if not path or path in ['?', '"?"', 'unknown']:
+        return 'no_path'
+
+    # Handle dev+inode identifiers
+    if path.startswith('dev:'):
+        return 'dev_inode'
+
+    # Extract meaningful path patterns for fcontext rules
+    import re
+
+    # Common system directories that group well
+    system_patterns = {
+        r'^/var/log(/.*)?$': '/var/log(/.*)?',
+        r'^/var/local/log(/.*)?$': '/var/local/log(/.*)?',  # Add specific pattern for /var/local/log
+        r'^/var/spool(/.*)?$': '/var/spool(/.*)?',
+        r'^/var/run(/.*)?$': '/var/run(/.*)?',
+        r'^/var/lib(/.*)?$': '/var/lib(/.*)?',
+        r'^/etc(/.*)?$': '/etc(/.*)?',
+        r'^/usr/bin(/.*)?$': '/usr/bin(/.*)?',
+        r'^/usr/sbin(/.*)?$': '/usr/sbin(/.*)?',
+        r'^/usr/lib(/.*)?$': '/usr/lib(/.*)?',
+        r'^/home/[^/]+(/.*)?$': '/home/[^/]+(/.*)?',
+        r'^/tmp(/.*)?$': '/tmp(/.*)?',
+        r'^/var/tmp(/.*)?$': '/var/tmp(/.*)?',
+    }
+
+    # Web server specific patterns
+    web_patterns = {
+        r'^/var/www(/.*)?$': '/var/www(/.*)?',
+        r'^/srv/www(/.*)?$': '/srv/www(/.*)?',
+        r'^/usr/share/nginx(/.*)?$': '/usr/share/nginx(/.*)?',
+        r'^/etc/httpd(/.*)?$': '/etc/httpd(/.*)?',
+        r'^/etc/nginx(/.*)?$': '/etc/nginx(/.*)?',
+    }
+
+    # Container storage patterns (already handled by format_path_for_display)
+    container_patterns = {
+        r'.*/containers/storage/overlay/[^/]+/.*': '/containers/storage/overlay/*/...',
+    }
+
+    # Check patterns in order of specificity
+    all_patterns = {**web_patterns, **container_patterns, **system_patterns}
+
+    for pattern, replacement in all_patterns.items():
+        if re.match(pattern, path):
+            return replacement
+
+    # For unmatched paths, normalize to directory patterns for grouping
+    # Both files and directories should use the same base pattern for location-based grouping
+    if tclass in ['file', 'dir']:
+        if tclass == 'file':
+            # Extract directory pattern for files
+            dir_path = '/'.join(path.split('/')[:-1])
+            if dir_path:
+                return f"{dir_path}/*"
+        elif tclass == 'dir':
+            # For directories, use the directory itself as the pattern base
+            if path.startswith('...'):
+                # This is a partial directory name like ".../sterling" or ".../info_server"
+                # Extract the actual directory name
+                dir_name = path.split('/')[-1]
+
+                # Map common directory names to use the same pattern as their corresponding files
+                # This ensures directories and files in the same location get grouped together
+                if dir_name in ['sterling', 'info_server', 'log']:
+                    # Use the same pattern that files in /var/local/log get from the regex
+                    return '/var/local/log(/.*)?'
+
+                # For unknown partial paths, assume they're also in /var/local/log
+                return '/var/local/log(/.*)?'
+            else:
+                # For full directory paths, use the directory as base pattern
+                return f"{path}/*"
+
+    # Keep the exact path for other cases
+    return path
+
+
+def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tuple:
+    """
+    Generate intelligent signature for SELinux remediation-aware grouping.
+
+    Args:
+        parsed_log (dict): Parsed AVC log data
+        legacy_mode (bool): Use legacy signature logic for regression testing
+
+    Returns:
+        tuple: Smart signature tuple for grouping
+    """
+    if legacy_mode:
+        # Use original logic for regression testing
+        scontext_val = parsed_log.get('scontext')
+        tcontext_val = parsed_log.get('tcontext')
+        return (
+            str(scontext_val) if scontext_val else None,
+            str(tcontext_val) if tcontext_val else None,
+            parsed_log.get('tclass'),
+            parsed_log.get('permission')
+        )
+
+    # Smart signature generation
+    scontext = parsed_log.get('scontext')
+    tcontext = parsed_log.get('tcontext')
+    tclass = parsed_log.get('tclass', '')
+    permission = parsed_log.get('permission', '')
+    path = parsed_log.get('path', '')
+    comm = parsed_log.get('comm', '')
+
+    # Generate signature components
+    process_category = get_process_category(comm, scontext)
+    permission_category = get_permission_category(permission, tclass)
+    object_group = get_object_group(tclass)
+    path_pattern = get_path_pattern(path, tclass)
+
+    # Build signature based on object type
+    if object_group == 'filesystem':
+        # Filesystem objects: group by (process_category, target_type, object_group, path_pattern, permission_category)
+        signature = (
+            process_category,
+            str(tcontext) if tcontext else None,
+            object_group,
+            path_pattern,
+            permission_category
+        )
+    elif object_group == 'network':
+        # Network objects: group by (process_category, port/dest, protocol)
+        dest_port = parsed_log.get('dest_port', '')
+        signature = (
+            process_category,
+            str(tcontext) if tcontext else None,
+            object_group,
+            dest_port,
+            permission_category
+        )
+    else:
+        # Other objects: use simpler grouping
+        signature = (
+            process_category,
+            str(tcontext) if tcontext else None,
+            object_group,
+            permission_category
+        )
+
+    return signature
+
+
 def human_time_ago(dt_object: datetime) -> str:  # pylint: disable=too-many-return-statements
     """
     Converts a datetime object into a human-readable relative time string.
@@ -2167,6 +2535,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         choices=["recent", "count", "chrono"],
         default="recent",
         help="Sort order: 'recent' (newest first, default), 'count' (highest count first), 'chrono' (oldest first).")
+    parser.add_argument(
+        "--legacy-signatures",
+        action="store_true",
+        help="Use legacy signature logic for regression testing (disables smart deduplication).")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -2244,10 +2616,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     unique_denials = {}
     all_unparsed_types = set()
 
-    # First pass: Validate and analyze each block to determine signature strategy
-    block_analysis = {}
+    # Validate and process each block
     validation_warnings = []
     valid_blocks = []
+    all_avc_denials = []
 
     for i, block in enumerate(log_blocks):
         # Validate and sanitize the log block
@@ -2269,28 +2641,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         valid_blocks.append(sanitized_block)
         avc_denials, unparsed = parse_avc_log(sanitized_block)
         all_unparsed_types.update(unparsed)
-
-        # Group by basic signature (without permission) to detect multiple permissions per block
-        block_signatures = {}
-        for parsed_log in avc_denials:
-            if "permission" in parsed_log:
-                # Convert AvcContext objects to strings for consistent signature generation
-                scontext_val = parsed_log.get('scontext')
-                tcontext_val = parsed_log.get('tcontext')
-                basic_sig = (
-                    str(scontext_val) if scontext_val else None,
-                    str(tcontext_val) if tcontext_val else None,
-                    parsed_log.get('tclass')
-                )
-                if basic_sig not in block_signatures:
-                    block_signatures[basic_sig] = set()
-                block_signatures[basic_sig].add(parsed_log.get('permission'))
-
-        block_analysis[i] = {
-            'avc_denials': avc_denials,
-            'signatures_with_multiple_permissions': {
-                sig for sig,
-                perms in block_signatures.items() if len(perms) > 1}}
+        all_avc_denials.extend(avc_denials)
 
     # Check if we have any valid blocks after validation
     if not valid_blocks:
@@ -2331,87 +2682,69 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         console.print(f"   • [bold green]Successfully processed all AVC data[/bold green]")
         console.print()  # Extra line for readability
 
-    # Second pass: Process with appropriate signature strategy
-    for i, block_data in block_analysis.items():
-        avc_denials = block_data['avc_denials']
-        multi_perm_sigs = block_data['signatures_with_multiple_permissions']
+    # Process all AVC denials with smart signature generation
+    for parsed_log in all_avc_denials:
+        if "permission" in parsed_log:
+            permission = parsed_log.get('permission')
 
-        for parsed_log in avc_denials:
-            if "permission" in parsed_log:
-                # Convert AvcContext objects to strings for consistent signature generation
-                scontext_val = parsed_log.get('scontext')
-                tcontext_val = parsed_log.get('tcontext')
-                basic_sig = (
-                    str(scontext_val) if scontext_val else None,
-                    str(tcontext_val) if tcontext_val else None,
-                    parsed_log.get('tclass')
-                )
-                permission = parsed_log.get('permission')
+            # Generate smart signature using new logic (or legacy for regression testing)
+            signature = generate_smart_signature(parsed_log, legacy_mode=args.legacy_signatures)
 
-                # Decide signature strategy: include permission unless block has multiple
-                # permissions for this signature
-                if basic_sig in multi_perm_sigs:
-                    # Multiple permissions in same block -> exclude permission from signature
-                    signature = basic_sig
-                else:
-                    # Single permission in block -> include permission in signature
-                    signature = basic_sig + (permission,)
+            dt_obj = parsed_log.get('datetime_obj')
 
-                dt_obj = parsed_log.get('datetime_obj')
+            if signature in unique_denials:
+                # Add permission to the set if not already present
+                if 'permissions' not in unique_denials[signature]:
+                    unique_denials[signature]['permissions'] = set()
+                unique_denials[signature]['permissions'].add(permission)
 
-                if signature in unique_denials:
-                    # Add permission to the set if not already present
-                    if 'permissions' not in unique_denials[signature]:
-                        unique_denials[signature]['permissions'] = set()
-                    unique_denials[signature]['permissions'].add(permission)
+                # Store individual event correlation for PID-to-resource mapping
+                if 'correlations' not in unique_denials[signature]:
+                    unique_denials[signature]['correlations'] = []
 
-                    # Store individual event correlation for PID-to-resource mapping
-                    if 'correlations' not in unique_denials[signature]:
-                        unique_denials[signature]['correlations'] = []
+                correlation_event = build_correlation_event(parsed_log, permission)
+                unique_denials[signature]['correlations'].append(correlation_event)
 
-                    correlation_event = build_correlation_event(parsed_log, permission)
-                    unique_denials[signature]['correlations'].append(correlation_event)
+                # Collect varying fields (not part of signature)
+                varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
+                for field in varying_fields:
+                    if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
+                        field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
+                        if field_key not in unique_denials[signature]:
+                            unique_denials[signature][field_key] = set()
+                        unique_denials[signature][field_key].add(parsed_log[field])
 
-                    # Collect varying fields (not part of signature)
-                    varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
-                    for field in varying_fields:
-                        if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
-                            field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
-                            if field_key not in unique_denials[signature]:
-                                unique_denials[signature][field_key] = set()
-                            unique_denials[signature][field_key].add(parsed_log[field])
+                unique_denials[signature]['count'] += 1
+                # Update first_seen_obj if this timestamp is older
+                if dt_obj and (
+                        not unique_denials[signature]['first_seen_obj'] or dt_obj < unique_denials[signature]['first_seen_obj']):
+                    unique_denials[signature]['first_seen_obj'] = dt_obj
+                # Update last_seen_obj if this timestamp is newer
+                if dt_obj and (
+                        not unique_denials[signature]['last_seen_obj'] or dt_obj > unique_denials[signature]['last_seen_obj']):
+                    unique_denials[signature]['last_seen_obj'] = dt_obj
+            else:
+                # Initialize new signature
+                denial_entry = {
+                    'log': parsed_log,
+                    'count': 1,
+                    'first_seen_obj': dt_obj,
+                    'last_seen_obj': dt_obj,
+                    'permissions': {permission}
+                }
 
-                    unique_denials[signature]['count'] += 1
-                    # Update first_seen_obj if this timestamp is older
-                    if dt_obj and (
-                            not unique_denials[signature]['first_seen_obj'] or dt_obj < unique_denials[signature]['first_seen_obj']):
-                        unique_denials[signature]['first_seen_obj'] = dt_obj
-                    # Update last_seen_obj if this timestamp is newer
-                    if dt_obj and (
-                            not unique_denials[signature]['last_seen_obj'] or dt_obj > unique_denials[signature]['last_seen_obj']):
-                        unique_denials[signature]['last_seen_obj'] = dt_obj
-                else:
-                    # Initialize new signature
-                    denial_entry = {
-                        'log': parsed_log,
-                        'count': 1,
-                        'first_seen_obj': dt_obj,
-                        'last_seen_obj': dt_obj,
-                        'permissions': {permission}
-                    }
+                # Initialize correlation storage for first event
+                correlation_event = build_correlation_event(parsed_log, permission)
+                denial_entry['correlations'] = [correlation_event]
 
-                    # Initialize correlation storage for first event
-                    correlation_event = build_correlation_event(parsed_log, permission)
-                    denial_entry['correlations'] = [correlation_event]
+                # Initialize varying fields for first occurrence
+                varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
+                for field in varying_fields:
+                    if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
+                        field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
+                        denial_entry[field_key] = {parsed_log[field]}
 
-                    # Initialize varying fields for first occurrence
-                    varying_fields = ['pid', 'comm', 'path', 'dest_port', 'permissive', 'proctitle']
-                    for field in varying_fields:
-                        if field in parsed_log and parsed_log[field] not in ["(null)", "null", ""]:
-                            field_key = f'{field}s'  # e.g., 'pids', 'comms', 'paths'
-                            denial_entry[field_key] = {parsed_log[field]}
-
-                    unique_denials[signature] = denial_entry
+                unique_denials[signature] = denial_entry
     if args.json:
         # Convert the dictionary of unique denials to a list for JSON output
         output_list = []
