@@ -126,7 +126,9 @@ correlations = [
 - [x] **Basic Filtering**: Process (`--process httpd`) and path filtering (`--path /var/www/*`)
 - [x] **Sorting Options**: `--sort recent|count|chrono` for different analysis workflows
 
-#### 🔄 **3B-2: Polish Features** (PLANNED - AFTER TESTING FOUNDATION)
+#### 🔄 **3B-2: Polish Features** (CURRENT PHASE - AFTER TESTING FOUNDATION)
+- [ ] **Smart Deduplication Logic**: SELinux remediation-aware signature generation to properly distinguish services while grouping related permissions for optimal `semanage` command correlation
+- [ ] **Smart Event Grouping**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs (builds on improved signatures)
 - [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`)
 - [ ] **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
 - [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
@@ -252,8 +254,7 @@ Detailed Events:
 
 ## Current Implementation Focus (Strategic Priority Order)
 
-**Phase 4A**: Essential testing foundation (unit tests, regression testing, input validation) - NEXT
-**Phase 3B-2**: Polish features (advanced filtering, smart resource display, JSON normalization for tool integration)
+**Phase 3B-2**: Polish Features (smart deduplication logic, smart event grouping, advanced filtering, smart resource display, JSON normalization) - CURRENT
 **Phase 4B**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
 
@@ -283,9 +284,8 @@ Detailed Events:
 - Phase 3B-1: High-Impact User Features (dontaudit detection, basic filtering, sorting)
 - Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
 
-**🔄 WITHIN SCOPE & NEXT:**
-- Phase 4A: Essential Testing Foundation (unit tests, regression testing, input validation)
-- Phase 3B-2: Polish Features (advanced filtering, smart resource display, JSON normalization)
+**🔄 WITHIN SCOPE & CURRENT:**
+- Phase 3B-2: Polish Features (smart deduplication logic, smart event grouping, advanced filtering, smart resource display, JSON normalization)
 
 **✅ WITHIN SCOPE & PLANNED:**
 - Phase 4B: Integration & Performance Testing

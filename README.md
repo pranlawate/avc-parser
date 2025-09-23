@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.1.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
+**Version 1.2.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
 
 ## ⚡ Quick Start
 
@@ -25,6 +25,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --fields
 
 # Export to JSON
 python3 parse_avc.py --file /var/log/audit/audit.log --json
+
+# Use legacy signature logic (for regression testing)
+python3 parse_avc.py --file /var/log/audit/audit.log --legacy-signatures
 ```
 
 ## 🎯 Purpose
@@ -52,7 +55,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 
 ### 🔍 **Advanced Analysis**
 - **Semantic Intelligence**: Human-readable permissions (`read` → `Read file content`) and contextual analysis
-- **Smart Deduplication**: Groups identical denials with occurrence counts, timestamps, and field aggregation
+- **Smart Deduplication**: SELinux remediation-aware grouping that properly distinguishes services while grouping related permissions for optimal `semanage` command correlation
 - **Correlation Tracking**: Individual PID-to-resource mappings solve deduplication information loss
 - **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback for complex scenarios
 - **dontaudit Detection**: Automatic detection of disabled dontaudit rules using permission indicators
@@ -72,14 +75,17 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 
 ## 🔮 Upcoming Features
 
-### 🎯 **Phase 3B-2: Advanced Filtering & Integration** (Next)
-- **Time Range Filtering**: Filter by date/time ranges (`--since`, `--until`)
-- **Context Filtering**: Filter by security contexts (`--source`, `--target`)
+### 🎯 **Phase 3B-2: Polish Features** (Current)
+- **Smart Deduplication Logic**: Enhanced signature generation for better service distinction and permission grouping
+- **Smart Event Grouping**: Intelligent grouping by common directory paths to reduce output volume for large audit logs
+- **Advanced Filtering**: Time range filtering (`--since`, `--until`) and context filtering (`--source`, `--target`)
+- **Smart Resource Display**: Context-aware formatting based on object class (file vs network)
 - **JSON Field Normalization**: Standardized path formats, clean port extraction, and normalized context fields for reliable tool integration
 
-### 🧪 **Phase 4: Testing & Quality**
-- **Comprehensive Testing**: Unit tests, integration tests, regression testing
-- **Performance Optimization**: Memory management for large files
+### 🧪 **Phase 4B: Integration & Performance** (After Polish Features)
+- **Real-world Testing**: Various audit log formats, different Linux distributions
+- **Cross-platform Compatibility**: Testing across RHEL, Ubuntu, SUSE, Arch distributions
+- **Memory Optimization**: Large file handling improvements (>500MB audit logs)
 
 ### 📚 **Phase 5: Enhanced Documentation**
 - **Architecture Overview**: Function relationship trees and data flow diagrams

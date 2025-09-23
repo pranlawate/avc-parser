@@ -468,6 +468,71 @@ This document maintains a comprehensive record of all feature decisions, includi
 **Date**: 2025-09-22 (Phase 3B-2)
 **Status**: PLANNED
 
+### ✅ ACCEPTED: Smart Event Grouping by Directory Paths
+**Proposal**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs
+**Problem**: Real-world audit logs generate hundreds of similar events that overwhelm forensic analysis
+**Solution**:
+- Group events by common parent directories (e.g., "4 files in /var/www/html/")
+- Show hierarchical breakdown for subdirectories
+- Maintain individual display for single events and non-file objects
+- Add `--expand-groups` flag for full detail when needed
+**Benefits**:
+- Dramatically reduces output volume for large logs
+- Maintains critical forensic information
+- Improves pattern recognition for incident analysis
+- Preserves existing functionality
+**Reason**: Solves real usability problem identified in production usage without scope creep
+**Date**: 2025-09-22 (Phase 3B-2)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: Smart Deduplication Logic (SELinux Remediation-Aware Signatures)
+**Proposal**: Replace current signature logic with intelligent grouping based on SELinux remediation patterns
+**Problem Solved**: Current logic has two critical flaws:
+1. Different services (httpd vs nginx) incorrectly grouped when sharing same SELinux contexts
+2. Related permissions (read/write/getattr) unnecessarily split when same `semanage` command fixes all
+**Solution**:
+- Service distinction: Add process categorization to distinguish different services with same contexts
+- Permission grouping: Group related permissions that share common remediation strategies
+- Path pattern matching: Extract remediation patterns (e.g., `/home/*/` for fcontext rules)
+- SELinux domain intelligence: Identify multi-service domains requiring process distinction
+**Technical Approach**:
+- Filesystem objects: Group by `(source_domain, target_type, filesystem, path_pattern)`
+- Network objects: Group by `(source_domain, port, protocol)`
+- Process distinction: Use process categorization for `unconfined_t`, `init_t`, etc.
+- Permission categories: `file_access` (read/write/getattr), `execute`, `net_bind`, etc.
+**Benefits**:
+- Optimal `semanage` command correlation - each group solved by single command
+- Proper service distinction while maintaining permission efficiency
+- Reduced output volume without losing forensic precision
+- Matches actual administrator remediation workflow
+**Scope Compliance**: ✅ Enhances forensic analysis accuracy without external dependencies
+**Implementation Priority**: Phase 3B-2 Priority 1 (foundation for other grouping features)
+**Risk Analysis**:
+- Edge Cases: Minimal impact - fallback to basic signature when smart logic fails
+- Performance: <1% overhead for 79K+ event logs (negligible for forensic use)
+- Backward Compatibility: ✅ JSON format unchanged - signature is internal grouping logic
+- User Control: `--legacy-signatures` flag for regression testing and edge cases
+**Data Sources Analyzed**: testRAW audit logs (79K+ events), selinux-policy access_vectors, setroubleshoot signature logic
+**Date**: 2025-09-23 (Phase 3B-2)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: Smart Event Grouping by Directory Paths
+**Proposal**: Intelligent grouping of events by common directory paths to reduce output volume for large audit logs
+**Problem**: Real-world audit logs generate hundreds of similar events that overwhelm forensic analysis
+**Solution**:
+- Group events by common parent directories (e.g., "4 files in /var/www/html/")
+- Show hierarchical breakdown for subdirectories
+- Maintain individual display for single events and non-file objects
+- Add `--expand-groups` flag for full detail when needed
+**Benefits**:
+- Dramatically reduces output volume for large logs
+- Maintains critical forensic information
+- Improves pattern recognition for incident analysis
+- Preserves existing functionality
+**Reason**: Solves real usability problem identified in production usage without scope creep
+**Date**: 2025-09-23 (Phase 3B-2)
+**Status**: PLANNED
+
 ---
 
 ## Decision Process

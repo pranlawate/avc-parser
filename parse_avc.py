@@ -790,6 +790,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             "tcontext": r"tcontext=(\S+)",
             "tclass": r"tclass=(\S+)",
             "dest_port": r"dest=(\S+)",
+            "dbus_dest": r"dest=(:\d+\.\d+)",  # D-Bus destination pattern
             "permissive": r"permissive=(\d+)",
         }
 
@@ -823,9 +824,26 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
 
         # Enhanced path resolution logic
         if 'path' not in avc_data or not avc_data['path']:
-            # No path in AVC, try to use PATH record data or create dev+inode identifier
+            # No path in AVC, try to use PATH record data or build from available info
             if shared_context.get('path'):
                 avc_data['path'] = shared_context['path']
+                avc_data['path_type'] = 'file_path'
+            elif avc_data.get('name') and avc_data['name'] not in ['?', '"?"']:
+                # We have a meaningful name field, use it as the path (common for directory access)
+                # Skip meaningless names like "?" which appear in D-Bus records
+                name_value = avc_data['name']
+                # Handle quoted vs unquoted names
+                if name_value.startswith('"') and name_value.endswith('"'):
+                    name_value = name_value[1:-1]
+
+                # For directories, the name is often just the directory name without full path
+                # Mark this as a partial path for better display and indicate it's incomplete
+                if avc_data.get('tclass') == 'dir':
+                    avc_data['path'] = f".../{name_value}"  # Indicate this is a partial path
+                    avc_data['path_type'] = 'directory_name'
+                else:
+                    avc_data['path'] = name_value
+                    avc_data['path_type'] = 'name_only'
             elif avc_data.get('dev') and avc_data.get('ino'):
                 # Create a dev+inode identifier when path is missing
                 avc_data['path'] = f"dev:{avc_data['dev']},inode:{avc_data['ino']}"
@@ -1015,6 +1033,52 @@ def format_bionic_text(text: str, base_color: str = "green") -> str:
             formatted_words.append(f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]")
 
     return " ".join(formatted_words)
+
+
+def format_path_for_display(path: str, max_length: int = 80) -> str:
+    """
+    Format file paths for better terminal display with smart truncation.
+
+    Args:
+        path (str): The file path to format
+        max_length (int): Maximum length before truncation (default: 80)
+
+    Returns:
+        str: Formatted path with intelligent truncation for container paths
+    """
+    if not path or len(path) <= max_length:
+        return path
+
+    # Special handling for container storage paths
+    if 'containers/storage/overlay' in path:
+        # Extract meaningful parts: base path + container ID + final path
+        parts = path.split('/')
+
+        # Find the overlay directory index
+        try:
+            overlay_idx = parts.index('overlay')
+            if overlay_idx + 1 < len(parts):
+                container_id = parts[overlay_idx + 1]
+                # Truncate container ID to first 8 characters
+                short_id = container_id[:8] + "..." if len(container_id) > 8 else container_id
+
+                # Get the final meaningful path
+                if overlay_idx + 3 < len(parts):
+                    # Usually: overlay/ID/diff/actual/path
+                    final_path = '/'.join(parts[overlay_idx + 3:])
+                    base_path = '/'.join(parts[:overlay_idx])
+                    return f"{base_path}/overlay/{short_id}/.../{final_path}"
+        except ValueError:
+            pass
+
+    # Generic path truncation - show beginning and end
+    if len(path) > max_length:
+        # Show first 30 and last 30 characters with ellipsis
+        start_len = min(30, max_length // 2 - 2)
+        end_len = min(30, max_length // 2 - 2)
+        return f"{path[:start_len]}...{path[-end_len:]}"
+
+    return path
 
 
 def has_permissive_denials(denial_info: dict) -> bool:
@@ -1656,17 +1720,44 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
 
             # Build event description with BIONIC reading for natural language parts
             if path:
-                file_bionic = format_bionic_text("file", "white")
-                target_desc = f"{file_bionic} {path}"
-                target_type = "file"
-            elif dest_port:
-                port_desc = PermissionSemanticAnalyzer.get_port_description(dest_port)
-                port_bionic = format_bionic_text("port", "white")
-                if port_desc != f"port {dest_port}":
-                    target_desc = f"{port_bionic} {dest_port} ({port_desc})"
+                # Determine object type for better display
+                tclass = parsed_log.get('tclass', 'file')
+                if tclass == 'dir':
+                    object_bionic = format_bionic_text("directory", "white")
+                    target_type = "directory"
+                elif tclass in ['tcp_socket', 'udp_socket']:
+                    object_bionic = format_bionic_text("socket", "white")
+                    target_type = "socket"
+                elif tclass == 'chr_file':
+                    object_bionic = format_bionic_text("character device", "white")
+                    target_type = "char_device"
+                elif tclass == 'blk_file':
+                    object_bionic = format_bionic_text("block device", "white")
+                    target_type = "block_device"
                 else:
-                    target_desc = f"{port_bionic} {dest_port}"
-                target_type = "tcp_socket"
+                    object_bionic = format_bionic_text("file", "white")
+                    target_type = "file"
+
+                # Smart path truncation for better display
+                formatted_path = format_path_for_display(path)
+                target_desc = f"{object_bionic} {formatted_path}"
+            elif dest_port:
+                # Check if this is a D-Bus destination or network port
+                tclass = parsed_log.get('tclass', '')
+                if tclass == 'dbus' or dest_port.startswith(':'):
+                    # D-Bus destination
+                    dbus_bionic = format_bionic_text("D-Bus service", "white")
+                    target_desc = f"{dbus_bionic} {dest_port}"
+                    target_type = "dbus"
+                else:
+                    # Network port
+                    port_desc = PermissionSemanticAnalyzer.get_port_description(dest_port)
+                    port_bionic = format_bionic_text("port", "white")
+                    if port_desc != f"port {dest_port}":
+                        target_desc = f"{port_bionic} {dest_port} ({port_desc})"
+                    else:
+                        target_desc = f"{port_bionic} {dest_port}"
+                    target_type = "tcp_socket"
             elif saddr:
                 socket_bionic = format_bionic_text("socket", "white")
                 target_desc = f"{socket_bionic} {saddr}"
