@@ -623,6 +623,54 @@ This document maintains a comprehensive record of all feature decisions, includi
 
 ---
 
+## **Distribution Strategy & Packaging (Phase 6)**
+
+### **Decision**: Multi-Format Distribution with RPM Priority
+
+**Context**: As the tool matures, professional deployment requires proper packaging and distribution methods. SELinux tools need to integrate well with enterprise Linux environments while remaining accessible to developers.
+
+**Options Considered**:
+1. **RPM-Only Distribution**: Focus solely on native SELinux environment packaging
+2. **Pip-Only Distribution**: Standard Python package distribution
+3. **Multi-Format Strategy**: RPM primary, Pip secondary, additional formats tertiary
+4. **Standalone Script Only**: Continue current git-clone model
+
+**Decision**: **Multi-Format Strategy** (Option 3)
+
+**Rationale**:
+- **Primary Audience Alignment**: SELinux is predominantly used on RPM-based systems (RHEL, Fedora, CentOS)
+- **Professional Integration**: System administrators expect security tools via native package managers
+- **Developer Accessibility**: Pip packaging enables CI/CD workflows and cross-platform development
+- **Enterprise Adoption**: Signed RPM packages integrate with corporate security policies
+
+**Implementation Strategy**:
+- **Phase 6A (Priority 1)**: RPM packaging for Fedora/EPEL repositories
+- **Phase 6B (Priority 2)**: Pip module with modern Python packaging (pyproject.toml)
+- **Phase 6C (Priority 3)**: Additional formats (.deb, AUR, container)
+- **Phase 6D (Priority 4)**: Release automation and cross-platform testing
+
+**Technical Benefits**:
+- **Dependency Management**: RPM properly declares audit package requirements
+- **System Integration**: Native package manager installation and updates
+- **Security**: Signed packages integrate with system security policies
+- **Automation**: Pip enables automated deployment in CI/CD environments
+
+**Success Metrics**:
+- RPM available in Fedora repositories within 2 months
+- PyPI package with automated releases via GitHub Actions
+- Cross-platform compatibility testing on 5+ Linux distributions
+- Zero-touch release process with proper versioning
+
+**Scope Compliance**: ✅ ALIGNED
+- Maintains forensic analysis focus without adding feature complexity
+- Improves professional deployment without changing core functionality
+- Minimal architectural impact (packaging only, not feature changes)
+
+**Date**: 2025-01-24 (Phase 6 Planning)
+**Status**: APPROVED - Ready for implementation
+
+---
+
 ## Decision Process
 
 All feature decisions should follow this process:

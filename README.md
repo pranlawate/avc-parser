@@ -40,6 +40,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --legacy-signatures
 # Show individual events instead of resource-based groupings
 python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 
+# Use interactive pager for large outputs
+python3 parse_avc.py --file /var/log/audit/audit.log --pager
+
 # Example output showing PID event counts in default view:
 # • PID 1234 (3x) (httpd (Web server process)) - PID 1234 has 3 events
 # • PID 5678 (nginx) - PID 5678 has 1 event (no count shown)
@@ -64,6 +67,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 
 ### 🎨 **Professional Display**
 - **Rich Terminal Format**: Default responsive panels with BIONIC reading, professional styling, and correlation events
+- **Interactive Pager Mode**: Built-in `less`-like interface with `--pager` for comfortable navigation of large outputs
 - **Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis with syscall details and context information
 - **Field-by-Field View**: Detailed breakdown using `--fields` flag for traditional analysis
 - **Normalized JSON Export**: Structured output with standardized field formats, semantic enrichment, and consistent data types for reliable tool integration and SIEM compatibility
@@ -94,8 +98,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 ## 🔮 Upcoming Features
 
 
-### 🎨 **Phase 4C: Enhanced User Experience** (After Critical Fixes)
-- **Interactive Pager Mode**: Built-in `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
+### 🎨 **Phase 4C: Enhanced User Experience** (In Progress)
 - **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
 - **Terminal Integration**: Enhanced output formatting for various terminal environments
 
@@ -229,7 +232,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 | **Pipe Compatibility** | ✅ **COMPLETE** | Handle broken pipe errors for head/less redirection |
 | **Advanced Filtering** | ✅ **COMPLETE** | Time range and context filtering with pattern matching support |
 | **JSON Field Normalization** | ✅ **COMPLETE** | Standardized path formats, clean port extraction, normalized context fields |
-| **Interactive Pager Mode** | ⏳ **PLANNED** | Built-in less-like interface for large outputs |
+| **Interactive Pager Mode** | ✅ **COMPLETE** | Built-in less-like interface with --pager, color preservation, smart fallbacks |
 | **Performance Optimization** | ⏳ **PLANNED** | Memory management, cross-platform testing |
 
 ### 🎯 **Design Principles**

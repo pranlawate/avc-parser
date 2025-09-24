@@ -3026,7 +3026,7 @@ def validate_arguments(args, console: Console) -> str:
 
     # Handle new --file argument with auto-detection
     if args.file:
-        return validate_file_with_auto_detection(args.file, console, quiet=args.json)
+        return validate_file_with_auto_detection(args.file, console, quiet=args.json or args.pager)
 
     # Validate raw file if provided
     elif args.raw_file:
@@ -3089,13 +3089,12 @@ def validate_file_with_auto_detection(file_path: str, console: Console, quiet: b
         # Auto-detect format type
         detected_format = detect_file_format(file_path)
 
+        detection_msg = ""
         if not quiet:
             if detected_format == 'raw':
-                console.print(f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format")
-                console.print(f"   Will process using ausearch: [cyan]{file_path}[/cyan]")
+                detection_msg = f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format\n   Will process using ausearch: [cyan]{file_path}[/cyan]"
             else:
-                console.print(f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format")
-                console.print(f"   Will parse the file [cyan]{file_path}[/cyan] directly")
+                detection_msg = f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format\n   Will parse the file [cyan]{file_path}[/cyan] directly"
 
         return 'raw_file' if detected_format == 'raw' else 'avc_file'
 
@@ -3328,6 +3327,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "--expand-groups",
         action="store_true",
         help="Show individual events instead of resource-based groupings (disables smart event grouping).")
+    parser.add_argument(
+        "--pager",
+        action="store_true",
+        help="Use interactive pager for large outputs (like 'less' command).")
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -3341,11 +3344,24 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     log_string = ""
 
+    # Initialize display messages
+    detection_message = ""
+    ausearch_message = ""
+
+    # Generate detection message if not in JSON mode
+    if not args.json and args.file:
+        file_path = args.file
+        detected_format = detect_file_format(file_path)
+        if detected_format == 'raw':
+            detection_message = f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format\n   Will process using ausearch: [cyan]{file_path}[/cyan]"
+        else:
+            detection_message = f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format\n   Will parse the file [cyan]{file_path}[/cyan] directly"
+
     if input_type == 'raw_file':
         # Determine the correct file path (could be from --file or --raw-file)
         file_path = args.file if args.file else args.raw_file
         if not args.json:
-            console.print(f"Raw file input provided. Running ausearch on '{file_path}'...")
+            ausearch_message = f"Raw file input provided. Running ausearch on '{file_path}'..."
         try:
             ausearch_cmd = [
                 "ausearch",
@@ -3609,9 +3625,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     else:
         # Non JSON default output
         total_events = sum(denial['count'] for denial in unique_denials.values())
-        console.print(
-            f"\nFound {total_events} AVC events. Displaying {
-                len(unique_denials)} unique denials...")
+
         # Apply sorting based on user preference
         sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
 
@@ -3623,23 +3637,20 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             console.print(f"[red]Error in filtering: {e}[/red]")
             return
 
-        # Check for dontaudit detection (on full results before filtering for complete context)
+        # Check for detection warnings (on full results before filtering for complete context)
         dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
-
-        # Check for permissive mode detection (on full results before filtering for complete context)
         permissive_detected, permissive_count, total_events = detect_permissive_mode(sorted_denials)
 
-        # Check for custom paths detection (on full results before filtering for complete context)
+        # Check for custom paths detection
         custom_paths_detected, found_custom_patterns = False, []
         for denial_info in sorted_denials:
             has_custom, custom_patterns = has_custom_paths(denial_info)
             if has_custom:
                 custom_paths_detected = True
                 found_custom_patterns.extend(custom_patterns)
-        # Remove duplicates and sort
         found_custom_patterns = sorted(list(set(found_custom_patterns)))
 
-        # Check for container issues detection (on full results before filtering for complete context)
+        # Check for container issues detection
         container_issues_detected, found_container_patterns, container_sample_paths = False, [], []
         for denial_info in sorted_denials:
             has_container, container_patterns, sample_paths = has_container_issues(denial_info)
@@ -3647,251 +3658,413 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 container_issues_detected = True
                 found_container_patterns.extend(container_patterns)
                 container_sample_paths.extend(sample_paths)
-        # Remove duplicates and sort
         found_container_patterns = sorted(list(set(found_container_patterns)))
-        container_sample_paths = list(dict.fromkeys(container_sample_paths))[:3]  # Keep first 3 unique
+        container_sample_paths = list(dict.fromkeys(container_sample_paths))[:3]
 
-        # Update display message to reflect filtering
-        if args.process or args.path or args.since or args.until or args.source or args.target:
-            filter_msg = []
-            if args.process:
-                filter_msg.append(f"process='{args.process}'")
-            if args.path:
-                filter_msg.append(f"path='{args.path}'")
-            if args.since:
-                filter_msg.append(f"since='{args.since}'")
-            if args.until:
-                filter_msg.append(f"until='{args.until}'")
-            if args.source:
-                filter_msg.append(f"source='{args.source}'")
-            if args.target:
-                filter_msg.append(f"target='{args.target}'")
-            filter_str = ", ".join(filter_msg)
-            console.print(f"Applied filters: {filter_str}")
-            console.print(f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering.")
+        # Create a function to display all content (including headers and summaries)
+        def display_all_content():
+            # Display detection and processing messages first
+            if detection_message:
+                console.print(detection_message)
+            if ausearch_message:
+                console.print(ausearch_message)
+            if detection_message or ausearch_message:
+                console.print()  # Empty line after processing messages
 
-        if filtered_denials:
-            console.print(Rule("[dim]Parsed Log Summary[/dim]"))
+            # Display initial count message
+            console.print(
+                f"Found {total_events} AVC events. Displaying {
+                    len(unique_denials)} unique denials...")
 
-            # Display prominent dontaudit detection warning if found
-            if dontaudit_detected:
-                indicators_str = ", ".join(found_indicators)
-                # Create a prominent warning panel that won't be missed
-                from rich.panel import Panel
-                from rich.align import Align
-                from rich.console import Group
+            # Display filtering info if applicable
+            if args.process or args.path or args.since or args.until or args.source or args.target:
+                filter_msg = []
+                if args.process:
+                    filter_msg.append(f"process='{args.process}'")
+                if args.path:
+                    filter_msg.append(f"path='{args.path}'")
+                if args.since:
+                    filter_msg.append(f"since='{args.since}'")
+                if args.until:
+                    filter_msg.append(f"until='{args.until}'")
+                if args.source:
+                    filter_msg.append(f"source='{args.source}'")
+                if args.target:
+                    filter_msg.append(f"target='{args.target}'")
+                filter_str = ", ".join(filter_msg)
+                console.print(f"Applied filters: {filter_str}")
+                console.print(f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering.")
 
-                # Create individual centered lines using Group
-                warning_lines = [
-                    Align.center("[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[yellow]Enhanced audit mode is active on this system.[/yellow]"),
-                    Align.center(f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[dim]This means you're seeing permissions that are normally hidden.[/dim]")
-                ]
+            if filtered_denials:
+                console.print(Rule("[dim]Parsed Log Summary[/dim]"))
 
-                warning_panel = Panel(
-                    Group(*warning_lines),
-                    title="[bold red]Security Notice[/bold red]",
-                    border_style="bright_yellow",
-                    padding=(1, 4)
-                )
-                # Responsive width: minimum 60% of screen, maximum 120 characters
-                panel_width = min(max(int(console.width * 0.6), 60), 120)
-                console.print(Align.center(warning_panel, width=panel_width))
-                console.print()
+                # Display detection warnings at the top
+                if dontaudit_detected:
+                    indicators_str = ", ".join(found_indicators)
+                    # Create a prominent warning panel
+                    from rich.panel import Panel
+                    from rich.align import Align
+                    from rich.console import Group
 
-            # Display permissive mode warning if found
-            if permissive_detected:
-                from rich.panel import Panel
-                from rich.align import Align
-                from rich.console import Group
+                    warning_lines = [
+                        Align.center("[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"),
+                        Align.center(""),
+                        Align.center("[yellow]Enhanced audit mode is active on this system.[/yellow]"),
+                        Align.center(f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"),
+                        Align.center(""),
+                        Align.center("[dim]This means you're seeing permissions that are normally hidden.[/dim]")
+                    ]
 
-                # Calculate percentage for context
-                permissive_percentage = round((permissive_count / total_events) * 100) if total_events > 0 else 0
+                    warning_panel = Panel(
+                        Group(*warning_lines),
+                        title="[bold red]Security Notice[/bold red]",
+                        border_style="bright_yellow",
+                        padding=(1, 4)
+                    )
+                    panel_width = min(max(int(console.width * 0.6), 60), 120)
+                    console.print(Align.center(warning_panel, width=panel_width))
+                    console.print()
 
-                # Create individual centered lines using Group
-                permissive_lines = [
-                    Align.center("[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[blue]Some denials are being allowed but logged.[/blue]"),
-                    Align.center(f"[dim]Permissive events: [bright_blue]{permissive_count}[/bright_blue] of {total_events} ({permissive_percentage}%)[/dim]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[dim]These actions succeeded despite policy violations.[/dim]")
-                ]
+                # Display permissive mode warning if found
+                if permissive_detected:
+                    from rich.panel import Panel
+                    from rich.align import Align
+                    from rich.console import Group
 
-                permissive_panel = Panel(
-                    Group(*permissive_lines),
-                    title="[bold blue]Security Notice[/bold blue]",
-                    border_style="bright_blue",
-                    padding=(1, 4)
-                )
-                # Responsive width: minimum 60% of screen, maximum 120 characters
-                panel_width = min(max(int(console.width * 0.6), 60), 120)
-                console.print(Align.center(permissive_panel, width=panel_width))
-                console.print()
+                    warning_lines = [
+                        Align.center("[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"),
+                        Align.center(""),
+                        Align.center(f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"),
+                        Align.center("[dim]These denials were logged but not enforced.[/dim]")
+                    ]
 
-            # Display custom paths warning if found
-            if custom_paths_detected:
-                from rich.panel import Panel
-                from rich.align import Align
-                from rich.console import Group
+                    permissive_panel = Panel(
+                        Group(*warning_lines),
+                        title="[bold blue]Mode Notice[/bold blue]",
+                        border_style="bright_blue",
+                        padding=(1, 4)
+                    )
+                    panel_width = min(max(int(console.width * 0.6), 60), 120)
+                    console.print(Align.center(permissive_panel, width=panel_width))
+                    console.print()
 
-                # Format patterns list for display
-                if len(found_custom_patterns) == 1:
-                    patterns_str = found_custom_patterns[0]
-                elif len(found_custom_patterns) <= 3:
-                    patterns_str = ", ".join(found_custom_patterns)
-                else:
-                    # Show first 3 and indicate there are more
-                    patterns_str = ", ".join(found_custom_patterns[:3]) + f" (+{len(found_custom_patterns)-3} more)"
+                # Display custom paths warning if found
+                if custom_paths_detected:
+                    from rich.panel import Panel
+                    from rich.align import Align
+                    from rich.console import Group
 
-                # Create individual centered lines using Group
-                custom_lines = [
-                    Align.center("[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[magenta]Non-standard directory paths found in denials.[/magenta]"),
-                    Align.center(f"[dim]Custom paths: [bright_magenta]{patterns_str}[/bright_magenta][/dim]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[dim]These may require custom SELinux policy configuration.[/dim]")
-                ]
+                    patterns_str = ", ".join(found_custom_patterns[:3])
+                    if len(found_custom_patterns) > 3:
+                        patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                custom_panel = Panel(
-                    Group(*custom_lines),
-                    title="[bold magenta]Policy Notice[/bold magenta]",
-                    border_style="bright_magenta",
-                    padding=(1, 4)
-                )
-                # Responsive width: minimum 60% of screen, maximum 120 characters
-                panel_width = min(max(int(console.width * 0.6), 60), 120)
-                console.print(Align.center(custom_panel, width=panel_width))
-                console.print()
+                    warning_lines = [
+                        Align.center("[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"),
+                        Align.center(""),
+                        Align.center(f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"),
+                        Align.center("[dim]These may require custom fcontext rules.[/dim]")
+                    ]
 
-            # Display container issues warning if found
-            if container_issues_detected:
-                from rich.panel import Panel
-                from rich.align import Align
-                from rich.console import Group
+                    custom_panel = Panel(
+                        Group(*warning_lines),
+                        title="[bold magenta]Path Notice[/bold magenta]",
+                        border_style="bright_magenta",
+                        padding=(1, 4)
+                    )
+                    panel_width = min(max(int(console.width * 0.6), 60), 120)
+                    console.print(Align.center(custom_panel, width=panel_width))
+                    console.print()
 
-                # Format patterns list for display
-                if len(found_container_patterns) == 1:
-                    patterns_str = found_container_patterns[0]
-                elif len(found_container_patterns) <= 3:
+                # Display container issues warning if found
+                if container_issues_detected:
+                    from rich.panel import Panel
+                    from rich.align import Align
+                    from rich.console import Group
+
                     patterns_str = ", ".join(found_container_patterns)
-                else:
-                    # Show first 3 and indicate there are more
-                    patterns_str = ", ".join(found_container_patterns[:3]) + f" (+{len(found_container_patterns)-3} more)"
 
-                # Show sample path to help users understand the issue
-                sample_path_line = ""
-                if container_sample_paths:
-                    # Get the first sample path and show a meaningful portion
-                    sample_path = container_sample_paths[0]
-                    if len(sample_path) > 80:
-                        # Show beginning and end with ellipsis
-                        sample_display = f"{sample_path[:40]}...{sample_path[-30:]}"
+                    warning_lines = [
+                        Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
+                        Align.center(""),
+                        Align.center(f"[cyan]Container patterns: {patterns_str}[/cyan]"),
+                        Align.center("[dim]These may require container-specific SELinux policies.[/dim]")
+                    ]
+
+                    container_panel = Panel(
+                        Group(*warning_lines),
+                        title="[bold cyan]Container Notice[/bold cyan]",
+                        border_style="bright_cyan",
+                        padding=(1, 4)
+                    )
+                    panel_width = min(max(int(console.width * 0.6), 60), 120)
+                    console.print(Align.center(container_panel, width=panel_width))
+                    console.print()
+
+                # Display denials
+                for i, denial_info in enumerate(filtered_denials):
+                    if i > 0:
+                        if args.fields:
+                            console.print(Rule(style="dim"))
+                        else:
+                            console.print()  # Space between denials
+
+                    # Choose display format based on flags
+                    if args.fields:
+                        print_summary(console, denial_info, i + 1)
                     else:
-                        sample_display = sample_path
-                    sample_path_line = f"[dim]Example path: [bright_cyan]{sample_display}[/bright_cyan][/dim]"
+                        print_rich_summary(console, denial_info, i + 1, detailed=args.detailed, expand_groups=args.expand_groups)
 
-                # Show generic container storage patterns without specific system paths
-                sample_path_lines = []
-                if container_sample_paths:
-                    # Show generic patterns based on detected container storage types
-                    sample_path = container_sample_paths[0]
-
-                    # Determine container storage type and show generic patterns
-                    if '/containers/storage/overlay/' in sample_path:
-                        # Extract the actual base path up to /containers/storage/overlay/
-                        parts = sample_path.split('/containers/storage/overlay/')
-                        if len(parts) == 2:
-                            actual_base = parts[0] + '/containers/storage/overlay/'
-                            sample_path_lines = [
-                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
-                            ]
-                    elif '/.local/share/containers/' in sample_path:
-                        # Extract the actual base path up to /.local/share/containers/storage/overlay/
-                        parts = sample_path.split('/.local/share/containers/')
-                        if len(parts) == 2:
-                            actual_base = parts[0] + '/.local/share/containers/storage/overlay/'
-                            sample_path_lines = [
-                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
-                            ]
-                    elif '/var/lib/containers/' in sample_path:
-                        # System container storage (alternative location)
-                        sample_path_lines = [
-                            f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
-                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
-                        ]
-
-                    # Fallback for other container patterns
-                    if not sample_path_lines:
-                        sample_path_lines = [
-                            f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
-                        ]
-
-                # Create individual centered lines using Group
-                container_lines = [
-                    Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[cyan]SELinux denials accessing container overlay storage.[/cyan]"),
-                    Align.center(""),  # Empty line
-                    Align.center("[dim]Complete path = Base path + Container path:[/dim]"),
-                ]
-
-                # Add the sample path lines if available
-                if sample_path_lines:
-                    for path_line in sample_path_lines:
-                        container_lines.append(Align.center(path_line))
-
-                container_lines.extend([
-                    Align.center(""),  # Empty line
-                    Align.center("[dim]Recommendation: container-selinux policy package[/dim]")
-                ])
-
-                container_panel = Panel(
-                    Group(*container_lines),
-                    title="[bold cyan]Container Notice[/bold cyan]",
-                    border_style="bright_cyan",
-                    padding=(1, 4)
-                )
-                # Responsive width: minimum 60% of screen, maximum 120 characters
-                panel_width = min(max(int(console.width * 0.6), 60), 120)
-                console.print(Align.center(container_panel, width=panel_width))
-                console.print()
-        for i, denial_info in enumerate(filtered_denials):
-            if i > 0:
-                if args.fields:
-                    console.print(Rule(style="dim"))
+                # Show filtering info in final summary if applicable
+                if args.process or args.path:
+                    console.print(
+                        f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                            len(log_blocks)} log blocks and found {
+                            len(unique_denials)} unique denials. Displayed {
+                            len(filtered_denials)} after filtering.")
                 else:
-                    console.print()  # Space between denials
+                    console.print(
+                        f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                            len(log_blocks)} log blocks and found {
+                            len(unique_denials)} unique denials.")
 
-            # Choose display format based on flags
-            if args.fields:
-                print_summary(console, denial_info, i + 1)
-            else:
-                print_rich_summary(console, denial_info, i + 1, detailed=args.detailed, expand_groups=args.expand_groups)
-        # Show filtering info in final summary if applicable
-        if args.process or args.path:
-            console.print(
-                f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                    len(log_blocks)} log blocks and found {
-                    len(unique_denials)} unique denials. Displayed {
-                    len(filtered_denials)} after filtering.")
+                # --- Added: Print the list of unparsed types found ---
+                if all_unparsed_types:
+                    console.print(
+                        "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
+                    console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
+
+        # Use interactive pager for large outputs if requested and running in a terminal
+        if args.pager and sys.stdout.isatty() and not args.json:
+            # Capture output with colors preserved for pager
+            import io
+            from rich.console import Console as RichConsole
+
+            # Create a string buffer to capture colored output
+            string_buffer = io.StringIO()
+            pager_console = RichConsole(file=string_buffer, width=console.width, force_terminal=True)
+
+            try:
+                # Temporarily switch console for content generation
+                original_console = console
+
+                # Create a modified display function that uses the pager console
+                def display_all_content_pager():
+                    # Display detection and processing messages first
+                    if detection_message:
+                        pager_console.print(detection_message)
+                    if ausearch_message:
+                        pager_console.print(ausearch_message)
+                    if detection_message or ausearch_message:
+                        pager_console.print()  # Empty line after processing messages
+
+                    # Display initial count message
+                    pager_console.print(
+                        f"Found {total_events} AVC events. Displaying {
+                            len(unique_denials)} unique denials...")
+
+                    # Display filtering info if applicable
+                    if args.process or args.path or args.since or args.until or args.source or args.target:
+                        filter_msg = []
+                        if args.process:
+                            filter_msg.append(f"process='{args.process}'")
+                        if args.path:
+                            filter_msg.append(f"path='{args.path}'")
+                        if args.since:
+                            filter_msg.append(f"since='{args.since}'")
+                        if args.until:
+                            filter_msg.append(f"until='{args.until}'")
+                        if args.source:
+                            filter_msg.append(f"source='{args.source}'")
+                        if args.target:
+                            filter_msg.append(f"target='{args.target}'")
+                        filter_str = ", ".join(filter_msg)
+                        pager_console.print(f"Applied filters: {filter_str}")
+                        pager_console.print(f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering.")
+
+                    if filtered_denials:
+                        pager_console.print(Rule("[dim]Parsed Log Summary[/dim]"))
+
+                        # Display detection warnings at the top
+                        if dontaudit_detected:
+                            indicators_str = ", ".join(found_indicators)
+                            # Create a prominent warning panel
+                            from rich.panel import Panel
+                            from rich.align import Align
+                            from rich.console import Group
+
+                            warning_lines = [
+                                Align.center("[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"),
+                                Align.center(""),
+                                Align.center("[yellow]Enhanced audit mode is active on this system.[/yellow]"),
+                                Align.center(f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"),
+                                Align.center(""),
+                                Align.center("[dim]This means you're seeing permissions that are normally hidden.[/dim]")
+                            ]
+
+                            warning_panel = Panel(
+                                Group(*warning_lines),
+                                title="[bold red]Security Notice[/bold red]",
+                                border_style="bright_yellow",
+                                padding=(1, 4)
+                            )
+                            panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                            pager_console.print(Align.center(warning_panel, width=panel_width))
+                            pager_console.print()
+
+                        # Display permissive mode warning if found
+                        if permissive_detected:
+                            from rich.panel import Panel
+                            from rich.align import Align
+                            from rich.console import Group
+
+                            warning_lines = [
+                                Align.center("[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"),
+                                Align.center(""),
+                                Align.center(f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"),
+                                Align.center("[dim]These denials were logged but not enforced.[/dim]")
+                            ]
+
+                            permissive_panel = Panel(
+                                Group(*warning_lines),
+                                title="[bold blue]Mode Notice[/bold blue]",
+                                border_style="bright_blue",
+                                padding=(1, 4)
+                            )
+                            panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                            pager_console.print(Align.center(permissive_panel, width=panel_width))
+                            pager_console.print()
+
+                        # Display custom paths warning if found
+                        if custom_paths_detected:
+                            from rich.panel import Panel
+                            from rich.align import Align
+                            from rich.console import Group
+
+                            patterns_str = ", ".join(found_custom_patterns[:3])
+                            if len(found_custom_patterns) > 3:
+                                patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
+
+                            warning_lines = [
+                                Align.center("[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"),
+                                Align.center(""),
+                                Align.center(f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"),
+                                Align.center("[dim]These may require custom fcontext rules.[/dim]")
+                            ]
+
+                            custom_panel = Panel(
+                                Group(*warning_lines),
+                                title="[bold magenta]Path Notice[/bold magenta]",
+                                border_style="bright_magenta",
+                                padding=(1, 4)
+                            )
+                            panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                            pager_console.print(Align.center(custom_panel, width=panel_width))
+                            pager_console.print()
+
+                        # Display container issues warning if found
+                        if container_issues_detected:
+                            from rich.panel import Panel
+                            from rich.align import Align
+                            from rich.console import Group
+
+                            patterns_str = ", ".join(found_container_patterns)
+
+                            warning_lines = [
+                                Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
+                                Align.center(""),
+                                Align.center(f"[cyan]Container patterns: {patterns_str}[/cyan]"),
+                                Align.center("[dim]These may require container-specific SELinux policies.[/dim]")
+                            ]
+
+                            container_panel = Panel(
+                                Group(*warning_lines),
+                                title="[bold cyan]Container Notice[/bold cyan]",
+                                border_style="bright_cyan",
+                                padding=(1, 4)
+                            )
+                            panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                            pager_console.print(Align.center(container_panel, width=panel_width))
+                            pager_console.print()
+
+                        # Display denials using pager console
+                        for i, denial_info in enumerate(filtered_denials):
+                            if i > 0:
+                                if args.fields:
+                                    pager_console.print(Rule(style="dim"))
+                                else:
+                                    pager_console.print()  # Space between denials
+
+                            # Choose display format based on flags
+                            if args.fields:
+                                print_summary(pager_console, denial_info, i + 1)
+                            else:
+                                print_rich_summary(pager_console, denial_info, i + 1, detailed=args.detailed, expand_groups=args.expand_groups)
+
+                        # Final summary
+                        if args.process or args.path:
+                            pager_console.print(
+                                f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                                    len(log_blocks)} log blocks and found {
+                                    len(unique_denials)} unique denials. Displayed {
+                                    len(filtered_denials)} after filtering.")
+                        else:
+                            pager_console.print(
+                                f"\n[bold green]Analysis Complete:[/bold green] Processed {
+                                    len(log_blocks)} log blocks and found {
+                                    len(unique_denials)} unique denials.")
+
+                        # Print unparsed types if any
+                        if all_unparsed_types:
+                            pager_console.print(
+                                "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
+                            pager_console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
+
+                # Generate all output using the pager console
+                display_all_content_pager()
+
+                # Get the captured content with colors
+                colored_output = string_buffer.getvalue()
+
+                # Set up environment for color support
+                env = os.environ.copy()
+                env['LESS'] = '-R'  # Enable raw control characters (colors)
+
+                pager_found = False
+
+                # Try less first (most common and supports colors well)
+                try:
+                    pager_process = subprocess.Popen(
+                        ['less', '-R'],
+                        stdin=subprocess.PIPE,
+                        env=env,
+                        text=True
+                    )
+                    pager_process.communicate(input=colored_output)
+                    pager_found = True
+                except FileNotFoundError:
+                    # Try fallback to more
+                    try:
+                        pager_process = subprocess.Popen(
+                            ['more'],
+                            stdin=subprocess.PIPE,
+                            text=True
+                        )
+                        pager_process.communicate(input=colored_output)
+                        pager_found = True
+                    except FileNotFoundError:
+                        pass  # Will handle below
+
+                if not pager_found:
+                    # Fallback: just print normally if no pager available
+                    console.print(f"[yellow]No pager available, showing output directly:[/yellow]")
+                    display_all_content()
+
+            except Exception as e:
+                # If pager fails, fall back to normal output
+                console.print(f"[yellow]Pager failed ({e}), falling back to normal output:[/yellow]")
+                display_all_content()
         else:
-            console.print(
-                f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                    len(log_blocks)} log blocks and found {
-                    len(unique_denials)} unique denials.")
-
-        # --- Added: Print the list of unparsed types found ---
-        if all_unparsed_types:
-            console.print(
-                "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:")
-            console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
+            display_all_content()
 
 
 if __name__ == "__main__":

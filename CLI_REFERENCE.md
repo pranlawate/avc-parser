@@ -38,6 +38,7 @@ This document provides comprehensive reference information for using the SELinux
 |--------|-------------|
 | `--legacy-signatures` | Use legacy signature logic for regression testing (disables smart deduplication) |
 | `--expand-groups` | Show individual events instead of resource-based groupings (disables smart event grouping) |
+| `--pager` | Use interactive pager for large outputs (like 'less' command) |
 | `-h, --help` | Show help message |
 
 ## 🔧 **Command Usage Examples**
@@ -103,6 +104,15 @@ python3 parse_avc.py --file audit.log --sort chrono
 
 ### Advanced Options
 ```bash
+# Use interactive pager for large outputs
+python3 parse_avc.py --file audit.log --pager
+
+# Combine pager with detailed view for comprehensive analysis
+python3 parse_avc.py --file audit.log --pager --detailed
+
+# Use pager with filtering for focused review
+python3 parse_avc.py --file audit.log --pager --process httpd --since yesterday
+
 # Show individual events instead of groups
 python3 parse_avc.py --file audit.log --expand-groups
 

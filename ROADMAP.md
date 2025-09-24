@@ -271,6 +271,7 @@ Detailed Events:
 **Phase 4C**: Enhanced User Experience (interactive pager mode, smart resource display, terminal integration) - CURRENT FOCUS
 **Phase 4D**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
+**Phase 6**: Distribution & Packaging (RPM, Pip, release automation)
 
 ## Key Benefits Expected (Scope-Compliant)
 
@@ -306,8 +307,9 @@ Detailed Events:
 - Phase 4C: Enhanced User Experience (interactive pager mode, smart resource display)
 
 **✅ WITHIN SCOPE & PLANNED:**
-- Phase 4C: Integration & Performance Testing
+- Phase 4D: Integration & Performance Testing
 - Phase 5: Enhanced Documentation & Architecture Overview
+- Phase 6: Distribution & Packaging (RPM, Pip, release automation)
 
 **❌ OUT OF SCOPE (Moved to Future Research):**
 - Complex event assembly and streaming correlation
@@ -315,6 +317,127 @@ Detailed Events:
 - System behavior analysis and performance tracking
 - Policy file analysis and automated recommendations
 - Web interfaces and graphical dashboards
+
+## 📦 **Phase 6: Distribution & Packaging (Professional Deployment)**
+
+### **Strategic Distribution Approach**
+**Primary**: RPM packaging for native SELinux environment integration
+**Secondary**: Pip module for development workflows and cross-platform support
+**Tertiary**: Additional distribution formats for broader ecosystem coverage
+
+### **Phase 6A: RPM Package Implementation (Priority 1)**
+
+**Target Audience**: System administrators on RHEL/Fedora/CentOS systems where SELinux is primarily deployed.
+
+#### **6A.1: RPM Spec File & Package Structure**
+- [ ] Create `selinux-avc-analyzer.spec` with proper metadata
+- [ ] Define runtime dependencies: `audit`, `python3-rich`
+- [ ] Configure build requirements and file lists
+- [ ] Set up package structure:
+  - Binary: `/usr/bin/selinux-avc-analyzer`
+  - Documentation: `/usr/share/doc/selinux-avc-analyzer/`
+  - Man page: `/usr/share/man/man1/selinux-avc-analyzer.1.gz`
+  - License: `/usr/share/licenses/selinux-avc-analyzer/LICENSE`
+
+#### **6A.2: Build System & Installation**
+- [ ] Create `Makefile` for build automation with `install` target
+- [ ] Configure proper file permissions and ownership
+- [ ] Set up build directory structure (`BUILDROOT`, `SOURCES`, etc.)
+- [ ] Test local RPM building with `rpmbuild`
+
+#### **6A.3: Repository Integration**
+- [ ] **Fedora Packaging**: Submit to Fedora Package Review process
+- [ ] **EPEL Integration**: Package for RHEL/CentOS via EPEL repository
+- [ ] **Copr Testing**: Use Fedora Copr for testing builds and feedback
+- [ ] Configure maintainer workflows and responsibilities
+
+### **Phase 6B: Pip Module Implementation (Priority 2)**
+
+**Target Audience**: Python developers, CI/CD workflows, cross-platform development environments.
+
+#### **6B.1: Modern Python Packaging**
+- [ ] Create `pyproject.toml` using modern Python packaging standards
+- [ ] Define console script entry point: `selinux-avc-analyzer = selinux_avc_analyzer.cli:main`
+- [ ] Configure build system (setuptools or hatchling)
+- [ ] Set up proper versioning with `__version__.py`
+
+#### **6B.2: Package Structure Refactoring**
+- [ ] Create `src/selinux_avc_analyzer/` package directory
+- [ ] Move `parse_avc.py` to `src/selinux_avc_analyzer/cli.py`
+- [ ] Create `__init__.py` with package exports and version
+- [ ] Add `__main__.py` for `python -m selinux_avc_analyzer` support
+- [ ] Update imports and maintain backward compatibility
+
+#### **6B.3: PyPI Publishing & Automation**
+- [ ] Configure GitHub Actions for automated releases
+- [ ] Set up PyPI trusted publishing via OIDC (no API keys needed)
+- [ ] Create wheel and source distribution builds
+- [ ] Configure automated testing matrix before publish
+
+#### **6B.4: Cross-Platform Compatibility**
+- [ ] Handle audit package dependency gracefully on non-Linux systems
+- [ ] Test pip installation on macOS and Windows
+- [ ] Document platform-specific limitations clearly
+- [ ] Provide fallback behavior when `ausearch` is unavailable
+
+### **Phase 6C: Additional Distribution Formats (Priority 3)**
+
+#### **6C.1: Debian Package (.deb)**
+- [ ] Create `debian/` directory structure
+- [ ] Write `debian/control` with proper dependencies (`auditd`, `python3-rich`)
+- [ ] Configure `debian/rules` for build process
+- [ ] Test on Ubuntu 22.04/24.04 LTS versions
+- [ ] Submit to Ubuntu Universe repository
+
+#### **6C.2: Arch User Repository (AUR)**
+- [ ] Create `PKGBUILD` for Arch Linux packaging
+- [ ] Configure dependency management (`audit`, `python-rich`)
+- [ ] Submit to AUR with proper metadata and descriptions
+- [ ] Set up maintainer responsibilities and update workflows
+
+#### **6C.3: Container Distribution**
+- [ ] Create optimized `Dockerfile` for containerized usage
+- [ ] Publish to GitHub Container Registry (`ghcr.io`)
+- [ ] Support volume mounting for audit log file access
+- [ ] Document container usage patterns and security considerations
+
+### **Phase 6D: Documentation & Release Automation (Priority 4)**
+
+#### **6D.1: Installation Documentation**
+- [ ] Update README.md with comprehensive installation section
+- [ ] Create platform-specific installation guides
+- [ ] Document all dependency requirements per platform
+- [ ] Add troubleshooting section for common installation issues
+- [ ] Include verification steps for successful installation
+
+#### **6D.2: Release Automation Pipeline**
+- [ ] GitHub Actions workflow for multi-format releases
+- [ ] Automated version bumping and changelog generation
+- [ ] Cross-platform testing matrix (RHEL, Fedora, Ubuntu, Arch)
+- [ ] Automated security scanning for dependencies
+- [ ] Release notes generation from commit messages
+
+#### **6D.3: Distribution Validation Testing**
+- [ ] Automated installation testing on RHEL 8/9, Fedora 39/40
+- [ ] Ubuntu 22.04/24.04 LTS compatibility validation
+- [ ] Pip installation testing in virtual environments
+- [ ] Verify all entry points and command-line functionality
+- [ ] Performance testing across different package formats
+
+### **Implementation Timeline & Success Metrics**
+
+**Week 1-2**: RPM packaging foundation (6A.1-6A.2)
+**Week 3**: Pip module structure (6B.1-6B.2)
+**Week 4**: Release automation setup (6D.2)
+**Week 5**: Repository submissions (6A.3, 6B.3)
+**Week 6**: Additional formats and comprehensive testing (6C, 6D.3)
+
+**Success Criteria**:
+- RPM available in Fedora repositories within 2 months
+- Pip package published to PyPI with automated releases
+- Complete installation documentation for all supported platforms
+- Validated functionality on 5+ Linux distributions
+- Zero-touch release process with proper version management
 
 ## Future Research Ideas (Not Committed Features)
 
