@@ -248,42 +248,108 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 ```
 
 ### JSON Format Structure
+
+> **🔬 Enhanced JSON Normalization**: Version 1.3.0 includes comprehensive field normalization for reliable tool integration, SIEM compatibility, and automated analysis workflows.
+
+#### Core Structure
 ```json
 {
   "unique_denials": [
     {
       "log": {
+        // Original parsed fields
         "datetime_str": "2024-09-05 02:18:01",
-        "timestamp": "1725482881.101",
+        "timestamp": 1725482881.101,
         "syscall": "openat",
         "exe": "/usr/sbin/httpd",
         "cwd": "/",
         "path": "/var/www/html/config.php",
         "denial_type": "AVC",
         "permission": "read",
-        "pid": "1234",
+        "pid": 1234,
         "comm": "httpd",
         "scontext": "system_u:system_r:httpd_t:s0",
         "tcontext": "unconfined_u:object_r:default_t:s0",
         "tclass": "file",
-        "permissive": "0"
+        "permissive": false,
+
+        // Enhanced normalized fields
+        "path_absolute": "/var/www/html/config.php",
+        "path_normalized": true,
+        "scontext_components": {
+          "user": "system_u",
+          "role": "system_r",
+          "type": "httpd_t",
+          "level": "s0",
+          "full": "system_u:system_r:httpd_t:s0"
+        },
+        "scontext_type": "httpd_t",
+        "tcontext_components": {
+          "user": "unconfined_u",
+          "role": "object_r",
+          "type": "default_t",
+          "level": "s0",
+          "full": "unconfined_u:object_r:default_t:s0"
+        },
+        "tcontext_type": "default_t",
+        "permissive_numeric": 0,
+        "timestamp_float": 1725482881.101,
+        "_normalized": true,
+        "_normalization_version": "1.0"
       },
       "count": 3,
       "permissions": ["read"],
       "correlations": [
         {
-          "pid": "1234",
+          // Correlations also include normalized fields
+          "pid": 1234,
           "comm": "httpd",
           "path": "/var/www/html/config.php",
           "permission": "read",
-          "permissive": "0",
-          "timestamp": "2024-09-05 02:18:01"
+          "permissive": false,
+          "timestamp": "2024-09-05 02:18:01",
+          "path_absolute": "/var/www/html/config.php",
+          "path_normalized": true,
+          "permissive_numeric": 0,
+          "_normalized": true
         }
-      ]
+      ],
+      "first_seen": "2024-09-05T02:18:01",
+      "last_seen": "2024-09-05T02:18:01"
     }
-  ]
+  ],
+  "summary": {
+    "total_events": 3,
+    "unique_denials_count": 1,
+    "log_blocks_processed": 1
+  }
 }
 ```
+
+#### Network Denial Example (with Port Normalization)
+```json
+{
+  "log": {
+    "dest_port": 8080,
+    "dest_port_string": "8080",
+    "dest_port_type": "numeric",
+    "dest_port_class": "registered",
+    "saddr_components": {
+      "laddr": "192.168.1.100",
+      "lport": "8080"
+    },
+    "local_address": "192.168.1.100",
+    "local_port": 8080
+  }
+}
+```
+
+#### Normalization Features
+- **Path Standardization**: Absolute paths with consistent separators (`path_absolute`, `path_normalized`)
+- **Port Classification**: Numeric conversion with system/registered/dynamic classification
+- **SELinux Context Parsing**: Component extraction (`user`, `role`, `type`, `level`) for easy filtering
+- **Data Type Consistency**: Proper boolean/numeric types instead of strings
+- **Metadata Tracking**: Normalization version and status for tool compatibility
 
 ## 💡 **Tips & Troubleshooting**
 

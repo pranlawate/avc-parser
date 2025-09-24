@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.3.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, advanced filtering capabilities, and clear correlation tracking.
+**Version 1.3.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, advanced filtering capabilities, normalized JSON output, and clear correlation tracking.
 
 ## ⚡ Quick Start
 
@@ -66,7 +66,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 - **Rich Terminal Format**: Default responsive panels with BIONIC reading, professional styling, and correlation events
 - **Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis with syscall details and context information
 - **Field-by-Field View**: Detailed breakdown using `--fields` flag for traditional analysis
-- **JSON Export**: Structured output with semantic fields for automation and integration
+- **Normalized JSON Export**: Structured output with standardized field formats, semantic enrichment, and consistent data types for reliable tool integration and SIEM compatibility
 
 ### 🔍 **Advanced Analysis**
 - **Semantic Intelligence**: Human-readable permissions (`read` → `Read file content`) and contextual analysis
@@ -93,8 +93,6 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 
 ## 🔮 Upcoming Features
 
-### 🔄 **Phase 4B: Critical Usability Features** (Current - High ROI)
-- **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
 ### 🎨 **Phase 4C: Enhanced User Experience** (After Critical Fixes)
 - **Interactive Pager Mode**: Built-in `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
@@ -213,7 +211,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 
 ## 📈 Development Status
 
-**Current Version**: 1.3.0 | **Current Phase**: 4B-2 (JSON Field Normalization - High ROI)
+**Current Version**: 1.3.0 | **Current Phase**: 4C (Enhanced User Experience)
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -230,7 +228,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 | **PID Event Counting** | ✅ **COMPLETE** | Event frequency display per PID in compact view (e.g., PID 1234 (3x)) |
 | **Pipe Compatibility** | ✅ **COMPLETE** | Handle broken pipe errors for head/less redirection |
 | **Advanced Filtering** | ✅ **COMPLETE** | Time range and context filtering with pattern matching support |
-| **JSON Field Normalization** | 🎯 **HIGH PRIORITY** | Standardized formats for tool integration |
+| **JSON Field Normalization** | ✅ **COMPLETE** | Standardized path formats, clean port extraction, normalized context fields |
 | **Interactive Pager Mode** | ⏳ **PLANNED** | Built-in less-like interface for large outputs |
 | **Performance Optimization** | ⏳ **PLANNED** | Memory management, cross-platform testing |
 
