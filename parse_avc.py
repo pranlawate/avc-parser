@@ -3083,22 +3083,33 @@ def validate_arguments(args, console: Console) -> str:
     if file_args_count > 1:
         # Use stderr for error messages so tests can capture them
         error_console = Console(stderr=True)
-        error_console.print("❌ [bold red]Error: Conflicting Arguments[/bold red]")
+        error_console.print("❌ [bold red]Error: Conflicting File Arguments[/bold red]")
         error_console.print("   Cannot specify multiple file arguments simultaneously.")
+
+        # Show which arguments were provided
+        provided_args = []
+        if args.file: provided_args.append(f"--file {args.file}")
+        if args.raw_file: provided_args.append(f"--raw-file {args.raw_file}")
+        if args.avc_file: provided_args.append(f"--avc-file {args.avc_file}")
+
+        error_console.print(f"   [dim]You provided: {', '.join(provided_args)}[/dim]")
         error_console.print("   [dim]Choose one input method:[/dim]")
-        error_console.print("   • [cyan]--file[/cyan] for auto-detection (recommended)")
-        error_console.print("   • [cyan]--raw-file[/cyan] for raw audit.log files")
-        error_console.print("   • [cyan]--avc-file[/cyan] for pre-processed ausearch output")
+        error_console.print("   • [cyan]--file <path>[/cyan] for auto-detection (recommended)")
+        error_console.print("   • [cyan]--raw-file <path>[/cyan] for raw audit.log files")
+        error_console.print("   • [cyan]--avc-file <path>[/cyan] for pre-processed ausearch output")
+        error_console.print("   [dim]Example:[/dim] [cyan]python3 parse_avc.py --file /var/log/audit/audit.log[/cyan]")
         sys.exit(1)
 
     # Validate JSON flag requirements
     if args.json and file_args_count == 0:
-        print_error("❌ [bold red]Error: Missing Required Arguments[/bold red]")
-        print_error("   --json flag requires a file input to process.")
-        print_error("   [dim]Valid combinations:[/dim]")
-        print_error("   • [cyan]--json --file audit.log[/cyan] (recommended)")
-        print_error("   • [cyan]--json --raw-file audit.log[/cyan]")
-        print_error("   • [cyan]--json --avc-file processed.log[/cyan]")
+        console.print("❌ [bold red]Error: Missing Required Arguments[/bold red]")
+        console.print("   [cyan]--json[/cyan] flag requires a file input to process.")
+        console.print("   [dim]JSON output cannot be generated without input data.[/dim]")
+        console.print("   [dim]Valid combinations:[/dim]")
+        console.print("   • [cyan]--json --file audit.log[/cyan] (recommended)")
+        console.print("   • [cyan]--json --raw-file audit.log[/cyan]")
+        console.print("   • [cyan]--json --avc-file processed.log[/cyan]")
+        console.print("   [dim]Example:[/dim] [cyan]python3 parse_avc.py --json --file /var/log/audit/audit.log[/cyan]")
         sys.exit(1)
 
     # Handle new --file argument with auto-detection
@@ -3137,25 +3148,42 @@ def validate_file_with_auto_detection(file_path: str, console: Console, quiet: b
     Raises:
         SystemExit: On file validation errors
     """
-    # First, perform basic file validation (similar to existing functions)
+    # First, perform basic file validation with enhanced error messages
     try:
         if not os.path.exists(file_path):
             console.print(f"❌ [bold red]Error: File Not Found[/bold red]")
             console.print(f"   File does not exist: [cyan]{file_path}[/cyan]")
             console.print("   [dim]Please verify the file path and try again.[/dim]")
+            console.print("   [dim]Common audit file locations:[/dim]")
+            console.print("   • [cyan]/var/log/audit/audit.log[/cyan] (raw audit log)")
+            console.print("   • [cyan]./avc_denials.log[/cyan] (processed output)")
+            sys.exit(1)
+
+        # Check if path is a directory
+        if os.path.isdir(file_path):
+            console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+            console.print(f"   Path is a directory, not a file: [cyan]{file_path}[/cyan]")
+            console.print("   [dim]Please specify a specific audit file:[/dim]")
+            console.print(f"   • [cyan]{file_path}/audit.log[/cyan] (if it exists)")
+            console.print(f"   • [cyan]{file_path}/*.log[/cyan] (list available files)")
             sys.exit(1)
 
         if not os.access(file_path, os.R_OK):
             console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
             console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
-            console.print("   [dim]Please check file permissions or run with appropriate privileges.[/dim]")
+            console.print("   [dim]Try one of these solutions:[/dim]")
+            console.print("   • [cyan]sudo python3 parse_avc.py --file <path>[/cyan] (run with privileges)")
+            console.print("   • [cyan]sudo cp <path> ~/audit.log && python3 parse_avc.py --file ~/audit.log[/cyan] (copy to accessible location)")
             sys.exit(1)
 
         file_size = os.path.getsize(file_path)
         if file_size == 0:
-            print_error(f"❌ [bold red]Error: Empty File[/bold red]")
-            print_error(f"   File is empty: [cyan]{file_path}[/cyan]")
-            print_error("   [dim]Please provide a file with audit log content.[/dim]")
+            console.print(f"❌ [bold red]Error: Empty File[/bold red]")
+            console.print(f"   File is empty: [cyan]{file_path}[/cyan]")
+            console.print("   [dim]Possible solutions:[/dim]")
+            console.print("   • Check if audit logging is enabled: [cyan]sudo systemctl status auditd[/cyan]")
+            console.print("   • Check for recent audit activity: [cyan]sudo tail /var/log/audit/audit.log[/cyan]")
+            console.print("   • Generate test AVC events if in test environment")
             sys.exit(1)
 
         if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
@@ -3175,15 +3203,26 @@ def validate_file_with_auto_detection(file_path: str, console: Console, quiet: b
 
         return 'raw_file' if detected_format == 'raw' else 'avc_file'
 
+    except IsADirectoryError:
+        console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+        console.print(f"   Path is a directory, not a file: [cyan]{file_path}[/cyan]")
+        console.print("   [dim]Please specify a specific audit file:[/dim]")
+        console.print(f"   • [cyan]{file_path}/audit.log[/cyan] (if it exists)")
+        console.print(f"   • [cyan]ls {file_path}/*.log[/cyan] (list available files)")
+        sys.exit(1)
     except UnicodeDecodeError:
         console.print(f"❌ [bold red]Error: Binary File Detected[/bold red]")
         console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
-        console.print("   [dim]Audit files should be text files.[/dim]")
+        console.print("   [dim]Audit files should be text files. Try:[/dim]")
+        console.print("   • [cyan]file <path>[/cyan] (check file type)")
+        console.print("   • [cyan]head -5 <path>[/cyan] (preview file content)")
         sys.exit(1)
     except PermissionError:
         console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
         console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
-        console.print("   [dim]Please check file permissions or run with appropriate privileges.[/dim]")
+        console.print("   [dim]Try one of these solutions:[/dim]")
+        console.print("   • [cyan]sudo python3 parse_avc.py --file <path>[/cyan] (run with privileges)")
+        console.print("   • [cyan]sudo cp <path> ~/audit.log && python3 parse_avc.py --file ~/audit.log[/cyan] (copy to accessible location)")
         sys.exit(1)
 
 
@@ -3226,8 +3265,11 @@ def validate_raw_file(file_path: str, console: Console) -> str:
     # Check if file is empty
     if os.path.getsize(file_path) == 0:
         console.print(f"❌ [bold red]Error: Empty File[/bold red]")
-        console.print(f"   Raw file is empty: [cyan]{file_path}[/cyan]")
-        console.print("   [dim]Please provide a file with audit log content.[/dim]")
+        console.print(f"   Raw audit file is empty: [cyan]{file_path}[/cyan]")
+        console.print("   [dim]Possible solutions:[/dim]")
+        console.print("   • Check if audit logging is enabled: [cyan]sudo systemctl status auditd[/cyan]")
+        console.print("   • Check for recent audit activity: [cyan]sudo tail /var/log/audit/audit.log[/cyan]")
+        console.print("   • Generate test AVC events if in test environment")
         sys.exit(1)
 
     # Check for binary file (basic heuristic)
@@ -3288,8 +3330,11 @@ def validate_avc_file(file_path: str, console: Console) -> str:
     # Check if file is empty
     if os.path.getsize(file_path) == 0:
         console.print(f"❌ [bold red]Error: Empty File[/bold red]")
-        console.print(f"   AVC file is empty: [cyan]{file_path}[/cyan]")
-        console.print("   [dim]Please provide a file with AVC log content.[/dim]")
+        console.print(f"   Pre-processed AVC file is empty: [cyan]{file_path}[/cyan]")
+        console.print("   [dim]Possible solutions:[/dim]")
+        console.print("   • Check if ausearch produced output: [cyan]ausearch -m AVC | head -5[/cyan]")
+        console.print("   • Verify AVC events exist: [cyan]sudo grep 'avc:' /var/log/audit/audit.log | head -1[/cyan]")
+        console.print("   • Generate test AVC events if in test environment")
         sys.exit(1)
 
     # Try to read and validate file content
@@ -3858,14 +3903,62 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     from rich.align import Align
                     from rich.console import Group
 
-                    patterns_str = ", ".join(found_container_patterns)
+                    # Show sample path to help users understand the issue
+                    sample_path_lines = []
+                    if container_sample_paths:
+                        # Show generic patterns based on detected container storage types
+                        sample_path = container_sample_paths[0]
 
+                        # Determine container storage type and show generic patterns
+                        if '/containers/storage/overlay/' in sample_path:
+                            # Extract the actual base path up to /containers/storage/overlay/
+                            parts = sample_path.split('/containers/storage/overlay/')
+                            if len(parts) == 2:
+                                actual_base = parts[0] + '/containers/storage/overlay/'
+                                sample_path_lines = [
+                                    f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                    f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                                ]
+                        elif '/.local/share/containers/' in sample_path:
+                            # Extract the actual base path up to /.local/share/containers/storage/overlay/
+                            parts = sample_path.split('/.local/share/containers/')
+                            if len(parts) == 2:
+                                actual_base = parts[0] + '/.local/share/containers/storage/overlay/'
+                                sample_path_lines = [
+                                    f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                    f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                                ]
+                        elif '/var/lib/containers/' in sample_path:
+                            # System container storage (alternative location)
+                            sample_path_lines = [
+                                f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
+                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                            ]
+
+                        # Fallback for other container patterns
+                        if not sample_path_lines:
+                            sample_path_lines = [
+                                f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
+                            ]
+
+                    # Create individual centered lines using Group
                     warning_lines = [
                         Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
-                        Align.center(""),
-                        Align.center(f"[cyan]Container patterns: {patterns_str}[/cyan]"),
-                        Align.center("[dim]These may require container-specific SELinux policies.[/dim]")
+                        Align.center(""),  # Empty line
+                        Align.center("[cyan]SELinux denials accessing container overlay storage.[/cyan]"),
+                        Align.center(""),  # Empty line
+                        Align.center("[dim]Complete path = Base path + Container path:[/dim]"),
                     ]
+
+                    # Add the sample path lines if available
+                    if sample_path_lines:
+                        for path_line in sample_path_lines:
+                            warning_lines.append(Align.center(path_line))
+
+                    warning_lines.extend([
+                        Align.center(""),  # Empty line
+                        Align.center("[dim]Recommendation: container-selinux policy package[/dim]")
+                    ])
 
                     container_panel = Panel(
                         Group(*warning_lines),
@@ -4044,14 +4137,62 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             from rich.align import Align
                             from rich.console import Group
 
-                            patterns_str = ", ".join(found_container_patterns)
+                            # Show sample path to help users understand the issue
+                            sample_path_lines = []
+                            if container_sample_paths:
+                                # Show generic patterns based on detected container storage types
+                                sample_path = container_sample_paths[0]
 
+                                # Determine container storage type and show generic patterns
+                                if '/containers/storage/overlay/' in sample_path:
+                                    # Extract the actual base path up to /containers/storage/overlay/
+                                    parts = sample_path.split('/containers/storage/overlay/')
+                                    if len(parts) == 2:
+                                        actual_base = parts[0] + '/containers/storage/overlay/'
+                                        sample_path_lines = [
+                                            f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                                        ]
+                                elif '/.local/share/containers/' in sample_path:
+                                    # Extract the actual base path up to /.local/share/containers/storage/overlay/
+                                    parts = sample_path.split('/.local/share/containers/')
+                                    if len(parts) == 2:
+                                        actual_base = parts[0] + '/.local/share/containers/storage/overlay/'
+                                        sample_path_lines = [
+                                            f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                                        ]
+                                elif '/var/lib/containers/' in sample_path:
+                                    # System container storage (alternative location)
+                                    sample_path_lines = [
+                                        f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
+                                        f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]"
+                                    ]
+
+                                # Fallback for other container patterns
+                                if not sample_path_lines:
+                                    sample_path_lines = [
+                                        f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
+                                    ]
+
+                            # Create individual centered lines using Group
                             warning_lines = [
                                 Align.center("[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"),
-                                Align.center(""),
-                                Align.center(f"[cyan]Container patterns: {patterns_str}[/cyan]"),
-                                Align.center("[dim]These may require container-specific SELinux policies.[/dim]")
+                                Align.center(""),  # Empty line
+                                Align.center("[cyan]SELinux denials accessing container overlay storage.[/cyan]"),
+                                Align.center(""),  # Empty line
+                                Align.center("[dim]Complete path = Base path + Container path:[/dim]"),
                             ]
+
+                            # Add the sample path lines if available
+                            if sample_path_lines:
+                                for path_line in sample_path_lines:
+                                    warning_lines.append(Align.center(path_line))
+
+                            warning_lines.extend([
+                                Align.center(""),  # Empty line
+                                Align.center("[dim]Recommendation: container-selinux policy package[/dim]")
+                            ])
 
                             container_panel = Panel(
                                 Group(*warning_lines),
