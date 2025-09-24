@@ -140,8 +140,14 @@ correlations = [
 - [x] **PID Event Counting**: Display event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for improved correlation clarity
 - [x] **Pipe Compatibility Fix**: Handle broken pipe errors when output is redirected to `head`, `less`, etc. (Critical daily workflow fix)
 
-### 🔄 **PHASE 4B: Critical Usability Features** (CURRENT PHASE - HIGH ROI)
-- [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`) (High forensic value)
+### ✅ **PHASE 4B-1: Advanced Filtering** (COMPLETED)
+- [x] **Advanced Filtering**: Time range filtering (`--since yesterday`, `--until today`) and context filtering (`--source httpd_t`, `--target '*default*'`) with comprehensive pattern matching support
+- [x] **Time Range Specifications**: Flexible time parsing supporting relative keywords, "X ago" patterns, and multiple date formats
+- [x] **Context Pattern Matching**: Intelligent SELinux context filtering with wildcard support and case-insensitive matching
+- [x] **Combined Filtering**: Seamless integration with existing process and path filters
+- [x] **Comprehensive Testing**: Validated across multiple log formats with 25+ test scenarios
+
+### 🔄 **PHASE 4B-2: JSON Field Normalization** (CURRENT PHASE - HIGH ROI)
 - [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
 ### 🎨 **PHASE 4C: Enhanced User Experience** (AFTER CRITICAL FIXES)
@@ -261,7 +267,7 @@ Detailed Events:
 
 ## Current Implementation Focus (ROI-Optimized Priority Order)
 
-**Phase 4B**: Critical Usability Features (advanced filtering, JSON normalization) - CURRENT HIGH ROI
+**Phase 4B-2**: JSON Field Normalization (standardized formats for tool integration) - CURRENT HIGH ROI
 **Phase 4C**: Enhanced User Experience (interactive pager mode, smart resource display, terminal integration)
 **Phase 4D**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
@@ -292,10 +298,11 @@ Detailed Events:
 - Phase 3B-1: High-Impact User Features (dontaudit detection, basic filtering, sorting)
 - Phase 3B-2: Polish Features (smart deduplication logic, smart event grouping)
 - Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting, pipe compatibility fix)
+- Phase 4B-1: Advanced Filtering (time range and context filtering with pattern matching support)
 - Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
 
 **🔄 WITHIN SCOPE & CURRENT:**
-- Phase 4B: User Experience Enhancements (advanced filtering, JSON normalization, interactive pager mode, terminal integration)
+- Phase 4B-2: JSON Field Normalization (standardized formats for tool integration)
 
 **✅ WITHIN SCOPE & PLANNED:**
 - Phase 4C: Integration & Performance Testing

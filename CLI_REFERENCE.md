@@ -1,8 +1,10 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.3.0** | Complete command-line reference, data fields, and troubleshooting guide
+**Version 1.3.0** | Complete command-line reference, data fields, and troubleshooting guide with Advanced Filtering
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
+
+> **🎯 New Advanced Filtering**: The tool now includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 
 ## 📋 **Command Line Options**
 
@@ -25,6 +27,10 @@ This document provides comprehensive reference information for using the SELinux
 |--------|-------------|
 | `--process` | Filter denials by process name (e.g., `--process httpd`) |
 | `--path` | Filter denials by file path with wildcards (e.g., `--path '/var/www/*'`) |
+| `--since` | Only include denials since this time (e.g., `--since yesterday`, `--since '2025-01-15'`) |
+| `--until` | Only include denials until this time (e.g., `--until today`, `--until '2025-01-15 14:30'`) |
+| `--source` | Filter by source context pattern (e.g., `--source httpd_t`, `--source '*unconfined*'`) |
+| `--target` | Filter by target context pattern (e.g., `--target default_t`, `--target '*var_lib*'`) |
 | `--sort` | Sort order: `recent` (default), `count`, or `chrono` |
 
 ### Advanced Options
@@ -69,8 +75,18 @@ python3 parse_avc.py --file audit.log --process httpd
 # Filter by file path with wildcards
 python3 parse_avc.py --file audit.log --path "/var/www/*"
 
-# Combine filters
-python3 parse_avc.py --file audit.log --process httpd --path "/var/www/*"
+# Filter by time range
+python3 parse_avc.py --file audit.log --since yesterday
+python3 parse_avc.py --file audit.log --since "2025-01-15" --until "2025-01-16"
+python3 parse_avc.py --file audit.log --since "2 hours ago"
+
+# Filter by SELinux context
+python3 parse_avc.py --file audit.log --source httpd_t
+python3 parse_avc.py --file audit.log --target "*default*"
+python3 parse_avc.py --file audit.log --source "*unconfined*" --target "var_lib_t"
+
+# Combine multiple filters
+python3 parse_avc.py --file audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t
 ```
 
 ### Sorting Options
@@ -95,6 +111,44 @@ python3 parse_avc.py --file audit.log --legacy-signatures
 
 # Complex analysis workflow
 python3 parse_avc.py --file audit.log --process httpd --sort count --detailed --json > analysis.json
+```
+
+## 🎯 **Advanced Filtering Examples**
+
+### Time Range Filtering
+```bash
+# Recent activity analysis
+python3 parse_avc.py --file audit.log --since yesterday --sort count
+
+# Specific incident timeframe
+python3 parse_avc.py --file audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
+
+# Relative time specifications
+python3 parse_avc.py --file audit.log --since "2 hours ago" --detailed
+```
+
+### SELinux Context Filtering
+```bash
+# Source context analysis
+python3 parse_avc.py --file audit.log --source httpd_t --since yesterday
+
+# Target context with wildcards
+python3 parse_avc.py --file audit.log --target "*default*" --sort count
+
+# Combined context filtering
+python3 parse_avc.py --file audit.log --source "*unconfined*" --target "var_lib_t"
+```
+
+### Multi-Criteria Forensic Analysis
+```bash
+# Comprehensive incident investigation
+python3 parse_avc.py --file audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
+
+# Security anomaly detection
+python3 parse_avc.py --file audit.log --source "*unconfined*" --since "1 week ago" --detailed
+
+# Time-bounded context analysis
+python3 parse_avc.py --file audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --target "*shadow*" --sort chrono
 ```
 
 ## 📊 **Parsed Data Fields**
@@ -139,6 +193,31 @@ python3 parse_avc.py --file audit.log --process httpd --sort count --detailed --
 - **PIDs Involved**: List of process IDs that generated these denials
 - **Time Range**: First seen to last seen timestamps
 - **Permissions List**: All permissions denied in this group
+
+### Time Specifications (--since, --until)
+- **Relative Keywords**:
+  - `now` - Current time
+  - `today` - Beginning of today (00:00:00)
+  - `yesterday` - Beginning of yesterday (00:00:00)
+  - `recent` - Last hour
+- **"X ago" Patterns**:
+  - `2 hours ago`, `3 days ago`, `1 week ago`, `2 months ago`, `1 year ago`
+  - Supports: seconds, minutes, hours, days, weeks, months, years
+- **Explicit Date/Time Formats**:
+  - `2025-01-15` (assumes 00:00:00)
+  - `2025-01-15 14:30` or `2025-01-15 14:30:45`
+  - `01/15/2025` or `01/15/2025 14:30` (US format)
+  - `15/01/2025` or `15/01/2025 14:30` (European format)
+
+### Context Pattern Matching (--source, --target)
+- **Direct Match**: `httpd_t` matches any context containing `httpd_t`
+- **Wildcard Patterns**: `*unconfined*` matches contexts containing "unconfined"
+- **Component Matching**: Pattern without colons matches individual context components
+- **Case Insensitive**: All matching is case-insensitive for better usability
+- **Examples**:
+  - `--source httpd_t` matches `system_u:system_r:httpd_t:s0`
+  - `--target "*default*"` matches `unconfined_u:object_r:default_t:s0`
+  - `--source "system_r"` matches the role component
 
 ## 🔍 **Data Field Examples**
 
@@ -281,19 +360,24 @@ python3 parse_avc.py --file audit.log | wc -l
    python3 parse_avc.py --file audit.log --sort count
    ```
 
-3. **Focus Investigation**: Filter by problematic service
+3. **Focus Investigation**: Filter by problematic service with time bounds
    ```bash
-   python3 parse_avc.py --file audit.log --process httpd --sort count
+   python3 parse_avc.py --file audit.log --process httpd --since yesterday --sort count
    ```
 
-4. **Detailed Analysis**: Use detailed view for context
+4. **Context Analysis**: Filter by SELinux contexts for targeted investigation
    ```bash
-   python3 parse_avc.py --file audit.log --process httpd --detailed
+   python3 parse_avc.py --file audit.log --source httpd_t --target "*default*" --detailed
    ```
 
-5. **Documentation**: Export findings to JSON
+5. **Time-Bounded Analysis**: Investigate specific incident timeframes
    ```bash
-   python3 parse_avc.py --file audit.log --process httpd --json > findings.json
+   python3 parse_avc.py --file audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --sort chrono
+   ```
+
+6. **Documentation**: Export findings with complete filter context
+   ```bash
+   python3 parse_avc.py --file audit.log --process httpd --since yesterday --json > incident_analysis.json
    ```
 
 #### Automation & Integration

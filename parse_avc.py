@@ -19,7 +19,7 @@ import sys
 import subprocess
 import json
 import signal
-from datetime import datetime
+from datetime import datetime, timedelta
 from rich.console import Console, Group
 from rich.rule import Rule
 from rich.panel import Panel
@@ -612,6 +612,88 @@ def parse_timestamp_from_audit_block(log_block: str) -> dict:
             timestamp_context['timestamp'] = dt_object.timestamp()
 
     return timestamp_context
+
+
+def parse_time_range(time_spec: str) -> datetime:
+    """
+    Parse time range specifications into datetime objects.
+
+    Args:
+        time_spec (str): Time specification (e.g., 'yesterday', 'today', '2025-01-15', 'recent', '2 hours ago')
+
+    Returns:
+        datetime: Parsed datetime object
+
+    Raises:
+        ValueError: If time specification cannot be parsed
+
+    Examples:
+        >>> parse_time_range('yesterday')
+        datetime(2025, 1, 14, 0, 0)
+        >>> parse_time_range('2025-01-15 14:30')
+        datetime(2025, 1, 15, 14, 30)
+    """
+    now = datetime.now()
+    time_spec_lower = time_spec.lower().strip()
+
+    # Handle relative time keywords
+    if time_spec_lower == 'now':
+        return now
+    elif time_spec_lower == 'today':
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_spec_lower == 'yesterday':
+        yesterday = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        return yesterday
+    elif time_spec_lower == 'recent':
+        # Recent means last hour
+        return now - timedelta(hours=1)
+
+    # Handle "X ago" patterns
+    ago_match = re.match(r'(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago', time_spec_lower)
+    if ago_match:
+        amount = int(ago_match.group(1))
+        unit = ago_match.group(2)
+
+        if unit == 'second':
+            return now - timedelta(seconds=amount)
+        elif unit == 'minute':
+            return now - timedelta(minutes=amount)
+        elif unit == 'hour':
+            return now - timedelta(hours=amount)
+        elif unit == 'day':
+            return now - timedelta(days=amount)
+        elif unit == 'week':
+            return now - timedelta(weeks=amount)
+        elif unit == 'month':
+            # Approximate month as 30 days
+            return now - timedelta(days=amount * 30)
+        elif unit == 'year':
+            # Approximate year as 365 days
+            return now - timedelta(days=amount * 365)
+
+    # Try parsing explicit date/time formats
+    time_formats = [
+        '%Y-%m-%d %H:%M:%S',  # 2025-01-15 14:30:45
+        '%Y-%m-%d %H:%M',     # 2025-01-15 14:30
+        '%Y-%m-%d',           # 2025-01-15 (assumes 00:00:00)
+        '%m/%d/%Y %H:%M:%S',  # 01/15/2025 14:30:45
+        '%m/%d/%Y %H:%M',     # 01/15/2025 14:30
+        '%m/%d/%Y',           # 01/15/2025 (assumes 00:00:00)
+        '%d/%m/%Y %H:%M:%S',  # 15/01/2025 14:30:45 (European format)
+        '%d/%m/%Y %H:%M',     # 15/01/2025 14:30
+        '%d/%m/%Y',           # 15/01/2025 (assumes 00:00:00)
+    ]
+
+    for fmt in time_formats:
+        try:
+            return datetime.strptime(time_spec, fmt)
+        except ValueError:
+            continue
+
+    # If no format matches, raise an error
+    raise ValueError(f"Unable to parse time specification: '{time_spec}'. "
+                    f"Supported formats include: 'yesterday', 'today', 'recent', "
+                    f"'X hours/days/weeks ago', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM', etc.")
 
 
 def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, set]:
@@ -1667,19 +1749,45 @@ def detect_dontaudit_disabled(unique_denials: list) -> tuple[bool, list[str]]:
     return len(found_indicators_list) > 0, found_indicators_list
 
 
-def filter_denials(denials: list, process_filter: str = None, path_filter: str = None) -> list:
+def filter_denials(denials: list, process_filter: str = None, path_filter: str = None,
+                   since_filter: str = None, until_filter: str = None,
+                   source_filter: str = None, target_filter: str = None) -> list:
     """
-    Filter denials based on process name and/or path criteria.
+    Filter denials based on multiple criteria.
 
     Args:
         denials (list): List of denial dictionaries to filter
         process_filter (str): Process name to filter by (case-insensitive partial match)
         path_filter (str): Path pattern to filter by (supports basic wildcards)
+        since_filter (str): Only include denials since this time (e.g., 'yesterday', '2025-01-15')
+        until_filter (str): Only include denials until this time (e.g., 'today', '2025-01-15 14:30')
+        source_filter (str): Filter by source context pattern (e.g., 'httpd_t', '*unconfined*')
+        target_filter (str): Filter by target context pattern (e.g., 'default_t', '*var_lib*')
 
     Returns:
         list: Filtered list of denials
+
+    Raises:
+        ValueError: If time filters cannot be parsed
     """
-    if not process_filter and not path_filter:
+    # Parse time filters once
+    since_dt = None
+    until_dt = None
+
+    if since_filter:
+        try:
+            since_dt = parse_time_range(since_filter)
+        except ValueError as e:
+            raise ValueError(f"Invalid --since value: {e}")
+
+    if until_filter:
+        try:
+            until_dt = parse_time_range(until_filter)
+        except ValueError as e:
+            raise ValueError(f"Invalid --until value: {e}")
+
+    # If no filters specified, return all denials
+    if not any([process_filter, path_filter, since_filter, until_filter, source_filter, target_filter]):
         return denials
 
     filtered_denials = []
@@ -1714,6 +1822,27 @@ def filter_denials(denials: list, process_filter: str = None, path_filter: str =
             if not path_found:
                 include_denial = False
 
+        # Time range filtering
+        if (since_dt or until_dt) and include_denial:
+            denial_time = denial_info.get('last_seen_obj') or denial_info.get('first_seen_obj')
+            if denial_time:
+                if since_dt and denial_time < since_dt:
+                    include_denial = False
+                elif until_dt and denial_time > until_dt:
+                    include_denial = False
+
+        # Source context filtering
+        if source_filter and include_denial:
+            scontext = str(parsed_log.get('scontext', ''))
+            if not _context_matches(scontext, source_filter):
+                include_denial = False
+
+        # Target context filtering
+        if target_filter and include_denial:
+            tcontext = str(parsed_log.get('tcontext', ''))
+            if not _context_matches(tcontext, target_filter):
+                include_denial = False
+
         if include_denial:
             filtered_denials.append(denial_info)
 
@@ -1733,6 +1862,56 @@ def _path_matches(path: str, pattern: str) -> bool:
     """
     import fnmatch
     return fnmatch.fnmatch(path, pattern)
+
+
+def _context_matches(context: str, pattern: str) -> bool:
+    """
+    Check if a SELinux context matches a pattern with wildcard support.
+
+    Args:
+        context (str): The SELinux context to check (e.g., 'system_u:system_r:httpd_t:s0')
+        pattern (str): The pattern to match against (supports * wildcards)
+                      Can match full context or individual components
+
+    Returns:
+        bool: True if context matches pattern
+
+    Examples:
+        >>> _context_matches('system_u:system_r:httpd_t:s0', 'httpd_t')
+        True
+        >>> _context_matches('system_u:system_r:httpd_t:s0', '*httpd*')
+        True
+        >>> _context_matches('unconfined_u:object_r:default_t:s0', '*default*')
+        True
+    """
+    import fnmatch
+
+    if not context or not pattern:
+        return False
+
+    context = context.strip()
+    pattern = pattern.strip()
+
+    # Case-insensitive matching for better user experience
+    context_lower = context.lower()
+    pattern_lower = pattern.lower()
+
+    # Direct substring match (for simple cases like 'httpd_t')
+    if pattern_lower in context_lower:
+        return True
+
+    # Wildcard pattern matching on full context
+    if fnmatch.fnmatch(context_lower, pattern_lower):
+        return True
+
+    # If pattern doesn't contain colons, try matching against individual context components
+    if ':' not in pattern:
+        context_parts = context_lower.split(':')
+        for part in context_parts:
+            if fnmatch.fnmatch(part, pattern_lower):
+                return True
+
+    return False
 
 
 def sort_denials(denials: list, sort_order: str) -> list:
@@ -2963,6 +3142,22 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         default="recent",
         help="Sort order: 'recent' (newest first, default), 'count' (highest count first), 'chrono' (oldest first).")
     parser.add_argument(
+        "--since",
+        type=str,
+        help="Only include denials since this time (e.g., 'yesterday', 'today', '2025-01-15', '2 hours ago').")
+    parser.add_argument(
+        "--until",
+        type=str,
+        help="Only include denials until this time (e.g., 'today', '2025-01-15 14:30').")
+    parser.add_argument(
+        "--source",
+        type=str,
+        help="Filter by source context pattern (e.g., 'httpd_t', '*unconfined*', 'system_r').")
+    parser.add_argument(
+        "--target",
+        type=str,
+        help="Filter by target context pattern (e.g., 'default_t', '*var_lib*').")
+    parser.add_argument(
         "--legacy-signatures",
         action="store_true",
         help="Use legacy signature logic for regression testing (disables smart deduplication).")
@@ -3251,7 +3446,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
 
         # Apply filtering if specified
-        filtered_denials = filter_denials(sorted_denials, args.process, args.path)
+        try:
+            filtered_denials = filter_denials(sorted_denials, args.process, args.path,
+                                             args.since, args.until, args.source, args.target)
+        except ValueError as e:
+            console.print(f"[red]Error in filtering: {e}[/red]")
+            return
 
         # Check for dontaudit detection (on full results before filtering for complete context)
         dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
@@ -3282,12 +3482,20 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         container_sample_paths = list(dict.fromkeys(container_sample_paths))[:3]  # Keep first 3 unique
 
         # Update display message to reflect filtering
-        if args.process or args.path:
+        if args.process or args.path or args.since or args.until or args.source or args.target:
             filter_msg = []
             if args.process:
                 filter_msg.append(f"process='{args.process}'")
             if args.path:
                 filter_msg.append(f"path='{args.path}'")
+            if args.since:
+                filter_msg.append(f"since='{args.since}'")
+            if args.until:
+                filter_msg.append(f"until='{args.until}'")
+            if args.source:
+                filter_msg.append(f"source='{args.source}'")
+            if args.target:
+                filter_msg.append(f"target='{args.target}'")
             filter_str = ", ".join(filter_msg)
             console.print(f"Applied filters: {filter_str}")
             console.print(f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering.")

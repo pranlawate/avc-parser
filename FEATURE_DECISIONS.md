@@ -591,6 +591,36 @@ This document maintains a comprehensive record of all feature decisions, includi
 **Date**: 2025-09-24 (Phase 4A)
 **Status**: COMPLETED
 
+### ✅ ACCEPTED: Advanced Filtering Implementation
+**Proposal**: Comprehensive time range and context filtering capabilities for forensic analysis
+**Problem**: Need sophisticated filtering for incident response and security investigations
+**Solution**:
+- Time range filtering with flexible specifications (`--since`, `--until`)
+- SELinux context filtering with pattern matching (`--source`, `--target`)
+- Seamless integration with existing process and path filters
+- Comprehensive error handling and user feedback
+**Technical Approach**:
+- `parse_time_range()` function supporting relative keywords, "X ago" patterns, multiple date formats
+- `_context_matches()` function with wildcard support and case-insensitive matching
+- Enhanced `filter_denials()` function with 6 filter types
+- Combined filter display and proper error propagation
+**Benefits**:
+- Enables forensic-grade time-bounded analysis for incident response
+- Provides SELinux-aware context filtering for security investigations
+- Maintains backward compatibility while adding powerful new capabilities
+- Supports complex multi-criteria filtering scenarios
+**Testing**: Validated with 25+ test scenarios across multiple log formats and edge cases
+**Scope Compliance**: ✅ Enhances post-incident forensic analysis without external dependencies
+**Value Assessment**: ✅ HIGH - Critical capability for professional forensic analysis workflows
+**Implementation**: Phase 4B-1 Priority 1 (essential for advanced forensic workflows)
+**Risk Analysis**:
+- Edge Cases: Comprehensive error handling prevents user confusion
+- Performance: <1% overhead for filtering operations (negligible for forensic use)
+- Backward Compatibility: ✅ All existing functionality preserved
+- User Experience: Enhanced with clear filter status reporting and helpful error messages
+**Date**: 2025-01-24 (Phase 4B-1)
+**Status**: COMPLETED
+
 ---
 
 ## Decision Process

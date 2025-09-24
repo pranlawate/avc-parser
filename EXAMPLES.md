@@ -1,8 +1,10 @@
 # SELinux AVC Denial Analyzer - Examples & Usage Patterns
 
-**Version 1.3.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer
+**Version 1.3.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Advanced Filtering
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
+
+> **🎯 New Advanced Filtering**: The tool now includes comprehensive time range and SELinux context filtering for forensic analysis. Jump to [Advanced Filtering Examples](#advanced-time-range-filtering) to see the powerful new capabilities in action.
 
 > **💡 Key Feature**: Notice how PID event counts are shown in the default compact view - `PID 1234 (3x)` indicates this PID generated 3 events, while `PID 5678` (no count) means only 1 event. This provides immediate correlation insight without expanding details.
 
@@ -162,12 +164,53 @@ Found 4 AVC events. Displaying 2 unique denials...
 [Less frequent denial second...]
 ```
 
-### Combined Filtering and Sorting
+### Advanced Time Range Filtering
 ```bash
-$ python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --sort count
-Applied filters: process='httpd', path='/var/www/*'
-Showing 3 of 8 unique denials after filtering.
-[Results sorted by frequency, filtered by process and path...]
+# Filter by relative time
+$ python3 parse_avc.py --file /var/log/audit/audit.log --since yesterday
+Applied filters: since='yesterday'
+Showing 15 of 45 unique denials after filtering.
+
+# Filter by specific date range
+$ python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15" --until "2025-01-16"
+Applied filters: since='2025-01-15', until='2025-01-16'
+Showing 8 of 45 unique denials after filtering.
+
+# Filter by recent activity
+$ python3 parse_avc.py --file /var/log/audit/audit.log --since "2 hours ago"
+Applied filters: since='2 hours ago'
+Showing 3 of 45 unique denials after filtering.
+```
+
+### SELinux Context Filtering
+```bash
+# Filter by source context type
+$ python3 parse_avc.py --file /var/log/audit/audit.log --source httpd_t
+Applied filters: source='httpd_t'
+Showing 12 of 45 unique denials after filtering.
+
+# Filter by target context with wildcards
+$ python3 parse_avc.py --file /var/log/audit/audit.log --target "*default*"
+Applied filters: target='*default*'
+Showing 8 of 45 unique denials after filtering.
+
+# Filter by both source and target contexts
+$ python3 parse_avc.py --file /var/log/audit/audit.log --source "*unconfined*" --target "var_lib_t"
+Applied filters: source='*unconfined*', target='var_lib_t'
+Showing 3 of 45 unique denials after filtering.
+```
+
+### Combined Advanced Filtering
+```bash
+# Comprehensive incident analysis
+$ python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
+Applied filters: process='httpd', path='/var/www/*', since='yesterday', source='httpd_t'
+Showing 5 of 45 unique denials after filtering.
+
+# Security investigation with time boundaries
+$ python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --target "*sensitive*" --sort chrono
+Applied filters: since='2025-01-15 09:00', until='2025-01-15 17:00', target='*sensitive*'
+Showing 2 of 45 unique denials after filtering.
 ```
 
 ## 📊 **Display Format Options**
@@ -344,14 +387,33 @@ Found 152 AVC events. Displaying 8 unique denials...
 # 1. Quick overview with recent-first sorting (default)
 python3 parse_avc.py --file /var/log/audit/audit.log
 
-# 2. Focus on problematic service
-python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --sort count
+# 2. Focus on recent activity (last 24 hours)
+python3 parse_avc.py --file /var/log/audit/audit.log --since yesterday --sort count
 
-# 3. Investigate specific paths
-python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --detailed
+# 3. Focus on problematic service with time constraints
+python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --since "2 hours ago" --sort count
 
-# 4. Export findings for documentation
-python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --json > httpd_denials.json
+# 4. Investigate specific paths and contexts
+python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --source httpd_t --detailed
+
+# 5. Export findings for documentation
+python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --since yesterday --json > incident_analysis.json
+```
+
+### Advanced Security Investigation
+```bash
+# 1. Identify unusual source contexts
+python3 parse_avc.py --file /var/log/audit/audit.log --source "*unconfined*" --since "1 week ago" --sort count
+
+# 2. Monitor sensitive target contexts
+python3 parse_avc.py --file /var/log/audit/audit.log --target "*shadow*" --since yesterday
+python3 parse_avc.py --file /var/log/audit/audit.log --target "*passwd*" --since yesterday
+
+# 3. Time-bounded security analysis
+python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --sort chrono
+
+# 4. Cross-reference process and context anomalies
+python3 parse_avc.py --file /var/log/audit/audit.log --process "*" --source "*unconfined*" --since "3 days ago" --detailed
 ```
 
 ### Timeline Analysis

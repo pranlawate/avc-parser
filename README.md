@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.3.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication and clear correlation tracking.
+**Version 1.3.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, advanced filtering capabilities, and clear correlation tracking.
 
 ## ⚡ Quick Start
 
@@ -16,6 +16,14 @@ python3 parse_avc.py --file /var/log/audit/audit.log --process httpd --sort coun
 
 # Filter by path with wildcards
 python3 parse_avc.py --file /var/log/audit/audit.log --path "/var/www/*"
+
+# Filter by time range (advanced filtering)
+python3 parse_avc.py --file /var/log/audit/audit.log --since yesterday --until today
+python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
+# Supports: relative times (yesterday, today, recent), "X ago" (2 hours ago), specific dates/times
+
+# Filter by SELinux context
+python3 parse_avc.py --file /var/log/audit/audit.log --source httpd_t --target "*default*"
 
 # Get enhanced detailed analysis
 python3 parse_avc.py --file /var/log/audit/audit.log --detailed
@@ -67,7 +75,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 - **PID Event Counting**: Shows event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for better correlation understanding
 - **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback for complex scenarios
 - **dontaudit Detection**: Automatic detection of disabled dontaudit rules using permission indicators
-- **Smart Filtering**: Process name and path filtering with wildcard support (`--process`, `--path`)
+- **Advanced Filtering**: Comprehensive filtering by process, path, time range, and SELinux contexts (`--process`, `--path`, `--since`, `--until`, `--source`, `--target`)
+- **Time Range Analysis**: Flexible time specifications from relative keywords (`yesterday`) to specific timestamps (`2025-01-15 14:30`)
+- **Context Pattern Matching**: Intelligent SELinux context filtering with wildcard support and component-level matching
 - **Flexible Sorting**: Multiple sort orders - recent, count-based, or chronological (`--sort`)
 
 ### 📥 **Flexible Input**
@@ -84,7 +94,6 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 ## 🔮 Upcoming Features
 
 ### 🔄 **Phase 4B: Critical Usability Features** (Current - High ROI)
-- **Advanced Filtering**: Time range filtering (`--since yesterday`) and context filtering (`--source httpd_t`) (High forensic value)
 - **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
 ### 🎨 **Phase 4C: Enhanced User Experience** (After Critical Fixes)
@@ -204,7 +213,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 
 ## 📈 Development Status
 
-**Current Version**: 1.3.0 | **Current Phase**: 4B (Critical Usability Features - High ROI)
+**Current Version**: 1.3.0 | **Current Phase**: 4B-2 (JSON Field Normalization - High ROI)
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -220,7 +229,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 | **Testing Foundation** | ✅ **COMPLETE** | 107 comprehensive tests, quality analysis, bug fixes |
 | **PID Event Counting** | ✅ **COMPLETE** | Event frequency display per PID in compact view (e.g., PID 1234 (3x)) |
 | **Pipe Compatibility** | ✅ **COMPLETE** | Handle broken pipe errors for head/less redirection |
-| **Advanced Filtering** | 🎯 **HIGH PRIORITY** | Time range and context filtering (high forensic value) |
+| **Advanced Filtering** | ✅ **COMPLETE** | Time range and context filtering with pattern matching support |
 | **JSON Field Normalization** | 🎯 **HIGH PRIORITY** | Standardized formats for tool integration |
 | **Interactive Pager Mode** | ⏳ **PLANNED** | Built-in less-like interface for large outputs |
 | **Performance Optimization** | ⏳ **PLANNED** | Memory management, cross-platform testing |
