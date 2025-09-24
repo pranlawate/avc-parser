@@ -147,13 +147,72 @@ correlations = [
 - [x] **Combined Filtering**: Seamless integration with existing process and path filters
 - [x] **Comprehensive Testing**: Validated across multiple log formats with 25+ test scenarios
 
-### 🔄 **PHASE 4B-2: JSON Field Normalization** (CURRENT PHASE - HIGH ROI)
-- [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
+### ✅ **PHASE 4B-2: JSON Field Normalization** (COMPLETED)
+- [x] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
+
+### 🔧 **PHASE 4B-3: Critical Bug Fixes** (HIGH PRIORITY - REGRESSION FIXES)
+- [ ] **Multiple File Handling Enhancement**: Improve error messages for conflicting file arguments and edge cases
+  - **Issue**: Basic error message exists but could be more user-friendly
+  - **Solution**: Enhanced error messaging with better guidance for edge cases
+  - **Status**: Partially implemented - basic message exists at line 3084, needs improvement
+
+### 🧪 **PHASE 4B-4: Comprehensive Test Coverage** (CRITICAL QUALITY IMPROVEMENT)
+**Root Cause**: Major bugs in core functionality missed due to test coverage gaps
+
+#### **4B-4.1: Display Layer Testing** (Priority 1)
+- [ ] **Rich Summary Function Tests**: Unit tests for `print_rich_summary()` with various denial types
+- [ ] **Detailed View Integration**: End-to-end tests for `--detailed` flag output validation
+- [ ] **Format Flag Testing**: Validate `--fields` vs default Rich format consistency
+- [ ] **Pager Integration**: Test `--pager` functionality with mock subprocess calls
+- [ ] **Smart Grouping Tests**: Validate `--expand-groups` vs grouped display behavior
+
+#### **4B-4.2: Process Name Resolution Testing** (Priority 1)
+- [ ] **Fallback Hierarchy Tests**: Test `comm` → `exe` → `proctitle` chain with various input combinations
+- [ ] **Edge Case Scenarios**: Missing fields, malformed process titles, complex executable paths
+- [ ] **Contextual Integration**: Verify process names appear correctly in semantic analysis output
+- [ ] **Performance Edge Cases**: Test with large datasets and missing process information
+
+#### **4B-4.3: Regression Prevention Framework** (Priority 2)
+- [ ] **Golden Master Tests**: Capture known-good output for regression detection
+- [ ] **CLI Workflow Tests**: Complete command combinations with output validation
+- [ ] **Breaking Change Detection**: Automated tests for all user-facing functionality changes
+- [ ] **Cross-Platform Validation**: Test display consistency across different terminal environments
+
+#### **4B-4.4: Output Validation Framework** (Priority 2)
+- [ ] **Terminal Output Parsing**: Structured validation of Rich-formatted output
+- [ ] **JSON Schema Validation**: Comprehensive JSON output structure and field validation
+- [ ] **Error Message Testing**: Validate all error conditions and user guidance messages
+- [ ] **Performance Regression Tests**: Ensure display optimizations don't break functionality
 
 ### 🎨 **PHASE 4C: Enhanced User Experience** (AFTER CRITICAL FIXES)
-- [ ] **Interactive Pager Mode**: Built-in `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
-- [ ] **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
+
+#### **4C.1: Interactive Pager Mode** (Priority 1)
+- [ ] **Built-in Pager Interface**: `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
+- [ ] **Color Preservation**: Maintain Rich formatting and colors in pager mode
+- [ ] **Cross-Platform Compatibility**: Fallback behavior when pager unavailable
+
+#### **4C.2: Rich Module UX Enhancements** (Priority 1 - Quick Wins)
+- [ ] **Progress Bars**: Visual progress indicators for large file processing operations (lines 3425-3450)
+- [ ] **Status Spinners**: Loading indicators during ausearch operations (lines 3366-3390)
+- [ ] **Enhanced JSON Display**: Rich.JSON module for beautiful JSON output formatting (lines 3615-3616)
+- [ ] **Professional Summary Tables**: Rich.Table for structured data presentation (lines 3825-3828)
+- [ ] **Tree-based Correlation Display**: Rich.Tree for hierarchical relationship visualization
+- [ ] **Multi-column Warning Panels**: Better space utilization for detection warnings
+
+#### **4C.3: Smart Resource Display** (Priority 2)
+- [ ] **Context-aware Formatting**: Dynamic formatting based on object class (file vs network vs etc.)
 - [ ] **Terminal Integration**: Enhanced output formatting for various terminal environments
+- [ ] **Adaptive Layout**: Responsive design for different terminal widths
+
+#### **4C.4: Advanced Integration Features** (Priority 3)
+- [ ] **Timezone Handling Enhancement**: Support for timezone-aware audit log parsing
+  - **Feature**: Pass timezone environment variables to `ausearch` subprocess calls (TZ="Asia/Kolkata")
+  - **Benefit**: Improved international usage and multi-timezone log analysis
+  - **Status**: Enhancement - current functionality works with system timezone
+- [ ] **Sesearch Command Generation**: Evaluate and implement SELinux policy query command generation feature
+  - **Feature**: Auto-generate appropriate `sesearch` commands based on AVC denials
+  - **Benefit**: Streamlined workflow from audit analysis to policy investigation
+  - **Status**: Enhancement - requires evaluation of user workflow integration value
 
 ### 🧪 **PHASE 4D: Integration & Performance** (QUALITY ASSURANCE)
 - [ ] **Real-world Scenarios**: Various audit log formats, different Linux distributions
@@ -167,13 +226,14 @@ correlations = [
 - **Code Architecture Overview**: Function relationship trees & data flow diagrams | **Developer Guide**: Contribution setup and architectural understanding
 - **Parsing Pipeline Visualization**: ASCII-based flow diagrams | **Component Interaction Maps**: Key classes and their relationships
 
-### 🔄 **PHASE 6: Code Quality & Optimization** (IN PROGRESS)
+### 🔄 **REFACTORING: Code Quality & Optimization** (COMPLETED)
 **Code Structure** | **Performance & Extensions**
 - [x] **Function Extraction**: Broke down oversized functions into focused components | Memory management for large files
 - [x] **DRY Optimization**: Extracted repeated logic into reusable helper functions | Time range filtering capabilities
-- Progress indicators & graceful degradation | Statistics mode & enhanced reporting
+- [x] **Progress indicators & graceful degradation**: Enhanced error handling and user feedback
+- [x] **Statistics mode & enhanced reporting**: Smart deduplication and correlation tracking
 
-### 🚀 **PHASE 7: Advanced Features** (FUTURE)
+### 🚀 **FUTURE RESEARCH: Advanced Features** (OUT OF SCOPE)
 - Advanced filtering and search capabilities | Enhanced correlation analysis
 - Performance optimization for very large files | Extended semantic analysis
 
@@ -268,10 +328,22 @@ Detailed Events:
 ## Current Implementation Focus (ROI-Optimized Priority Order)
 
 **Phase 4B-2**: JSON Field Normalization (standardized formats for tool integration) ✅ COMPLETED
-**Phase 4C**: Enhanced User Experience (interactive pager mode, smart resource display, terminal integration) - CURRENT FOCUS
+
+**IMMEDIATE PRIORITY (Critical Path):**
+**Phase 4B-3**: Critical Bug Fixes (multiple file handling enhancement) - **HIGH PRIORITY** (1 pending)
+**Phase 4B-4**: Comprehensive Test Coverage (display layer testing, regression prevention) - **CRITICAL QUALITY** (0/4 completed)
+
+**NEXT PRIORITY (Enhancement Phase):**
+**Phase 4C**: Enhanced User Experience - **AFTER CRITICAL FIXES**
+  - **4C.1**: Interactive Pager Mode (0/3 completed)
+  - **4C.2**: Rich Module UX Enhancements (0/6 completed) - Quick wins with immediate visual impact
+  - **4C.3**: Smart Resource Display (0/3 completed)
+  - **4C.4**: Advanced Integration Features (0/2 completed) - Timezone handling, sesearch evaluation
+
+**SUBSEQUENT PHASES:**
 **Phase 4D**: Integration & performance testing
-**Phase 5**: Enhanced documentation & architecture overview
-**Phase 6**: Distribution & Packaging (RPM, Pip, release automation)
+**Phase 5**: Enhanced documentation & architecture overview ✅ SUBSTANTIALLY COMPLETED
+**Phase 7**: Distribution & Packaging (RPM, Pip, release automation)
 
 ## Key Benefits Expected (Scope-Compliant)
 
@@ -301,10 +373,14 @@ Detailed Events:
 - Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting, pipe compatibility fix)
 - Phase 4B-1: Advanced Filtering (time range and context filtering with pattern matching support)
 - Phase 4B-2: JSON Field Normalization (standardized formats for tool integration)
-- Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
+- Refactoring: Code Quality & Optimization (function extraction, DRY improvements)
 
-**🔄 WITHIN SCOPE & CURRENT:**
-- Phase 4C: Enhanced User Experience (interactive pager mode, smart resource display)
+**🔧 WITHIN SCOPE & IMMEDIATE PRIORITY (Critical Path):**
+- Phase 4B-3: Critical Bug Fixes (multiple file handling enhancement)
+- Phase 4B-4: Comprehensive Test Coverage (display layer testing, regression prevention)
+
+**🔄 WITHIN SCOPE & NEXT PRIORITY (Enhancement Phase):**
+- Phase 4C: Enhanced User Experience (interactive pager mode, Rich UX enhancements, smart resource display, advanced integration features)
 
 **✅ WITHIN SCOPE & PLANNED:**
 - Phase 4D: Integration & Performance Testing
@@ -318,7 +394,7 @@ Detailed Events:
 - Policy file analysis and automated recommendations
 - Web interfaces and graphical dashboards
 
-## 📦 **Phase 6: Distribution & Packaging (Professional Deployment)**
+## 📦 **PHASE 6: Distribution & Packaging (Professional Deployment)**
 
 ### **Strategic Distribution Approach**
 **Primary**: RPM packaging for native SELinux environment integration

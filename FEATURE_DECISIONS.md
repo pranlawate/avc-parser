@@ -11,6 +11,74 @@ This document maintains a comprehensive record of all feature decisions, includi
 
 ---
 
+## Recent Implementation Updates (Phase 4B-4)
+
+### ✅ COMPLETED: Process Name Fallback Enhancement
+**Implementation**: Enhanced process name resolution hierarchy
+**Technical Details**:
+- **Primary**: `comm` field (direct command name)
+- **Secondary**: `exe` field (extract filename from executable path)
+- **Tertiary**: `proctitle` field (extract command from process title, clean suffixes)
+**Impact**: Eliminates "unknown" process names in detailed view analysis
+**Code Location**: `parse_avc.py` lines 2913-2932, improved contextual analysis
+**Date**: 2025-01-24 (Phase 4B-4)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Contextual Analysis Process Name Integration
+**Implementation**: Dynamic process name usage in semantic analysis
+**Technical Details**:
+- Modified `get_contextual_analysis()` to accept `process_name` parameter
+- Updated all call sites to pass actual process names instead of SELinux types
+- Improved analysis output: "nginx attempting to read file" vs "Web server process attempting to read file"
+**Impact**: More precise and user-friendly contextual analysis
+**Code Location**: `parse_avc.py` lines 266-290, 965-968, 2896-2898, 3040-3042
+**Date**: 2025-01-24 (Phase 4B-4)
+**Status**: COMPLETED
+
+---
+
+## Bug Fixes and Quality Improvements (Phase 4D)
+
+### ✅ ACCEPTED: Rich Module UX Enhancements
+**Proposal**: Integrate additional Rich modules for enhanced user experience
+**Components**:
+- Progress bars for large file processing (lines 3425-3450)
+- Status spinners during ausearch operations (lines 3366-3390)
+- Enhanced JSON pretty display with Rich.JSON (lines 3615-3616)
+- Professional summary tables (lines 3825-3828)
+- Tree-based correlation display for hierarchical relationships
+- Multi-column warning panels for better space utilization
+**Reason**: Immediate UX improvements with minimal code changes, professional polish
+**Date**: 2025-01-24 (Phase 4D)
+**Status**: PLANNED
+
+### ✅ ACCEPTED: Critical Bug Fixes
+**Proposal**: Address system discovered bugs affecting core functionality
+**Critical Issues**:
+1. ❌ Timezone handling for audit log parsing (TZ support for ausearch) - **PENDING**
+2. ✅ Detailed analysis showing scontext instead of process name - **COMPLETED**
+3. ✅ Permission analysis mismatch (write permission showing as read analysis) - **COMPLETED**
+4. ❌ Multiple file handling error management - **PENDING** (basic implementation exists)
+5. ✅ Socket address display missing in detailed network AVC view - **COMPLETED**
+6. ✅ Permission combining failure for same type denials (read/view grouping) - **COMPLETED**
+**Reason**: Core functionality correctness, user experience reliability
+**Date**: 2025-01-24 (Phase 4D)
+**Status**: PARTIALLY_COMPLETED (4/6 fixed)
+
+### 🔄 REVISED: Feature Request - sesearch Integration
+**Proposal**: Generate sesearch commands with prefilled scontext, tcontext, permission, tclass
+**Evaluation Criteria**:
+- **User Value**: How often do analysts need to run sesearch after AVC analysis?
+- **Implementation Complexity**: Command generation vs policy file dependency management
+- **Scope Alignment**: Policy analysis vs audit log forensics focus
+- **Alternative Solutions**: Reference documentation vs automated command generation
+**Current Assessment**: Needs user feedback on workflow integration value
+**Reason**: Potential workflow enhancement for policy analysis
+**Date**: 2025-01-24 (Phase 4D)
+**Status**: EVALUATION_PENDING
+
+---
+
 ## Display Format Decisions
 
 ### ✅ ACCEPTED: Rich Rule Header Format

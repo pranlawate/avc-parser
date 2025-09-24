@@ -213,6 +213,34 @@ Applied filters: since='2025-01-15 09:00', until='2025-01-15 17:00', target='*se
 Showing 2 of 45 unique denials after filtering.
 ```
 
+## 🔧 **Process Name Resolution Examples**
+
+### Improved Contextual Analysis (Version 1.3.0+)
+The tool now uses actual process names instead of SELinux type descriptions in contextual analysis:
+
+```bash
+# Example with missing comm field - falls back to exe
+$ echo 'type=AVC msg=audit(01/15/2025 14:30:00.123:456): avc: denied { read } for pid=1234 exe="/usr/bin/nginx" path="/etc/passwd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:passwd_file_t:s0 tclass=file permissive=0' | python3 parse_avc.py --detailed
+
+• PID 1234 (nginx) [/usr/bin/nginx]
+  denied 'read' to file /etc/passwd [Enforcing] ✗ BLOCKED
+  └─ Analysis: nginx attempting to read file content    # ✅ Uses actual process name
+
+# Example with proctitle fallback
+$ echo 'type=AVC msg=audit(01/15/2025 14:30:00.123:456): avc: denied { read } for pid=1234 proctitle="mongod --config /etc/mongod.conf" path="/var/log/audit.log" scontext=system_u:system_r:mongod_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0' | python3 parse_avc.py --detailed
+
+• PID 1234 (mongod)
+  denied 'read' to file /var/log/audit.log [Enforcing] ✗ BLOCKED
+  └─ Analysis: mongod attempting to read file content   # ✅ Uses actual process name from proctitle
+```
+
+**Process Name Resolution Hierarchy:**
+1. **comm** field (if available) → `httpd`
+2. **exe** field → `/usr/bin/nginx` → `nginx`
+3. **proctitle** field → `mongod --config /etc/mongod.conf` → `mongod`
+
+This provides more precise and user-friendly analysis output compared to generic SELinux type descriptions.
+
 ## 📊 **Display Format Options**
 
 ### Enhanced Detailed View (`--detailed`)

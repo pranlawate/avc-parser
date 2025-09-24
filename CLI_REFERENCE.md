@@ -38,7 +38,7 @@ This document provides comprehensive reference information for using the SELinux
 |--------|-------------|
 | `--legacy-signatures` | Use legacy signature logic for regression testing (disables smart deduplication) |
 | `--expand-groups` | Show individual events instead of resource-based groupings (disables smart event grouping) |
-| `--pager` | Use interactive pager for large outputs (like 'less' command) |
+| `--pager` | Use interactive pager for large outputs (like 'less' command) - only works in terminal environments |
 | `-h, --help` | Show help message |
 
 ## 🔧 **Command Usage Examples**
@@ -228,6 +228,20 @@ python3 parse_avc.py --file audit.log --since "2025-01-15 08:00" --until "2025-0
   - `--source httpd_t` matches `system_u:system_r:httpd_t:s0`
   - `--target "*default*"` matches `unconfined_u:object_r:default_t:s0`
   - `--source "system_r"` matches the role component
+
+### Process Name Resolution
+The tool uses an intelligent fallback hierarchy to determine process names:
+1. **Primary**: `comm` field (direct command name from audit record)
+2. **Secondary**: `exe` field (extracts filename from executable path like `/usr/bin/httpd` → `httpd`)
+3. **Tertiary**: `proctitle` field (extracts command from process title, cleans suffixes like `nginx:` → `nginx`)
+
+This ensures meaningful process names appear in analysis instead of "unknown" values.
+
+### Timezone Limitations
+- **Current Limitation**: The tool uses system timezone for timestamp interpretation
+- **ausearch Integration**: Timezone environment variables (TZ=) are not currently passed to ausearch subprocess
+- **Workaround**: Run the tool in the desired timezone environment: `TZ="Asia/Kolkata" python3 parse_avc.py --file audit.log`
+- **Planned Enhancement**: Native timezone support in Phase 4B-3
 
 ## 🔍 **Data Field Examples**
 

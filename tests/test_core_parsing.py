@@ -223,7 +223,7 @@ class TestSemanticAnalysis(unittest.TestCase):
         target_context = AvcContext("unconfined_u:object_r:default_t:s0")
 
         analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
-            'read', 'file', source_context, target_context
+            'read', 'file', source_context, target_context, 'httpd'
         )
 
         self.assertIn('Web server', analysis)

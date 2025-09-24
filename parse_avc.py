@@ -265,7 +265,8 @@ class PermissionSemanticAnalyzer:
     @classmethod
     def get_contextual_analysis(cls, permission: str, obj_class: str,
                               source_context: AvcContext = None,
-                              target_context: AvcContext = None) -> str:
+                              target_context: AvcContext = None,
+                              process_name: str = None) -> str:
         """
         Generate contextual analysis based on permission, class, and contexts.
 
@@ -274,13 +275,18 @@ class PermissionSemanticAnalyzer:
             obj_class: The target object class
             source_context: Source AvcContext object (optional)
             target_context: Target AvcContext object (optional)
+            process_name: Actual process name from comm field (optional)
 
         Returns:
             Human-readable analysis string
         """
-        # Get source process description
+        # Get source process description - prioritize actual process name
         source_desc = "Process"
-        if source_context and source_context.type:
+        if process_name:
+            # Use actual process name when available
+            source_desc = process_name
+        elif source_context and source_context.type:
+            # Fall back to SELinux type description
             source_desc = source_context.get_type_description()
 
         # Get target description
@@ -725,7 +731,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
             "success": r"success=(yes|no)",         # Success flag
         },
         "PROCTITLE": {"proctitle": r"proctitle=(.+)"},  # Process command line
-        "SOCKADDR": {"saddr": r"saddr=\{([^\}]+)\}"}     # Socket address info
+        "SOCKADDR": {"saddr": r"saddr=([a-fA-F0-9]+)"}  # Socket address info (hexadecimal format)
     }
 
     # Process non-AVC lines for shared context using enhanced parsing
@@ -864,6 +870,8 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             "permission": r"denied\s+\{ ([^}]+) \}",
             "pid": r"pid=(\S+)",
             "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))",
+            "exe": r"exe=\"([^\"]+)\"",  # Executable path in AVC records
+            "proctitle": r"proctitle=\"([^\"]+)\"",  # Process title in AVC records
             "path": r"path=\"([^\"]+)\"",
             "path_unquoted": r"path=([^\s]+)",  # For unquoted paths in AVC
             "name": r"name=([^\s]+)",  # name field in AVC (often just filename)
@@ -956,8 +964,9 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             avc_data['permission_description'] = PermissionSemanticAnalyzer.get_permission_description(permission)
 
             # Add contextual analysis
+            process_name = avc_data.get('comm')
             avc_data['contextual_analysis'] = PermissionSemanticAnalyzer.get_contextual_analysis(
-                permission, obj_class, source_context, target_context
+                permission, obj_class, source_context, target_context, process_name
             )
 
             # Add object class description
@@ -1171,6 +1180,16 @@ def get_permission_category(permission: str, tclass: str) -> str:
     # D-Bus operations
     dbus_communication_perms = {'send_msg', 'acquire_svc', 'own'}
 
+    # Security key operations
+    key_access_perms = {'read', 'view', 'search', 'link'}
+    key_manage_perms = {'write', 'create', 'setattr', 'chown'}
+
+    # System capability operations
+    capability_perms = {'use', 'audit_access', 'audit_control', 'setuid', 'setgid'}
+
+    # System security operations
+    security_perms = {'enforce', 'load_policy', 'compute_av', 'compute_create', 'check_context'}
+
     # Check permission against categories
     if tclass in ['file', 'dir', 'lnk_file', 'chr_file', 'blk_file', 'sock_file', 'fifo_file']:
         if permission in file_access_perms:
@@ -1207,6 +1226,26 @@ def get_permission_category(permission: str, tclass: str) -> str:
             return 'dbus_communication'
         else:
             return f'dbus_{permission}'
+
+    elif tclass == 'key':
+        if permission in key_access_perms:
+            return 'key_access'
+        elif permission in key_manage_perms:
+            return 'key_manage'
+        else:
+            return f'key_{permission}'
+
+    elif tclass in ['capability', 'capability2']:
+        if permission in capability_perms:
+            return 'capability_use'
+        else:
+            return f'capability_{permission}'
+
+    elif tclass == 'security':
+        if permission in security_perms:
+            return 'security_control'
+        else:
+            return f'security_{permission}'
 
     # Default: use permission directly for other classes
     return permission
@@ -2845,7 +2884,20 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
                 # Add process context at the bottom
                 exe_path = parsed_log.get('exe', '')
                 proctitle = parsed_log.get('proctitle', '')
-                contextual_analysis = parsed_log.get('contextual_analysis', '')
+
+                # Generate contextual analysis for the group's permission (dynamic per-group analysis)
+                group_permission = permissions[0] if len(permissions) == 1 else None
+                tclass = parsed_log.get('tclass', '')
+                scontext = parsed_log.get('scontext')
+                tcontext = parsed_log.get('tcontext')
+
+                contextual_analysis = ''
+                if group_permission and tclass:
+                    # Generate fresh analysis specific to this group's permission
+                    process_name = parsed_log.get('comm')
+                    contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
+                        group_permission, tclass, scontext, tcontext, process_name
+                    )
 
                 if exe_path or proctitle or contextual_analysis:
                     console.print(f"  └─ Process Context:")
@@ -2860,7 +2912,24 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
         for item in grouped_events['individual']:
             correlation = item['event']
             pid = correlation.get('pid', 'unknown')
-            comm = correlation.get('comm', 'unknown')
+            # Get comm from correlation event, fallback to main parsed_log, then exe, then proctitle
+            comm = correlation.get('comm') or parsed_log.get('comm')
+            if not comm:
+                # Fallback to exe (executable path) - extract just the executable name
+                exe = correlation.get('exe') or parsed_log.get('exe')
+                if exe:
+                    # Extract just the executable name from the path
+                    comm = exe.split('/')[-1] if '/' in exe else exe
+                else:
+                    # Fallback to proctitle (process title)
+                    proctitle = correlation.get('proctitle') or parsed_log.get('proctitle')
+                    if proctitle and proctitle not in ['(null)', 'null', '']:
+                        # Use proctitle, taking just the first word (command name) and clean it up
+                        first_word = proctitle.split()[0] if proctitle.split() else 'unknown'
+                        # Remove common suffixes like ":" from process titles
+                        comm = first_word.rstrip(':') if first_word != 'unknown' else 'unknown'
+                    else:
+                        comm = 'unknown'
             permission = correlation.get('permission', '')
             path = correlation.get('path', '')
             dest_port = correlation.get('dest_port', '')
@@ -2964,9 +3033,17 @@ def print_rich_summary(console: Console, denial_info: dict, denial_num: int, det
 
                 # Add semantic analysis last as it provides interpretive context
                 if permission and hasattr(PermissionSemanticAnalyzer, 'get_contextual_analysis'):
-                    contextual_analysis = parsed_log.get('contextual_analysis', '')
-                    if contextual_analysis:
-                        console.print(f"  └─ Analysis: [dim]{contextual_analysis}[/dim]")
+                    # Generate contextual analysis specific to this event's permission and object class
+                    tclass = parsed_log.get('tclass', '')
+                    scontext = parsed_log.get('scontext')
+                    tcontext = parsed_log.get('tcontext')
+
+                    if tclass:
+                        contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
+                            permission, tclass, scontext, tcontext, comm
+                        )
+                        if contextual_analysis:
+                            console.print(f"  └─ Analysis: [dim]{contextual_analysis}[/dim]")
 
                 # Fallback closing branch if no other context is available
                 if not (cwd or (proctitle and proctitle != comm) or
