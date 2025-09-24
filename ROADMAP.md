@@ -138,9 +138,9 @@ correlations = [
 - [x] **Input Validation**: Edge cases, malformed logs, large files, boundary conditions
 - [x] **Quality Analysis**: Comprehensive code review, bug detection, and critical fix implementation
 - [x] **PID Event Counting**: Display event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for improved correlation clarity
+- [x] **Pipe Compatibility Fix**: Handle broken pipe errors when output is redirected to `head`, `less`, etc. (Critical daily workflow fix)
 
 ### 🔄 **PHASE 4B: Critical Usability Features** (CURRENT PHASE - HIGH ROI)
-- [ ] **Pipe Compatibility Fix**: Handle broken pipe errors when output is redirected to `head`, `less`, etc. (Critical daily workflow fix)
 - [ ] **Advanced Filtering**: Time range (`--since yesterday`) and context filtering (`--source httpd_t`) (High forensic value)
 - [ ] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
@@ -261,7 +261,7 @@ Detailed Events:
 
 ## Current Implementation Focus (ROI-Optimized Priority Order)
 
-**Phase 4B**: Critical Usability Features (pipe compatibility fix, advanced filtering, JSON normalization) - CURRENT HIGH ROI
+**Phase 4B**: Critical Usability Features (advanced filtering, JSON normalization) - CURRENT HIGH ROI
 **Phase 4C**: Enhanced User Experience (interactive pager mode, smart resource display, terminal integration)
 **Phase 4D**: Integration & performance testing
 **Phase 5**: Enhanced documentation & architecture overview
@@ -291,11 +291,11 @@ Detailed Events:
 - Phase 3A: Rich Rule Display Format with BIONIC Reading & Professional Panels (terminal-focused)
 - Phase 3B-1: High-Impact User Features (dontaudit detection, basic filtering, sorting)
 - Phase 3B-2: Polish Features (smart deduplication logic, smart event grouping)
-- Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting)
+- Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting, pipe compatibility fix)
 - Phase 6: Code Quality & Optimization (function extraction, DRY improvements)
 
 **🔄 WITHIN SCOPE & CURRENT:**
-- Phase 4B: User Experience Enhancements (pipe compatibility fix, interactive pager mode, terminal integration)
+- Phase 4B: User Experience Enhancements (advanced filtering, JSON normalization, interactive pager mode, terminal integration)
 
 **✅ WITHIN SCOPE & PLANNED:**
 - Phase 4C: Integration & Performance Testing

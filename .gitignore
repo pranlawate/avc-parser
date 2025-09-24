@@ -3,3 +3,6 @@ __pycache__/
 *.pyo
 testRAW/
 .vscode/
+
+# Demo materials (internal use only)
+DEMO_CHEAT_SHEET.md

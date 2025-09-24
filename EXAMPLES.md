@@ -373,6 +373,24 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups --detailed
 - **Memory Usage**: Use `--json` output for processing large datasets programmatically
 - **Large Outputs**: Use pipe redirection for easier navigation: `python3 parse_avc.py --file audit.log | less`
 
+### Pipe Operations (✅ Fixed in v1.3.0)
+```bash
+# View first few lines of output
+python3 parse_avc.py --file audit.log | head -10
+
+# Page through large outputs
+python3 parse_avc.py --file audit.log | less
+
+# Filter output for specific content
+python3 parse_avc.py --file audit.log | grep "httpd"
+
+# Count total lines of output
+python3 parse_avc.py --file audit.log | wc -l
+
+# Extract just PID information
+python3 parse_avc.py --file audit.log | grep "PID"
+```
+
 ### Best Practices
 - **Incident Analysis**: Start with Rich format for overview, use `--fields` for detailed investigation
 - **Automation**: Use `--json` output for integration with SIEM tools or custom scripts

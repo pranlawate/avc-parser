@@ -257,14 +257,15 @@ sudo systemctl status auditd
 sudo tail /var/log/audit/audit.log
 ```
 
-#### Pipe Errors
-**Problem**: BrokenPipeError when using `| head` or `| less`
-**Status**: This will be fixed in Phase 4B (User Experience Enhancements)
-**Workaround**:
+#### Pipe Compatibility
+**Status**: ✅ **FIXED** - Pipe operations now work correctly
+**Usage**:
 ```bash
-# Use file redirection instead
-python3 parse_avc.py --file audit.log > output.txt
-head output.txt
+# All standard pipe operations work seamlessly
+python3 parse_avc.py --file audit.log | head -10
+python3 parse_avc.py --file audit.log | less
+python3 parse_avc.py --file audit.log | grep "httpd"
+python3 parse_avc.py --file audit.log | wc -l
 ```
 
 ### Best Practices

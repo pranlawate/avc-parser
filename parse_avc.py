@@ -3517,4 +3517,13 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # Handle broken pipe gracefully when output is piped to head, less, etc.
+        # Restore default SIGPIPE behavior and exit cleanly
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+        sys.exit(0)
+    except KeyboardInterrupt:
+        # Handle Ctrl+C gracefully
+        sys.exit(1)
