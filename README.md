@@ -243,12 +243,55 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 
 📊 **Documentation**: [EXAMPLES.md](EXAMPLES.md) | [CLI_REFERENCE.md](CLI_REFERENCE.md) | [ROADMAP.md](ROADMAP.md) | [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md)
 
+## 🛠️ Development
+
+### Quick Development Setup
+```bash
+# Install development dependencies
+make install-tools
+
+# Set up pre-commit hooks (auto-format with black)
+make pre-commit-install
+
+# Format code
+make format
+
+# Generate function flow diagrams
+make flow-diagram      # Complete architecture (49 nodes, 104 edges)
+make flow-focused      # Focused view from main() function
+
+# Run basic checks
+make check
+
+# See all available commands
+make help
+```
+
+### Code Quality Tools
+- **✅ black**: Code formatting (line-length=88) - Applied with pre-commit hooks
+- **✅ code2flow**: Function call graph visualization - Architecture diagrams generated
+- **✅ pre-commit**: Automated formatting on commits
+- **🔄 Under Evaluation**: vulture, rope, flake8, mypy, pylint, safety
+
+### Development Workflow
+1. Code changes are automatically formatted with black on commit
+2. Use `make flow-diagram` to visualize function relationships after major changes
+3. Generated diagrams (*.svg, *.gv) are excluded from git commits
+4. All quality tools are managed through the Makefile for consistency
+
+### Architecture Overview
+Generated flow diagrams show:
+- **3 main components**: File: parse_avc, Class: AvcContext, Class: PermissionSemanticAnalyzer
+- **49 functions** with complex parsing pipeline
+- **104 function call relationships** for understanding code flow
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please see our development roadmap and feature decisions for current priorities:
 - 🐛 **Bug Reports**: Open an issue with reproduction steps
 - 💡 **Feature Requests**: Check [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for scope alignment
 - 🔧 **Pull Requests**: Follow existing code style and include tests
+- 🛠️ **Development**: Use `make help` for available development commands
 
 ## 📄 License
 

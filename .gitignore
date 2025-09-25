@@ -4,5 +4,14 @@ __pycache__/
 testRAW/
 .vscode/
 
+# Quality tool outputs
+*.svg
+*.png
+*.gv
+.mypy_cache/
+
+# Pre-commit cache
+.pre-commit-cache/
+
 # Demo materials (internal use only)
 DEMO_CHEAT_SHEET.md

@@ -1,0 +1,19 @@
+# Development dependencies for AVC Parser
+# Install with: pip install -r dev-requirements.txt
+
+# Code formatting
+black==25.9.0
+
+# Flow diagram generation
+code2flow==2.5.1
+
+# Pre-commit hooks
+pre-commit
+
+# Quality tools under evaluation (install separately as needed)
+# vulture
+# rope
+# flake8
+# mypy
+# pylint
+# safety

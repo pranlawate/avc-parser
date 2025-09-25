@@ -77,6 +77,69 @@ This document maintains a comprehensive record of all feature decisions, includi
 **Date**: 2025-01-24 (Phase 4D)
 **Status**: EVALUATION_PENDING
 
+### ✅ COMPLETED: Black Code Formatting Integration
+**Implementation**: Non-disruptive code formatting with black
+**Technical Details**:
+- Installed black 25.9.0 with line-length=88 configuration
+- Applied formatting to parse_avc.py (reformatted 1 file successfully)
+- Created `.pre-commit-config.yaml` for automated formatting on commits
+- Added Makefile targets for easy formatting: `make format`
+**Impact**: Consistent code style without functional changes, improved maintainability
+**Reason**: Non-disruptive tool that immediately improves code consistency
+**Date**: 2025-09-25 (Phase 4B-5)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Code Flow Visualization with code2flow
+**Implementation**: Function call graph generation for architecture understanding
+**Technical Details**:
+- Installed code2flow 2.5.1 for Python function flow analysis
+- Generated complete flow diagram: avc_parser_flow.svg (49 nodes, 104 edges)
+- Generated focused view from main(): avc_core_flow.svg (43 nodes, 99 edges)
+- Makefile targets: `make flow-diagram`, `make flow-focused`, `make flow-png`
+**Components Identified**:
+- 3 main groups: File: parse_avc, Class: AvcContext, Class: PermissionSemanticAnalyzer
+- 49 functions with complex parsing pipeline visualization
+- Clear visual representation of function call hierarchy
+**Impact**: Better architecture understanding, easier onboarding for developers
+**Reason**: Non-disruptive visualization tool providing immediate architectural insights
+**Date**: 2025-09-25 (Phase 4B-5)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Development Workflow Automation
+**Implementation**: Comprehensive Makefile for quality tool management
+**Technical Details**:
+- Created Makefile with 8 primary targets for common development tasks
+- Automated tool installation: `make install-tools`
+- Pre-commit hook setup: `make pre-commit-install`
+- Code quality checks: `make check`, `make format`
+- Flow diagram generation: `make flow-diagram`, `make flow-focused`
+- Cleanup utilities: `make clean`
+**Benefits**:
+- Simplified tool usage for developers
+- Standardized development workflow
+- Easy quality tool adoption
+- Documented process for new contributors
+**Reason**: Streamlines development workflow and lowers barrier to quality tool usage
+**Date**: 2025-09-25 (Phase 4B-5)
+**Status**: COMPLETED
+
+### 🔄 PENDING: Reevaluation of Remaining Quality Tools Required
+**Proposal**: Comprehensive reevaluation of quality tools based on session findings
+**Tools Requiring Reevaluation**: vulture, rope, flake8, mypy, pylint, safety
+**Current Status**: Initial assessment completed with mixed results and identified risks
+**Key Findings**:
+- Some tools showed high value but also high risk (flake8 broke syntax in testing)
+- Others showed immediate value with low risk (safety, vulture)
+- Implementation order and strategy needs refinement based on actual testing results
+**Next Steps Required**:
+1. Detailed risk/value assessment for each tool
+2. Specific implementation strategy with safeguards
+3. Phased rollout plan prioritizing safety and value
+4. Clear guidelines for tool usage and limitations
+**Reason**: Session revealed complexity in tool integration requiring strategic planning
+**Date**: 2025-09-25 (Phase 4B-5)
+**Status**: PENDING REEVALUATION
+
 ---
 
 ## Display Format Decisions
