@@ -251,10 +251,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 # Install development dependencies
 make install-tools
 
-# Set up pre-commit hooks (auto-format with black)
-make pre-commit-install
-
-# Format code
+# Format code (with ruff)
 make format
 
 # Generate function flow diagrams
@@ -274,11 +271,10 @@ make security
 make help
 ```
 
-### Code Quality Tools (Phase 4C - Optimized)
-**🏆 Tier 1 - Daily Use (< 5 seconds)**
-- **✅ black**: Code formatting (line-length=88) with pre-commit hooks
-- **✅ isort**: Import organization - critical for modularization
-- **✅ pyflakes**: Fast syntax checking (replaces flake8)
+### Code Quality Tools (Ultra-Fast Optimized)
+**🏆 Tier 1 - Daily Use (< 1 second)**
+- **✅ ruff**: All-in-one formatting + linting + import sorting (197x faster than old 3-tool combo)
+- **✅ pydeps**: Import dependency analysis - fast, reliable
 - **✅ vulture**: Dead code detection - found 46 real issues
 - **✅ code2flow**: Function dependency visualization
 
@@ -287,13 +283,14 @@ make help
 - **✅ safety**: Dependency security scanning
 - **✅ refurb**: Python modernization suggestions
 
-**❌ Excluded Tools** (Performance issues on 4870-line file)
+**❌ Excluded Tools** (Performance issues or replaced)
 - pytest (timeout), flake8 (broken pipe), radon (pipe issues), pylint (too slow)
+- black, isort, pyflakes (replaced by single ruff tool)
 
 ### Development Workflow
-1. Code changes are automatically formatted with black on commit
-2. Use `make flow-diagram` to visualize function relationships after major changes
-3. Generated diagrams (*.svg, *.gv) are excluded from git commits
+1. Use `make format` to format code with ruff (no automatic hooks)
+2. Use `make quick-check` for ultra-fast quality validation
+3. Use `make flow-diagram` to visualize function relationships after major changes
 4. All quality tools are managed through the Makefile for consistency
 
 ### Architecture Overview
