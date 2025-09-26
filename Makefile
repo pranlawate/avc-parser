@@ -91,6 +91,12 @@ test:
 	@python3 -m unittest discover tests/ -v
 	@echo "✅ Test suite completed"
 
+# Regression prevention framework (PHASE 7 COMPLETED)
+test-regression:
+	@echo "🛡️ Running regression prevention suite..."
+	@python3 tests/test_runner.py
+	@echo "✅ Regression prevention completed"
+
 # === SETUP & MAINTENANCE ===
 
 # Install winning tools

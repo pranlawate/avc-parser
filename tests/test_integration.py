@@ -220,5 +220,258 @@ class TestBackwardCompatibility(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
 
 
+class TestAdvancedWorkflows(unittest.TestCase):
+    """Test advanced CLI workflows and combinations."""
+
+    def test_filtering_workflows(self):
+        """Test various filtering options work correctly."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test process filtering
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--process", "httpd"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+
+        # Test path filtering
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--path", "/var/*"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_sorting_options(self):
+        """Test different sorting options."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test each sort option
+        for sort_option in ["recent", "count", "chrono"]:
+            with self.subTest(sort_option=sort_option):
+                result = subprocess.run(
+                    [sys.executable, "parse_avc.py", "--file", test_file, "--sort", sort_option],
+                    capture_output=True,
+                    text=True,
+                    cwd=os.path.dirname(os.path.dirname(__file__)),
+                )
+                self.assertEqual(result.returncode, 0)
+
+    def test_output_format_combinations(self):
+        """Test different output format combinations."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test detailed view
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--detailed"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Detailed Events", result.stdout)
+
+        # Test fields view (legacy format)
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--fields"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+
+        # Test JSON with detailed
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--json", "--detailed"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        # Should still be valid JSON
+        json.loads(result.stdout)
+
+    def test_count_limiting(self):
+        """Test count limiting functionality (via output analysis)."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Note: --count option doesn't exist, but we can test output length control
+        # by analyzing output structure instead
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        # Verify we get some output (basic functionality test)
+        self.assertGreater(len(result.stdout), 0)
+
+    def test_context_filtering(self):
+        """Test SELinux context filtering."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test source context filtering
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--source", "*httpd*"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+
+        # Test target context filtering
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--target", "*default*"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+
+
+class TestErrorHandlingWorkflows(unittest.TestCase):
+    """Test comprehensive error handling in CLI workflows."""
+
+    def test_invalid_arguments(self):
+        """Test handling of various invalid arguments."""
+        # Invalid sort option
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", "test.log", "--sort", "invalid"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+        # Invalid (nonexistent) argument
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", "test.log", "--nonexistent-arg"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_directory_instead_of_file(self):
+        """Test error handling when directory is passed instead of file."""
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", "tests"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertNotEqual(result.returncode, 0)
+        # Error message appears in stdout for this case
+        self.assertIn("Directory Provided", result.stdout)
+
+    def test_permission_denied_file(self):
+        """Test handling of files with no read permission."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as tmp:
+            tmp.write("test content")
+            tmp_path = tmp.name
+
+        try:
+            # Remove read permissions
+            os.chmod(tmp_path, 0o000)
+
+            result = subprocess.run(
+                [sys.executable, "parse_avc.py", "--file", tmp_path],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+            self.assertNotEqual(result.returncode, 0)
+        finally:
+            # Restore permissions for cleanup
+            os.chmod(tmp_path, 0o644)
+            os.unlink(tmp_path)
+
+
+class TestRegressionPrevention(unittest.TestCase):
+    """Test cases to prevent regression of previously fixed issues."""
+
+    def test_no_avc_records_handling(self):
+        """Test proper handling when no AVC records are found."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as tmp:
+            tmp.write("type=SYSCALL msg=audit(1234567890.123:456): arch=c000003e syscall=2\n")
+            tmp.write("type=PATH msg=audit(1234567890.123:456): item=0 name=\"/etc/passwd\"\n")
+            tmp_path = tmp.name
+
+        try:
+            result = subprocess.run(
+                [sys.executable, "parse_avc.py", "--file", tmp_path],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+            # Should exit cleanly with informative message
+            self.assertIn("No AVC records found", result.stdout)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_pipe_compatibility(self):
+        """Test that output works correctly with pipes (head, less, etc.)."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test with head to simulate broken pipe
+        result = subprocess.run(
+            f"python3 parse_avc.py --file {test_file} | head -n 5",
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        # Should not crash with broken pipe error
+        self.assertNotIn("BrokenPipeError", result.stderr)
+
+    def test_bionic_formatting_consistency(self):
+        """Test that BIONIC formatting produces consistent output."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Run twice and compare output for consistency
+        result1 = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        result2 = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result1.returncode, 0)
+        self.assertEqual(result2.returncode, 0)
+        self.assertEqual(result1.stdout, result2.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
