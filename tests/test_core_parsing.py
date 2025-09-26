@@ -24,7 +24,7 @@ from parse_avc import (
     AvcContext,
     PermissionSemanticAnalyzer,
     validate_log_entry,
-    detect_file_format
+    detect_file_format,
 )
 
 
@@ -33,7 +33,9 @@ class TestAuditRecordParsing(unittest.TestCase):
 
     def test_audit_record_regex_basic(self):
         """Test basic audit record pattern matching."""
-        line = "type=AVC msg=audit(1234567890.123:456): avc: denied { read } for pid=1234"
+        line = (
+            "type=AVC msg=audit(1234567890.123:456): avc: denied { read } for pid=1234"
+        )
         success, host, record_type, event_id, body = parse_audit_record_text(line)
 
         self.assertTrue(success)
@@ -120,50 +122,52 @@ class TestIndividualAvcProcessing(unittest.TestCase):
         result = process_individual_avc_record(line, shared_context)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['permission'], 'read')
-        self.assertEqual(result['pid'], '1234')
-        self.assertEqual(result['comm'], 'httpd')
-        self.assertEqual(result['path'], '/var/www/html/index.html')
-        self.assertEqual(result['tclass'], 'file')
-        self.assertEqual(result['permissive'], '0')
-        self.assertEqual(result['denial_type'], 'AVC')
+        self.assertEqual(result["permission"], "read")
+        self.assertEqual(result["pid"], "1234")
+        self.assertEqual(result["comm"], "httpd")
+        self.assertEqual(result["path"], "/var/www/html/index.html")
+        self.assertEqual(result["tclass"], "file")
+        self.assertEqual(result["permissive"], "0")
+        self.assertEqual(result["denial_type"], "AVC")
 
         # Check timestamp parsing
-        self.assertIn('datetime_obj', result)
-        self.assertIsInstance(result['datetime_obj'], datetime)
-        self.assertEqual(result['datetime_obj'].year, 2025)
-        self.assertEqual(result['datetime_obj'].month, 6)
-        self.assertEqual(result['datetime_obj'].day, 18)
+        self.assertIn("datetime_obj", result)
+        self.assertIsInstance(result["datetime_obj"], datetime)
+        self.assertEqual(result["datetime_obj"].year, 2025)
+        self.assertEqual(result["datetime_obj"].month, 6)
+        self.assertEqual(result["datetime_obj"].day, 18)
 
     def test_user_avc_processing(self):
         """Test processing of USER_AVC record."""
-        line = "type=USER_AVC msg=audit(06/18/2025 09:12:51.190:456): pid=1234 uid=0 auid=0 ses=123 msg='avc: denied { read } for pid=5678 comm=\"app\" path=\"/tmp/file\" scontext=user_u:user_r:user_t:s0 tcontext=system_u:object_r:tmp_t:s0 tclass=file permissive=1'"
+        line = 'type=USER_AVC msg=audit(06/18/2025 09:12:51.190:456): pid=1234 uid=0 auid=0 ses=123 msg=\'avc: denied { read } for pid=5678 comm="app" path="/tmp/file" scontext=user_u:user_r:user_t:s0 tcontext=system_u:object_r:tmp_t:s0 tclass=file permissive=1\''
         shared_context = {}
 
         result = process_individual_avc_record(line, shared_context)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['denial_type'], 'USER_AVC')
-        self.assertEqual(result['permission'], 'read')
-        self.assertEqual(result['pid'], '1234')  # Outer PID takes precedence
-        self.assertEqual(result['permissive'], '1')
+        self.assertEqual(result["denial_type"], "USER_AVC")
+        self.assertEqual(result["permission"], "read")
+        self.assertEqual(result["pid"], "1234")  # Outer PID takes precedence
+        self.assertEqual(result["permissive"], "1")
 
     def test_avc_processing_with_shared_context(self):
         """Test AVC processing with shared context from other records."""
         line = 'type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pid=1234 comm="httpd" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0'
         shared_context = {
-            'path': '/var/www/html/index.html',
-            'exe': '/usr/sbin/httpd',
-            'cwd': '/var/www'
+            "path": "/var/www/html/index.html",
+            "exe": "/usr/sbin/httpd",
+            "cwd": "/var/www",
         }
 
         result = process_individual_avc_record(line, shared_context)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['permission'], 'read')
-        self.assertEqual(result['path'], '/var/www/html/index.html')  # From shared context
-        self.assertEqual(result['exe'], '/usr/sbin/httpd')  # From shared context
-        self.assertEqual(result['cwd'], '/var/www')  # From shared context
+        self.assertEqual(result["permission"], "read")
+        self.assertEqual(
+            result["path"], "/var/www/html/index.html"
+        )  # From shared context
+        self.assertEqual(result["exe"], "/usr/sbin/httpd")  # From shared context
+        self.assertEqual(result["cwd"], "/var/www")  # From shared context
 
     def test_semantic_analysis_integration(self):
         """Test that semantic analysis is properly integrated."""
@@ -173,15 +177,17 @@ class TestIndividualAvcProcessing(unittest.TestCase):
         result = process_individual_avc_record(line, shared_context)
 
         # Check semantic analysis fields
-        self.assertIn('permission_description', result)
-        self.assertIn('contextual_analysis', result)
-        self.assertIn('class_description', result)
-        self.assertIn('source_type_description', result)
-        self.assertIn('target_type_description', result)
+        self.assertIn("permission_description", result)
+        self.assertIn("contextual_analysis", result)
+        self.assertIn("class_description", result)
+        self.assertIn("source_type_description", result)
+        self.assertIn("target_type_description", result)
 
-        self.assertEqual(result['permission_description'], 'Read file content')
-        self.assertEqual(result['class_description'], 'file')
-        self.assertIn('Web server', result['contextual_analysis'])
+        self.assertEqual(result["permission_description"], "Read file content")
+        self.assertEqual(result["class_description"], "file")
+        self.assertIn(
+            "httpd attempting to read file content", result["contextual_analysis"]
+        )
 
 
 class TestSemanticAnalysis(unittest.TestCase):
@@ -190,31 +196,30 @@ class TestSemanticAnalysis(unittest.TestCase):
     def test_permission_descriptions(self):
         """Test permission description mappings."""
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_permission_description('read'),
-            'Read file content'
+            PermissionSemanticAnalyzer.get_permission_description("read"),
+            "Read file content",
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_permission_description('write'),
-            'Modify file content'
+            PermissionSemanticAnalyzer.get_permission_description("write"),
+            "Modify file content",
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_permission_description('unknown_perm'),
-            'unknown_perm'
+            PermissionSemanticAnalyzer.get_permission_description("unknown_perm"),
+            "unknown_perm",
         )
 
     def test_class_descriptions(self):
         """Test object class description mappings."""
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_class_description('file'),
-            'file'
+            PermissionSemanticAnalyzer.get_class_description("file"), "file"
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_class_description('tcp_socket'),
-            'TCP network socket'
+            PermissionSemanticAnalyzer.get_class_description("tcp_socket"),
+            "TCP network socket",
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_class_description('unknown_class'),
-            'unknown_class'
+            PermissionSemanticAnalyzer.get_class_description("unknown_class"),
+            "unknown_class",
         )
 
     def test_contextual_analysis(self):
@@ -223,30 +228,26 @@ class TestSemanticAnalysis(unittest.TestCase):
         target_context = AvcContext("unconfined_u:object_r:default_t:s0")
 
         analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
-            'read', 'file', source_context, target_context, 'httpd'
+            "read", "file", source_context, target_context, "httpd"
         )
 
-        self.assertIn('Web server', analysis)
-        self.assertIn('read', analysis)
-        self.assertIn('file', analysis)
+        self.assertIn("httpd attempting to read file content", analysis)
+        self.assertIn("read", analysis)
+        self.assertIn("file", analysis)
 
     def test_port_descriptions(self):
         """Test network port description mappings."""
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_port_description('80'),
-            'HTTP web service'
+            PermissionSemanticAnalyzer.get_port_description("80"), "HTTP web service"
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_port_description('22'),
-            'SSH service'
+            PermissionSemanticAnalyzer.get_port_description("22"), "SSH service"
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_port_description('9999'),
-            'JBoss management'
+            PermissionSemanticAnalyzer.get_port_description("9999"), "JBoss management"
         )
         self.assertEqual(
-            PermissionSemanticAnalyzer.get_port_description('12345'),
-            'port 12345'
+            PermissionSemanticAnalyzer.get_port_description("12345"), "port 12345"
         )
 
 
@@ -263,8 +264,8 @@ type=SYSCALL msg=audit(1234567890.123:456): arch=x86_64 syscall=openat
         is_valid, sanitized, warnings = validate_log_entry(log_block)
 
         self.assertTrue(is_valid)
-        self.assertIn('type=AVC', sanitized)
-        self.assertIn('type=SYSCALL', sanitized)
+        self.assertIn("type=AVC", sanitized)
+        self.assertIn("type=SYSCALL", sanitized)
         self.assertIsInstance(warnings, list)
 
     def test_empty_log_entry(self):
@@ -282,8 +283,8 @@ type=SYSCALL msg=audit(1234567890.123:456): arch=x86_64 syscall=openat
         is_valid, sanitized, warnings = validate_log_entry(log_block)
 
         self.assertTrue(is_valid)
-        self.assertNotIn('\x00', sanitized)
-        self.assertNotIn('\x01', sanitized)
+        self.assertNotIn("\x00", sanitized)
+        self.assertNotIn("\x01", sanitized)
         self.assertIn("Removed control characters", warnings[0])
 
     def test_malformed_log_entry(self):
@@ -297,8 +298,8 @@ type=AVC msg=audit(123:456): avc: denied { read }
         is_valid, sanitized, warnings = validate_log_entry(log_block)
 
         self.assertTrue(is_valid)  # Should still be valid due to one valid line
-        self.assertIn('type=AVC', sanitized)
-        self.assertTrue(any('malformed' in w for w in warnings))
+        self.assertIn("type=AVC", sanitized)
+        self.assertTrue(any("malformed" in w for w in warnings))
 
 
 class TestFileFormatDetection(unittest.TestCase):
@@ -308,15 +309,18 @@ class TestFileFormatDetection(unittest.TestCase):
         """Test detection of pre-processed format."""
         # Create a temporary file with processed format content
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as f:
             f.write("time->06/18/2025 09:12:51\n")
-            f.write("type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied\n")
+            f.write(
+                "type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied\n"
+            )
             f.write("----\n")
             temp_file = f.name
 
         try:
             format_type = detect_file_format(temp_file)
-            self.assertEqual(format_type, 'processed')
+            self.assertEqual(format_type, "processed")
         finally:
             os.unlink(temp_file)
 
@@ -324,14 +328,15 @@ class TestFileFormatDetection(unittest.TestCase):
         """Test detection of raw format."""
         # Create a temporary file with raw format content
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as f:
             f.write("audit(1234567890.123:456): avc: denied { read }\n")
             f.write("audit(1234567890.124:457): syscall=openat\n")
             temp_file = f.name
 
         try:
             format_type = detect_file_format(temp_file)
-            self.assertEqual(format_type, 'raw')
+            self.assertEqual(format_type, "raw")
         finally:
             os.unlink(temp_file)
 
@@ -351,20 +356,20 @@ type=AVC msg=audit(06/18/2025 09:12:52.190:4997971): avc: denied { write } for p
         self.assertEqual(len(denials), 2)
 
         # Verify individual denial data
-        self.assertEqual(denials[0]['permission'], 'read')
-        self.assertEqual(denials[0]['pid'], '1234')
-        self.assertEqual(denials[0]['path'], '/file1')
-        self.assertEqual(denials[0]['permissive'], '0')
+        self.assertEqual(denials[0]["permission"], "read")
+        self.assertEqual(denials[0]["pid"], "1234")
+        self.assertEqual(denials[0]["path"], "/file1")
+        self.assertEqual(denials[0]["permissive"], "0")
 
-        self.assertEqual(denials[1]['permission'], 'write')
-        self.assertEqual(denials[1]['pid'], '5678')
-        self.assertEqual(denials[1]['path'], '/file2')
-        self.assertEqual(denials[1]['permissive'], '1')
+        self.assertEqual(denials[1]["permission"], "write")
+        self.assertEqual(denials[1]["pid"], "5678")
+        self.assertEqual(denials[1]["path"], "/file2")
+        self.assertEqual(denials[1]["permissive"], "1")
 
         # Verify timestamp differences
-        self.assertNotEqual(denials[0]['datetime_obj'], denials[1]['datetime_obj'])
-        self.assertLess(denials[0]['datetime_obj'], denials[1]['datetime_obj'])
+        self.assertNotEqual(denials[0]["datetime_obj"], denials[1]["datetime_obj"])
+        self.assertLess(denials[0]["datetime_obj"], denials[1]["datetime_obj"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

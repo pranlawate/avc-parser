@@ -50,17 +50,26 @@ type=AVC msg=audit(06/18/2025 09:15:51.190:4997973): avc: denied { name_connect 
         self.assertIsInstance(denial, dict)
 
         # Verify expected fields are present
-        required_fields = ['permission', 'pid', 'comm', 'path', 'scontext', 'tcontext', 'tclass', 'permissive']
+        required_fields = [
+            "permission",
+            "pid",
+            "comm",
+            "path",
+            "scontext",
+            "tcontext",
+            "tclass",
+            "permissive",
+        ]
         for field in required_fields:
             self.assertIn(field, denial, f"Field '{field}' missing from parsed denial")
 
         # Verify field values
-        self.assertEqual(denial['permission'], 'read')
-        self.assertEqual(denial['pid'], '1234')
-        self.assertEqual(denial['comm'], 'httpd')
-        self.assertEqual(denial['path'], '/var/www/html/index.html')
-        self.assertEqual(denial['tclass'], 'file')
-        self.assertEqual(denial['permissive'], '0')
+        self.assertEqual(denial["permission"], "read")
+        self.assertEqual(denial["pid"], "1234")
+        self.assertEqual(denial["comm"], "httpd")
+        self.assertEqual(denial["path"], "/var/www/html/index.html")
+        self.assertEqual(denial["tclass"], "file")
+        self.assertEqual(denial["permissive"], "0")
 
     def test_multiple_denials_parsing(self):
         """Test parsing of multiple denials maintains independence."""
@@ -69,20 +78,20 @@ type=AVC msg=audit(06/18/2025 09:15:51.190:4997973): avc: denied { name_connect 
         self.assertEqual(len(denials), 3)
 
         # Verify each denial has correct data
-        self.assertEqual(denials[0]['permission'], 'read')
-        self.assertEqual(denials[0]['pid'], '1234')
-        self.assertEqual(denials[0]['comm'], 'httpd')
+        self.assertEqual(denials[0]["permission"], "read")
+        self.assertEqual(denials[0]["pid"], "1234")
+        self.assertEqual(denials[0]["comm"], "httpd")
 
-        self.assertEqual(denials[1]['permission'], 'write')
-        self.assertEqual(denials[1]['pid'], '5678')
-        self.assertEqual(denials[1]['comm'], 'nginx')
+        self.assertEqual(denials[1]["permission"], "write")
+        self.assertEqual(denials[1]["pid"], "5678")
+        self.assertEqual(denials[1]["comm"], "nginx")
 
-        self.assertEqual(denials[2]['permission'], 'read')
-        self.assertEqual(denials[2]['pid'], '1234')
-        self.assertEqual(denials[2]['comm'], 'httpd')
+        self.assertEqual(denials[2]["permission"], "read")
+        self.assertEqual(denials[2]["pid"], "1234")
+        self.assertEqual(denials[2]["comm"], "httpd")
 
         # Verify timestamps are different
-        timestamps = [d['datetime_obj'] for d in denials if 'datetime_obj' in d]
+        timestamps = [d["datetime_obj"] for d in denials if "datetime_obj" in d]
         self.assertEqual(len(timestamps), 3)
         self.assertNotEqual(timestamps[0], timestamps[1])
         self.assertNotEqual(timestamps[1], timestamps[2])
@@ -94,10 +103,10 @@ type=AVC msg=audit(06/18/2025 09:15:51.190:4997973): avc: denied { name_connect 
         self.assertEqual(len(denials), 1)
         denial = denials[0]
 
-        self.assertEqual(denial['permission'], 'name_connect')
-        self.assertEqual(denial['tclass'], 'tcp_socket')
-        self.assertEqual(denial['dest_port'], '9999')
-        self.assertNotIn('path', denial)  # Network denials don't have paths
+        self.assertEqual(denial["permission"], "name_connect")
+        self.assertEqual(denial["tclass"], "tcp_socket")
+        self.assertEqual(denial["dest_port"], "9999")
+        self.assertNotIn("path", denial)  # Network denials don't have paths
 
     def test_semantic_analysis_consistency(self):
         """Test that semantic analysis fields are added consistently."""
@@ -106,20 +115,22 @@ type=AVC msg=audit(06/18/2025 09:15:51.190:4997973): avc: denied { name_connect 
 
         # Verify semantic analysis fields are present
         semantic_fields = [
-            'permission_description',
-            'contextual_analysis',
-            'class_description',
-            'source_type_description',
-            'target_type_description'
+            "permission_description",
+            "contextual_analysis",
+            "class_description",
+            "source_type_description",
+            "target_type_description",
         ]
 
         for field in semantic_fields:
             self.assertIn(field, denial, f"Semantic field '{field}' missing")
 
         # Verify semantic content
-        self.assertEqual(denial['permission_description'], 'Read file content')
-        self.assertEqual(denial['class_description'], 'file')
-        self.assertIn('Web server', denial['contextual_analysis'])
+        self.assertEqual(denial["permission_description"], "Read file content")
+        self.assertEqual(denial["class_description"], "file")
+        self.assertIn(
+            "httpd attempting to read file content", denial["contextual_analysis"]
+        )
 
     def test_timestamp_parsing_consistency(self):
         """Test that timestamp parsing works correctly."""
@@ -127,17 +138,17 @@ type=AVC msg=audit(06/18/2025 09:15:51.190:4997973): avc: denied { name_connect 
         denial = denials[0]
 
         # Verify timestamp fields
-        self.assertIn('datetime_obj', denial)
-        self.assertIn('datetime_str', denial)
-        self.assertIn('timestamp', denial)
+        self.assertIn("datetime_obj", denial)
+        self.assertIn("datetime_str", denial)
+        self.assertIn("timestamp", denial)
 
         # Verify timestamp types and values
-        self.assertIsInstance(denial['datetime_obj'], datetime)
-        self.assertIsInstance(denial['datetime_str'], str)
-        self.assertIsInstance(denial['timestamp'], float)
+        self.assertIsInstance(denial["datetime_obj"], datetime)
+        self.assertIsInstance(denial["datetime_str"], str)
+        self.assertIsInstance(denial["timestamp"], float)
 
         # Verify timestamp accuracy
-        dt = denial['datetime_obj']
+        dt = denial["datetime_obj"]
         self.assertEqual(dt.year, 2025)
         self.assertEqual(dt.month, 6)
         self.assertEqual(dt.day, 18)
@@ -154,23 +165,23 @@ class TestSortingRegression(unittest.TestCase):
         """Set up test denial data with known timestamps."""
         self.test_denials = [
             {
-                'first_seen_obj': datetime(2025, 6, 18, 9, 12, 11),
-                'last_seen_obj': datetime(2025, 6, 18, 9, 16, 31),
-                'count': 54,
-                'log': {'comm': 'process_a'}
+                "first_seen_obj": datetime(2025, 6, 18, 9, 12, 11),
+                "last_seen_obj": datetime(2025, 6, 18, 9, 16, 31),
+                "count": 54,
+                "log": {"comm": "process_a"},
             },
             {
-                'first_seen_obj': datetime(2025, 6, 18, 9, 12, 51),
-                'last_seen_obj': datetime(2025, 6, 18, 9, 12, 51),
-                'count': 6,
-                'log': {'comm': 'process_b'}
+                "first_seen_obj": datetime(2025, 6, 18, 9, 12, 51),
+                "last_seen_obj": datetime(2025, 6, 18, 9, 12, 51),
+                "count": 6,
+                "log": {"comm": "process_b"},
             },
             {
-                'first_seen_obj': datetime(2025, 6, 18, 9, 12, 31),
-                'last_seen_obj': datetime(2025, 6, 18, 9, 12, 31),
-                'count': 1,
-                'log': {'comm': 'process_c'}
-            }
+                "first_seen_obj": datetime(2025, 6, 18, 9, 12, 31),
+                "last_seen_obj": datetime(2025, 6, 18, 9, 12, 31),
+                "count": 1,
+                "log": {"comm": "process_c"},
+            },
         ]
 
     def test_recent_sort_order(self):
@@ -178,8 +189,8 @@ class TestSortingRegression(unittest.TestCase):
         sorted_denials = sort_denials(self.test_denials, "recent")
 
         # Should be sorted by last_seen_obj descending
-        expected_order = ['process_a', 'process_b', 'process_c']
-        actual_order = [d['log']['comm'] for d in sorted_denials]
+        expected_order = ["process_a", "process_b", "process_c"]
+        actual_order = [d["log"]["comm"] for d in sorted_denials]
 
         self.assertEqual(actual_order, expected_order)
 
@@ -188,8 +199,8 @@ class TestSortingRegression(unittest.TestCase):
         sorted_denials = sort_denials(self.test_denials, "count")
 
         # Should be sorted by count descending
-        expected_order = ['process_a', 'process_b', 'process_c']
-        actual_order = [d['log']['comm'] for d in sorted_denials]
+        expected_order = ["process_a", "process_b", "process_c"]
+        actual_order = [d["log"]["comm"] for d in sorted_denials]
 
         self.assertEqual(actual_order, expected_order)
 
@@ -198,8 +209,8 @@ class TestSortingRegression(unittest.TestCase):
         sorted_denials = sort_denials(self.test_denials, "chrono")
 
         # Should be sorted by first_seen_obj ascending
-        expected_order = ['process_a', 'process_c', 'process_b']
-        actual_order = [d['log']['comm'] for d in sorted_denials]
+        expected_order = ["process_a", "process_c", "process_b"]
+        actual_order = [d["log"]["comm"] for d in sorted_denials]
 
         self.assertEqual(actual_order, expected_order)
 
@@ -209,8 +220,8 @@ class TestSortingRegression(unittest.TestCase):
         recent_sorted = sort_denials(self.test_denials, "recent")
 
         self.assertEqual(
-            [d['log']['comm'] for d in sorted_denials],
-            [d['log']['comm'] for d in recent_sorted]
+            [d["log"]["comm"] for d in sorted_denials],
+            [d["log"]["comm"] for d in recent_sorted],
         )
 
 
@@ -221,65 +232,52 @@ class TestFilteringRegression(unittest.TestCase):
         """Set up test denial data for filtering."""
         self.test_denials = [
             {
-                'log': {
-                    'comm': 'httpd',
-                    'path': '/var/www/html/index.html'
-                },
-                'correlations': [
-                    {'path': '/var/www/html/config.php'}
-                ]
+                "log": {"comm": "httpd", "path": "/var/www/html/index.html"},
+                "correlations": [{"path": "/var/www/html/config.php"}],
             },
             {
-                'log': {
-                    'comm': 'nginx',
-                    'path': '/var/log/nginx.log'
-                },
-                'correlations': []
+                "log": {"comm": "nginx", "path": "/var/log/nginx.log"},
+                "correlations": [],
             },
             {
-                'log': {
-                    'comm': 'httpd',
-                    'path': '/etc/httpd/conf/httpd.conf'
-                },
-                'correlations': []
-            }
+                "log": {"comm": "httpd", "path": "/etc/httpd/conf/httpd.conf"},
+                "correlations": [],
+            },
         ]
 
     def test_process_filtering(self):
         """Test filtering by process name."""
-        filtered = filter_denials(self.test_denials, process_filter='httpd')
+        filtered = filter_denials(self.test_denials, process_filter="httpd")
 
         self.assertEqual(len(filtered), 2)
         for denial in filtered:
-            self.assertEqual(denial['log']['comm'], 'httpd')
+            self.assertEqual(denial["log"]["comm"], "httpd")
 
     def test_path_filtering(self):
         """Test filtering by path pattern."""
-        filtered = filter_denials(self.test_denials, path_filter='/var/www/*')
+        filtered = filter_denials(self.test_denials, path_filter="/var/www/*")
 
         self.assertEqual(len(filtered), 1)
-        self.assertEqual(filtered[0]['log']['comm'], 'httpd')
-        self.assertIn('/var/www/html/', filtered[0]['log']['path'])
+        self.assertEqual(filtered[0]["log"]["comm"], "httpd")
+        self.assertIn("/var/www/html/", filtered[0]["log"]["path"])
 
     def test_correlation_path_filtering(self):
         """Test filtering includes correlation paths."""
-        filtered = filter_denials(self.test_denials, path_filter='/var/www/html/*')
+        filtered = filter_denials(self.test_denials, path_filter="/var/www/html/*")
 
         # Should include denial with correlation path match
         self.assertEqual(len(filtered), 1)
-        self.assertEqual(filtered[0]['log']['comm'], 'httpd')
+        self.assertEqual(filtered[0]["log"]["comm"], "httpd")
 
     def test_combined_filtering(self):
         """Test filtering with both process and path filters."""
         filtered = filter_denials(
-            self.test_denials,
-            process_filter='httpd',
-            path_filter='/var/www/*'
+            self.test_denials, process_filter="httpd", path_filter="/var/www/*"
         )
 
         self.assertEqual(len(filtered), 1)
-        self.assertEqual(filtered[0]['log']['comm'], 'httpd')
-        self.assertIn('/var/www/', filtered[0]['log']['path'])
+        self.assertEqual(filtered[0]["log"]["comm"], "httpd")
+        self.assertIn("/var/www/", filtered[0]["log"]["path"])
 
     def test_no_filtering(self):
         """Test that no filters returns all denials."""
@@ -320,7 +318,9 @@ class TestErrorHandlingRegression(unittest.TestCase):
 
     def test_corrupted_timestamp_handling(self):
         """Test handling of corrupted timestamps."""
-        corrupted_log = 'type=AVC msg=audit(INVALID:456): avc: denied { read } for pid=1234'
+        corrupted_log = (
+            "type=AVC msg=audit(INVALID:456): avc: denied { read } for pid=1234"
+        )
         denials, unparsed = parse_avc_log(corrupted_log)
 
         # Should not crash, timestamp should be None or missing
@@ -330,7 +330,7 @@ class TestErrorHandlingRegression(unittest.TestCase):
             denial = denials[0]
             # Either datetime_obj is None or the field is missing
             self.assertTrue(
-                'datetime_obj' not in denial or denial['datetime_obj'] is None
+                "datetime_obj" not in denial or denial["datetime_obj"] is None
             )
 
 
@@ -347,22 +347,23 @@ type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pi
         denial = denials[0]
 
         # Verify context fields exist and are properly typed
-        self.assertIn('scontext', denial)
-        self.assertIn('tcontext', denial)
+        self.assertIn("scontext", denial)
+        self.assertIn("tcontext", denial)
 
         # Check if they're AvcContext objects or strings
         from parse_avc import AvcContext
-        scontext = denial['scontext']
-        tcontext = denial['tcontext']
+
+        scontext = denial["scontext"]
+        tcontext = denial["tcontext"]
 
         # Should be either AvcContext objects or strings
         self.assertTrue(
             isinstance(scontext, (AvcContext, str)),
-            f"scontext is {type(scontext)}, expected AvcContext or str"
+            f"scontext is {type(scontext)}, expected AvcContext or str",
         )
         self.assertTrue(
             isinstance(tcontext, (AvcContext, str)),
-            f"tcontext is {type(tcontext)}, expected AvcContext or str"
+            f"tcontext is {type(tcontext)}, expected AvcContext or str",
         )
 
         # If they're AvcContext objects, they should be valid
@@ -381,9 +382,9 @@ type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read write } 
         denial = denials[0]
 
         # Permission field should contain the full permission string
-        self.assertIn('permission', denial)
-        self.assertIn('read', denial['permission'])
-        self.assertIn('write', denial['permission'])
+        self.assertIn("permission", denial)
+        self.assertIn("read", denial["permission"])
+        self.assertIn("write", denial["permission"])
 
     def test_numeric_field_types(self):
         """Test that numeric fields maintain correct types."""
@@ -395,11 +396,13 @@ type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pi
         denial = denials[0]
 
         # Verify field types
-        self.assertIsInstance(denial['pid'], str)  # PIDs are stored as strings
-        self.assertIsInstance(denial['permissive'], str)  # Permissive is stored as string
-        if 'ino' in denial:
-            self.assertIsInstance(denial['ino'], str)  # Inode numbers stored as strings
+        self.assertIsInstance(denial["pid"], str)  # PIDs are stored as strings
+        self.assertIsInstance(
+            denial["permissive"], str
+        )  # Permissive is stored as string
+        if "ino" in denial:
+            self.assertIsInstance(denial["ino"], str)  # Inode numbers stored as strings
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@ import tempfile
 from unittest.mock import patch, MagicMock
 
 # Add parent directory to path to import parse_avc
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from parse_avc import (
     validate_arguments,
@@ -21,7 +21,7 @@ from parse_avc import (
     validate_avc_file,
     validate_file_with_auto_detection,
     human_time_ago,
-    MAX_FILE_SIZE_MB
+    MAX_FILE_SIZE_MB,
 )
 from datetime import datetime, timedelta
 from rich.console import Console
@@ -32,10 +32,11 @@ class TestArgumentValidation(unittest.TestCase):
 
     def setUp(self):
         """Set up test console."""
-        self.console = Console(file=open(os.devnull, 'w'))  # Suppress output
+        self.console = Console(file=open(os.devnull, "w"))  # Suppress output
 
     def test_conflicting_file_arguments(self):
         """Test that conflicting file arguments are caught."""
+
         class MockArgs:
             file = "test.log"
             raw_file = "raw.log"
@@ -47,6 +48,7 @@ class TestArgumentValidation(unittest.TestCase):
 
     def test_json_requires_file_input(self):
         """Test that JSON flag requires file input."""
+
         class MockArgs:
             file = None
             raw_file = None
@@ -59,32 +61,36 @@ class TestArgumentValidation(unittest.TestCase):
     def test_valid_file_argument(self):
         """Test valid --file argument."""
         # Create a temporary test file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as tmp:
             tmp.write("type=AVC msg=audit(1234567890.123:456): avc: denied { read }")
             tmp_path = tmp.name
 
         try:
+
             class MockArgs:
                 file = tmp_path
                 raw_file = None
                 avc_file = None
                 json = False
+                pager = False
 
             result = validate_arguments(MockArgs(), self.console)
-            self.assertIn(result, ['raw_file', 'avc_file'])
+            self.assertIn(result, ["raw_file", "avc_file"])
         finally:
             os.unlink(tmp_path)
 
     def test_interactive_mode(self):
         """Test interactive mode validation."""
+
         class MockArgs:
             file = None
             raw_file = None
             avc_file = None
             json = False
+            pager = False
 
         result = validate_arguments(MockArgs(), self.console)
-        self.assertEqual(result, 'interactive')
+        self.assertEqual(result, "interactive")
 
 
 class TestFileValidation(unittest.TestCase):
@@ -92,7 +98,7 @@ class TestFileValidation(unittest.TestCase):
 
     def setUp(self):
         """Set up test console and temporary files."""
-        self.console = Console(file=open(os.devnull, 'w'))
+        self.console = Console(file=open(os.devnull, "w"))
 
     def test_validate_nonexistent_file(self):
         """Test validation of non-existent file."""
@@ -113,41 +119,41 @@ class TestFileValidation(unittest.TestCase):
     def test_validate_large_file_warning(self):
         """Test warning for large files."""
         # Create a file larger than the limit (we'll mock the size check)
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
             tmp.write("type=AVC msg=audit(1234567890.123:456): avc: denied { read }")
             tmp_path = tmp.name
 
         try:
             # Mock os.path.getsize to return a large size
-            with patch('parse_avc.os.path.getsize') as mock_getsize:
+            with patch("parse_avc.os.path.getsize") as mock_getsize:
                 mock_getsize.return_value = (MAX_FILE_SIZE_MB + 1) * 1024 * 1024
                 # This should print a warning but not exit
                 result = validate_raw_file(tmp_path, self.console)
-                self.assertEqual(result, 'raw_file')
+                self.assertEqual(result, "raw_file")
         finally:
             os.unlink(tmp_path)
 
     def test_validate_avc_file_with_content(self):
         """Test AVC file validation with proper content."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as tmp:
             tmp.write("type=AVC msg=audit(1234567890.123:456): avc: denied { read }")
             tmp_path = tmp.name
 
         try:
             result = validate_avc_file(tmp_path, self.console)
-            self.assertEqual(result, 'avc_file')
+            self.assertEqual(result, "avc_file")
         finally:
             os.unlink(tmp_path)
 
     def test_auto_detection_validation(self):
         """Test auto-detection file validation."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as tmp:
             tmp.write("type=AVC msg=audit(1234567890.123:456): avc: denied { read }")
             tmp_path = tmp.name
 
         try:
             result = validate_file_with_auto_detection(tmp_path, self.console)
-            self.assertIn(result, ['raw_file', 'avc_file'])
+            self.assertIn(result, ["raw_file", "avc_file"])
         finally:
             os.unlink(tmp_path)
 
@@ -190,13 +196,13 @@ class TestEdgeCases(unittest.TestCase):
 
     def setUp(self):
         """Set up test console."""
-        self.console = Console(file=open(os.devnull, 'w'))
+        self.console = Console(file=open(os.devnull, "w"))
 
     def test_binary_file_detection(self):
         """Test detection of binary files."""
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as tmp:
             # Write invalid UTF-8 bytes that will trigger UnicodeDecodeError
-            tmp.write(b'\xff\xfe\xfd\xfc' * 500)  # Invalid UTF-8 sequence repeated
+            tmp.write(b"\xff\xfe\xfd\xfc" * 500)  # Invalid UTF-8 sequence repeated
             tmp_path = tmp.name
 
         try:
@@ -208,13 +214,15 @@ class TestEdgeCases(unittest.TestCase):
     def test_permission_denied_simulation(self):
         """Test permission denied error handling."""
         # Create a file and then mock permission error
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
             tmp.write("test content")
             tmp_path = tmp.name
 
         try:
             # Mock open to raise PermissionError
-            with patch('parse_avc.open', side_effect=PermissionError("Permission denied")):
+            with patch(
+                "parse_avc.open", side_effect=PermissionError("Permission denied")
+            ):
                 with self.assertRaises(SystemExit):
                     validate_raw_file(tmp_path, self.console)
         finally:
@@ -222,9 +230,9 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_unicode_decode_error(self):
         """Test Unicode decode error handling."""
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as tmp:
             # Write invalid UTF-8 bytes
-            tmp.write(b'\xff\xfe\xfd')
+            tmp.write(b"\xff\xfe\xfd")
             tmp_path = tmp.name
 
         try:
@@ -234,5 +242,5 @@ class TestEdgeCases(unittest.TestCase):
             os.unlink(tmp_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -13,50 +13,32 @@ Version: 1.3.0
 """
 
 import argparse
+import json
 import os
 import re
-import sys
-import subprocess
-import json
 import signal
+import subprocess
+import sys
 from datetime import datetime, timedelta
+
+from rich.align import Align
 from rich.console import Console, Group
 from rich.rule import Rule
-from rich.panel import Panel
-from rich.align import Align
+
+from context import AvcContext, PermissionSemanticAnalyzer
+
+# Local modules
+from utils import (
+    format_bionic_text,
+    format_path_for_display,
+    human_time_ago,
+    print_error,
+    signal_handler,
+)
 
 # Configuration constants
 MAX_FILE_SIZE_MB = 100
 FILE_ANALYSIS_LINES = 10
-
-
-def print_error(message: str, console: Console = None):
-    """
-    Print error message to stderr using Rich formatting.
-
-    Args:
-        message (str): Error message to print
-        console (Console): Optional console instance for additional non-error output
-    """
-    error_console = Console(stderr=True)
-    error_console.print(message)
-
-
-def signal_handler(signum, frame):  # pylint: disable=unused-argument
-    """
-    Handles interrupt signals (Ctrl+C) with graceful cleanup and user feedback.
-
-    Args:
-        signum: Signal number (usually SIGINT)
-        frame: Current stack frame (unused)
-
-    Note:
-        Provides clear feedback to user about interruption and exits cleanly.
-    """
-    console = Console()
-    console.print("\n\n🛑 [bold yellow]Operation interrupted by user[/bold yellow]")
-    console.print("   [dim]Cleaning up and exiting...[/dim]")
-    sys.exit(130)  # Standard exit code for Ctrl+C interruption
 
 
 # Enhanced audit record regex pattern from setroubleshoot for robust parsing
@@ -65,302 +47,6 @@ def signal_handler(signum, frame):  # pylint: disable=unused-argument
 AUDIT_RECORD_RE = re.compile(
     r"(node=(\S+)\s+)?(type=(\S+)\s+)?(msg=)?audit\(((\d+)\.(\d+):(\d+))\)\s*:\s*(.*)"
 )
-
-
-class AvcContext:
-    """
-    Enhanced SELinux context parsing class based on setroubleshoot's proven approach.
-
-    Parses SELinux security contexts (user:role:type:mls) into structured components
-    for enhanced analysis and correlation tracking.
-    """
-
-    def __init__(self, context_string: str):
-        """
-        Initialize AvcContext from a SELinux context string.
-
-        Args:
-            context_string (str): SELinux context string (e.g., "system_u:system_r:httpd_t:s0")
-        """
-        self.user = None
-        self.role = None
-        self.type = None
-        self.mls = None
-
-        if isinstance(context_string, str) and context_string:
-            fields = context_string.split(":")
-            if len(fields) >= 3:
-                self.user = fields[0]
-                self.role = fields[1]
-                self.type = fields[2]
-                if len(fields) > 3:
-                    # Handle MLS labels that may contain colons (e.g., s0:c0.c1023)
-                    self.mls = ":".join(fields[3:])
-                else:
-                    # Default MLS level if not present
-                    self.mls = "s0"
-
-    def __str__(self) -> str:
-        """Return the full context string."""
-        if all([self.user, self.role, self.type, self.mls]):
-            return f"{self.user}:{self.role}:{self.type}:{self.mls}"
-        return ""
-
-    def __repr__(self) -> str:
-        """Return a detailed representation."""
-        return f"AvcContext(user='{self.user}', role='{self.role}', type='{self.type}', mls='{self.mls}')"
-
-    def __eq__(self, other) -> bool:
-        """Compare two AvcContext objects for equality."""
-        if not isinstance(other, AvcContext):
-            return False
-        return (
-            self.user == other.user
-            and self.role == other.role
-            and self.type == other.type
-            and self.mls == other.mls
-        )
-
-    def __ne__(self, other) -> bool:
-        """Compare two AvcContext objects for inequality."""
-        return not self.__eq__(other)
-
-    def is_valid(self) -> bool:
-        """Check if the context has all required fields."""
-        return all([self.user, self.role, self.type, self.mls])
-
-    def get_type_description(self) -> str:
-        """
-        Get a human-readable description of the SELinux type.
-
-        Returns:
-            str: Human-readable description or the type itself if no mapping exists
-        """
-        # Basic type descriptions for common SELinux types
-        type_descriptions = {
-            "httpd_t": "Web server process",
-            "init_t": "System initialization process",
-            "unconfined_t": "Unconfined process",
-            "sshd_t": "SSH daemon process",
-            "systemd_t": "Systemd service manager",
-            "default_t": "Default file context",
-            "admin_home_t": "Administrator home directory",
-            "user_home_t": "User home directory",
-            "tmp_t": "Temporary file",
-            "var_t": "Variable data file",
-            "etc_t": "Configuration file",
-            "bin_t": "System binary",
-            "lib_t": "System library",
-        }
-
-        return type_descriptions.get(self.type, self.type)
-
-
-class PermissionSemanticAnalyzer:
-    """
-    Provides human-readable descriptions and contextual analysis for SELinux permissions.
-
-    Uses static mappings to avoid requiring policy file access while providing
-    meaningful insights into denial semantics.
-    """
-
-    # Permission descriptions for common SELinux permissions
-    PERMISSION_DESCRIPTIONS = {
-        # File permissions
-        "read": "Read file content",
-        "write": "Modify file content",
-        "append": "Append to file",
-        "execute": "Run executable file",
-        "open": "Open file handle",
-        "create": "Create new file",
-        "unlink": "Delete file",
-        "rename": "Rename file",
-        "setattr": "Change file attributes",
-        "getattr": "Read file attributes",
-        "lock": "Lock file for exclusive access",
-        "ioctl": "Perform device control operations",
-        "map": "Memory map file",
-        # Network permissions
-        "name_connect": "Connect to network service",
-        "name_bind": "Bind to network port",
-        "accept": "Accept network connections",
-        "listen": "Listen for network connections",
-        "recv_msg": "Receive network message",
-        "send_msg": "Send network message",
-        "node_bind": "Bind to network node",
-        # Process permissions
-        "transition": "Change security context",
-        "signal": "Send signal to process",
-        "signull": "Check process existence",
-        "sigkill": "Terminate process forcefully",
-        "sigstop": "Suspend process",
-        "ptrace": "Debug or trace process",
-        "getsched": "Get process scheduling info",
-        "setsched": "Set process scheduling",
-        "share": "Share process memory",
-        # Directory permissions
-        "search": "Search directory contents",
-        "add_name": "Add entry to directory",
-        "remove_name": "Remove entry from directory",
-        "reparent": "Move directory entry",
-        "rmdir": "Remove directory",
-        # D-Bus permissions
-        "acquire_svc": "Acquire D-Bus service name",
-        "send_msg": "Send D-Bus message",
-        # System permissions
-        "load": "Load system module",
-        "use": "Use system resource",
-        "admin": "Perform administrative operation",
-        "audit_access": "Access audit logs",
-        "audit_control": "Control audit system",
-        "setuid": "Change user ID",
-        "setgid": "Change group ID",
-        # Security permissions
-        "enforce": "Enforce security policy",
-        "load_policy": "Load security policy",
-        "compute_av": "Compute access vector",
-        "compute_create": "Compute creation context",
-        "compute_member": "Compute member context",
-        "check_context": "Validate security context",
-    }
-
-    # Object class descriptions
-    CLASS_DESCRIPTIONS = {
-        "file": "file",
-        "dir": "directory",
-        "lnk_file": "symbolic link",
-        "chr_file": "character device",
-        "blk_file": "block device",
-        "sock_file": "socket file",
-        "fifo_file": "named pipe",
-        "tcp_socket": "TCP network socket",
-        "udp_socket": "UDP network socket",
-        "unix_stream_socket": "Unix stream socket",
-        "unix_dgram_socket": "Unix datagram socket",
-        "process": "process",
-        "dbus": "D-Bus service",
-        "capability": "system capability",
-        "key": "security key",
-        "shm": "shared memory",
-        "sem": "semaphore",
-        "msg": "message queue",
-        "security": "security subsystem",
-        "system": "system resource",
-    }
-
-    @classmethod
-    def get_permission_description(cls, permission: str) -> str:
-        """Get human-readable description for a permission."""
-        return cls.PERMISSION_DESCRIPTIONS.get(permission, permission)
-
-    @classmethod
-    def get_class_description(cls, obj_class: str) -> str:
-        """Get human-readable description for an object class."""
-        return cls.CLASS_DESCRIPTIONS.get(obj_class, obj_class)
-
-    @classmethod
-    def get_contextual_analysis(
-        cls,
-        permission: str,
-        obj_class: str,
-        source_context: AvcContext = None,
-        target_context: AvcContext = None,
-        process_name: str = None,
-    ) -> str:
-        """
-        Generate contextual analysis based on permission, class, and contexts.
-
-        Args:
-            permission: The denied permission
-            obj_class: The target object class
-            source_context: Source AvcContext object (optional)
-            target_context: Target AvcContext object (optional)
-            process_name: Actual process name from comm field (optional)
-
-        Returns:
-            Human-readable analysis string
-        """
-        # Get source process description - prioritize actual process name
-        source_desc = "Process"
-        if process_name:
-            # Use actual process name when available
-            source_desc = process_name
-        elif source_context and source_context.type:
-            # Fall back to SELinux type description
-            source_desc = source_context.get_type_description()
-
-        # Get target description
-        target_desc = cls.get_class_description(obj_class)
-
-        # Generate contextual descriptions based on permission + class combinations
-        context_patterns = {
-            ("read", "file"): f"{source_desc} attempting to read file content",
-            ("write", "file"): f"{source_desc} attempting to modify file content",
-            ("execute", "file"): f"{source_desc} attempting to run executable",
-            ("open", "file"): f"{source_desc} attempting to open file",
-            ("create", "file"): f"{source_desc} attempting to create new file",
-            ("unlink", "file"): f"{source_desc} attempting to delete file",
-            ("search", "dir"): f"{source_desc} attempting to search directory",
-            ("add_name", "dir"): f"{source_desc} attempting to add entry to directory",
-            (
-                "remove_name",
-                "dir",
-            ): f"{source_desc} attempting to remove directory entry",
-            (
-                "name_connect",
-                "tcp_socket",
-            ): f"{source_desc} attempting to connect to network service",
-            (
-                "name_bind",
-                "tcp_socket",
-            ): f"{source_desc} attempting to bind to network port",
-            (
-                "listen",
-                "tcp_socket",
-            ): f"{source_desc} attempting to listen for connections",
-            ("send_msg", "dbus"): f"{source_desc} attempting to send D-Bus message",
-            (
-                "acquire_svc",
-                "dbus",
-            ): f"{source_desc} attempting to acquire D-Bus service",
-            (
-                "signal",
-                "process",
-            ): f"{source_desc} attempting to send signal to process",
-            ("ptrace", "process"): f"{source_desc} attempting to debug/trace process",
-            (
-                "transition",
-                "process",
-            ): f"{source_desc} attempting to change security context",
-        }
-
-        # Look for specific pattern match
-        pattern_key = (permission, obj_class)
-        if pattern_key in context_patterns:
-            return context_patterns[pattern_key]
-
-        # Fallback to generic description
-        perm_desc = cls.get_permission_description(permission).lower()
-        return f"{source_desc} attempting to {perm_desc} on {target_desc}"
-
-    @classmethod
-    def get_port_description(cls, port: str) -> str:
-        """Get description for common network ports."""
-        port_descriptions = {
-            "22": "SSH service",
-            "80": "HTTP web service",
-            "443": "HTTPS web service",
-            "3306": "MySQL database",
-            "5432": "PostgreSQL database",
-            "6379": "Redis cache",
-            "8080": "HTTP alternate service",
-            "9999": "JBoss management",
-            "25": "SMTP mail service",
-            "53": "DNS service",
-            "993": "IMAPS mail service",
-            "995": "POP3S mail service",
-        }
-        return port_descriptions.get(port, f"port {port}")
 
 
 def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
@@ -386,10 +72,10 @@ def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
     if match is None:
         return False, None, None, None, None
 
-    host = match.group(2) if match.group(2) else None
-    record_type = match.group(4) if match.group(4) else None
-    event_id = match.group(6) if match.group(6) else None
-    body_text = match.group(10) if match.group(10) else None
+    host = match.group(2) or None
+    record_type = match.group(4) or None
+    event_id = match.group(6) or None
+    body_text = match.group(10) or None
 
     return True, host, record_type, event_id, body_text
 
@@ -822,7 +508,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                             shared_context["path"] = value.strip()
                     else:
                         shared_context[key] = value.strip()
-        elif log_type not in ["AVC", "USER_AVC", "AVC_PATH", "1400", "1107"]:
+        elif log_type not in ("AVC", "USER_AVC", "AVC_PATH", "1400", "1107"):
             # Track unparsed types (excluding all supported AVC-related types)
             unparsed_types.add(log_type)
 
@@ -851,7 +537,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
         record_type = record_type_match.group(1)
 
         # Handle USER_AVC and numeric equivalent (1107)
-        if record_type in ["USER_AVC", "1107"]:
+        if record_type in ("USER_AVC", "1107"):
             # Extract the msg content from USER_AVC
             msg_match = re.search(r"msg='([^']+)'", line)
             if msg_match:
@@ -873,7 +559,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             avc_content = line
 
         # Set the denial type based on the record type
-        if record_type in ["USER_AVC", "1107"]:
+        if record_type in ("USER_AVC", "1107"):
             avc_data["denial_type"] = "USER_AVC"
         elif record_type == "AVC_PATH":
             avc_data["denial_type"] = "AVC_PATH"
@@ -946,7 +632,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                     # Only use unquoted path if we don't already have a quoted path
                     if "path" not in avc_data:
                         avc_data["path"] = field_match.group(1).strip()
-                elif key in ["scontext", "tcontext"]:
+                elif key in ("scontext", "tcontext"):
                     # Parse SELinux contexts into AvcContext objects for enhanced analysis
                     context_string = field_match.group(1).strip()
                     avc_context = AvcContext(context_string)
@@ -966,7 +652,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             if shared_context.get("path"):
                 avc_data["path"] = shared_context["path"]
                 avc_data["path_type"] = "file_path"
-            elif avc_data.get("name") and avc_data["name"] not in ["?", '"?"']:
+            elif avc_data.get("name") and avc_data["name"] not in ("?", '"?"'):
                 # We have a meaningful name field, use it as the path (common for directory access)
                 # Skip meaningless names like "?" which appear in D-Bus records
                 name_value = avc_data["name"]
@@ -999,7 +685,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             avc_data["path_type"] = "file_path"
 
         # Use comm as fallback for proctitle if proctitle is null or missing
-        if avc_data.get("proctitle") in ["(null)", "null", "", None] and avc_data.get(
+        if avc_data.get("proctitle") in ("(null)", "null", "", None) and avc_data.get(
             "comm"
         ):
             avc_data["proctitle"] = avc_data["comm"]
@@ -1543,135 +1229,6 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         )
 
     return signature
-
-
-def human_time_ago(
-    dt_object: datetime,
-) -> str:  # pylint: disable=too-many-return-statements
-    """
-    Converts a datetime object into a human-readable relative time string.
-
-    Args:
-        dt_object (datetime): The datetime object to convert, or None
-
-    Returns:
-        str: Human-readable time difference (e.g., "2 days ago", "3 hours ago")
-             Returns "an unknown time" if dt_object is None or invalid
-
-    Example:
-        >>> from datetime import datetime, timedelta
-        >>> dt = datetime.now() - timedelta(days=2)
-        >>> human_time_ago(dt)
-        '2 day(s) ago'
-    """
-    if not dt_object:
-        return "an unknown time"
-    now = datetime.now()
-    delta = now - dt_object
-
-    if delta.days > 365:
-        return f"{delta.days // 365} year(s) ago"
-    elif delta.days > 30:
-        return f"{delta.days // 30} month(s) ago"
-    elif delta.days > 7:
-        return f"{delta.days // 7} week(s) ago"
-    elif delta.days > 0:
-        return f"{delta.days} day(s) ago"
-    elif delta.seconds > 3600:
-        return f"{delta.seconds // 3600} hour(s) ago"
-    else:
-        return f"{max(0, delta.seconds // 60)} minute(s) ago"
-
-
-def format_bionic_text(text: str, base_color: str = "green") -> str:
-    """
-    Apply BIONIC reading format to text for improved readability.
-
-    Args:
-        text (str): The text to format
-        base_color (str): Base color for the text (default: "green")
-
-    Returns:
-        str: Rich markup formatted text with BIONIC reading emphasis
-
-    Note:
-        Emphasizes the first half of words (typically 2-3 characters) to improve
-        reading speed and comprehension. Uses bold for emphasis, dim for rest.
-    """
-    if not text:
-        return text
-
-    words = text.split()
-    formatted_words = []
-
-    for word in words:
-        if len(word) <= 2:
-            # Short words get normal emphasis
-            formatted_words.append(f"[{base_color}]{word}[/{base_color}]")
-        elif len(word) <= 4:
-            # Medium words: emphasize first 2 characters
-            emphasized = word[:2]
-            rest = word[2:]
-            formatted_words.append(
-                f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]"
-            )
-        else:
-            # Longer words: emphasize first 3 characters
-            emphasized = word[:3]
-            rest = word[3:]
-            formatted_words.append(
-                f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]"
-            )
-
-    return " ".join(formatted_words)
-
-
-def format_path_for_display(path: str, max_length: int = 80) -> str:
-    """
-    Format file paths for better terminal display with smart truncation.
-
-    Args:
-        path (str): The file path to format
-        max_length (int): Maximum length before truncation (default: 80)
-
-    Returns:
-        str: Formatted path with intelligent truncation for container paths
-    """
-    if not path or len(path) <= max_length:
-        return path
-
-    # Special handling for container storage paths
-    if "containers/storage/overlay" in path:
-        # Extract meaningful parts: base path + container ID + final path
-        parts = path.split("/")
-
-        # Find the overlay directory index
-        try:
-            overlay_idx = parts.index("overlay")
-            if overlay_idx + 1 < len(parts):
-                container_id = parts[overlay_idx + 1]
-                # Truncate container ID to first 8 characters
-                short_id = (
-                    container_id[:8] + "..." if len(container_id) > 8 else container_id
-                )
-
-                # Get the final meaningful path
-                if overlay_idx + 3 < len(parts):
-                    # Usually: overlay/ID/diff/actual/path
-                    final_path = "/".join(parts[overlay_idx + 3 :])
-                    base_path = "/".join(parts[:overlay_idx])
-                    return f"{base_path}/overlay/{short_id}/.../{final_path}"
-        except ValueError:
-            pass
-
-    # Generic path truncation - show beginning and end
-    if len(path) > max_length:
-        # Show first 30 and last 30 characters with ellipsis
-        start_len = min(30, max_length // 2 - 2)
-        end_len = min(30, max_length // 2 - 2)
-        return f"{path[:start_len]}...{path[-end_len:]}"
-
-    return path
 
 
 def has_permissive_denials(denial_info: dict) -> bool:
@@ -2450,7 +2007,7 @@ def print_summary(
 
     console.print("-" * 35)
     # --- Action Details ---
-    console.print(f"  [bold]Action:[/bold]".ljust(22) + "Denied")
+    console.print("  [bold]Action:[/bold]".ljust(22) + "Denied")
 
     # Show denial type (AVC vs USER_AVC)
     if parsed_log.get("denial_type"):
@@ -2462,7 +2019,7 @@ def print_summary(
             denial_type_display = "AVC Path Info"
         else:
             denial_type_display = parsed_log["denial_type"]
-        console.print(f"  [bold]Denial Type:[/bold]".ljust(22), end="")
+        console.print("  [bold]Denial Type:[/bold]".ljust(22), end="")
         console.print(f"[bright_green bold]{denial_type_display}[/bright_green bold]")
 
     for label, key in action_fields:
@@ -2746,8 +2303,6 @@ def print_rich_summary(
         denial_num (int): Sequential denial number for display
     """
     from rich.panel import Panel
-    from rich.columns import Columns
-    from rich.text import Text
 
     parsed_log = denial_info["log"]
     count = denial_info["count"]
@@ -2781,13 +2336,13 @@ def print_rich_summary(
                 f" • [bright_magenta]📁 {custom_patterns[0]}[/bright_magenta]"
             )
         else:
-            custom_indicator = f" • [bright_magenta]📁 custom paths[/bright_magenta]"
+            custom_indicator = " • [bright_magenta]📁 custom paths[/bright_magenta]"
         header_bionic += custom_indicator
 
     # Check if this denial contains container issues and add indicator
     has_container, container_patterns, sample_paths = has_container_issues(denial_info)
     if has_container:
-        container_indicator = f" • [bright_cyan]🐳 container[/bright_cyan]"
+        container_indicator = " • [bright_cyan]🐳 container[/bright_cyan]"
         header_bionic += container_indicator
 
     console.print(Rule(header_bionic, style="cyan"))
@@ -3167,7 +2722,7 @@ def print_rich_summary(
                     )
 
                 if exe_path or proctitle or contextual_analysis:
-                    console.print(f"  └─ Process Context:")
+                    console.print("  └─ Process Context:")
                     if exe_path:
                         console.print(f"     ├─ Executable: [dim]{exe_path}[/dim]")
                     if contextual_analysis:
@@ -3220,19 +2775,14 @@ def print_rich_summary(
                 tclass = parsed_log.get("tclass", "file")
                 if tclass == "dir":
                     object_bionic = format_bionic_text("directory", "white")
-                    target_type = "directory"
                 elif tclass in ["tcp_socket", "udp_socket"]:
                     object_bionic = format_bionic_text("socket", "white")
-                    target_type = "socket"
                 elif tclass == "chr_file":
                     object_bionic = format_bionic_text("character device", "white")
-                    target_type = "char_device"
                 elif tclass == "blk_file":
                     object_bionic = format_bionic_text("block device", "white")
-                    target_type = "block_device"
                 else:
                     object_bionic = format_bionic_text("file", "white")
-                    target_type = "file"
 
                 # Smart path truncation for better display
                 formatted_path = format_path_for_display(path)
@@ -3244,7 +2794,6 @@ def print_rich_summary(
                     # D-Bus destination
                     dbus_bionic = format_bionic_text("D-Bus service", "white")
                     target_desc = f"{dbus_bionic} {dest_port}"
-                    target_type = "dbus"
                 else:
                     # Network port
                     port_desc = PermissionSemanticAnalyzer.get_port_description(
@@ -3255,14 +2804,11 @@ def print_rich_summary(
                         target_desc = f"{port_bionic} {dest_port} ({port_desc})"
                     else:
                         target_desc = f"{port_bionic} {dest_port}"
-                    target_type = "tcp_socket"
             elif saddr:
                 socket_bionic = format_bionic_text("socket", "white")
                 target_desc = f"{socket_bionic} {saddr}"
-                target_type = "socket"
             else:
                 target_desc = format_bionic_text("resource", "white")
-                target_type = "unknown"
 
             # Determine enforcement status
             if permissive == "1":
@@ -3474,7 +3020,7 @@ def validate_file_with_auto_detection(
     # First, perform basic file validation with enhanced error messages
     try:
         if not os.path.exists(file_path):
-            console.print(f"❌ [bold red]Error: File Not Found[/bold red]")
+            console.print("❌ [bold red]Error: File Not Found[/bold red]")
             console.print(f"   File does not exist: [cyan]{file_path}[/cyan]")
             console.print("   [dim]Please verify the file path and try again.[/dim]")
             console.print("   [dim]Common audit file locations:[/dim]")
@@ -3484,7 +3030,7 @@ def validate_file_with_auto_detection(
 
         # Check if path is a directory
         if os.path.isdir(file_path):
-            console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+            console.print("❌ [bold red]Error: Directory Provided[/bold red]")
             console.print(
                 f"   Path is a directory, not a file: [cyan]{file_path}[/cyan]"
             )
@@ -3494,7 +3040,7 @@ def validate_file_with_auto_detection(
             sys.exit(1)
 
         if not os.access(file_path, os.R_OK):
-            console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+            console.print("❌ [bold red]Error: Permission Denied[/bold red]")
             console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
             console.print("   [dim]Try one of these solutions:[/dim]")
             console.print(
@@ -3507,7 +3053,7 @@ def validate_file_with_auto_detection(
 
         file_size = os.path.getsize(file_path)
         if file_size == 0:
-            console.print(f"❌ [bold red]Error: Empty File[/bold red]")
+            console.print("❌ [bold red]Error: Empty File[/bold red]")
             console.print(f"   File is empty: [cyan]{file_path}[/cyan]")
             console.print("   [dim]Possible solutions:[/dim]")
             console.print(
@@ -3520,38 +3066,39 @@ def validate_file_with_auto_detection(
             sys.exit(1)
 
         if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
-            console.print(f"⚠️  [bold yellow]Warning: Large File Detected[/bold yellow]")
+            console.print("⚠️  [bold yellow]Warning: Large File Detected[/bold yellow]")
             console.print(f"   File size: {file_size / (1024*1024):.1f}MB")
             console.print("   [dim]Processing may take some time...[/dim]")
 
         # Auto-detect format type
         detected_format = detect_file_format(file_path)
 
-        detection_msg = ""
         if not quiet:
             if detected_format == "raw":
-                detection_msg = f"🔍 [bold green]Auto-detected:[/bold green] Raw audit.log format\n   Will process using ausearch: [cyan]{file_path}[/cyan]"
+                # Detection message handled by caller
+                pass
             else:
-                detection_msg = f"🔍 [bold green]Auto-detected:[/bold green] Pre-processed format\n   Will parse the file [cyan]{file_path}[/cyan] directly"
+                # Detection message handled by caller
+                pass
 
         return "raw_file" if detected_format == "raw" else "avc_file"
 
     except IsADirectoryError:
-        console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+        console.print("❌ [bold red]Error: Directory Provided[/bold red]")
         console.print(f"   Path is a directory, not a file: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Please specify a specific audit file:[/dim]")
         console.print(f"   • [cyan]{file_path}/audit.log[/cyan] (if it exists)")
         console.print(f"   • [cyan]ls {file_path}/*.log[/cyan] (list available files)")
         sys.exit(1)
     except UnicodeDecodeError:
-        console.print(f"❌ [bold red]Error: Binary File Detected[/bold red]")
+        console.print("❌ [bold red]Error: Binary File Detected[/bold red]")
         console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Audit files should be text files. Try:[/dim]")
         console.print("   • [cyan]file <path>[/cyan] (check file type)")
         console.print("   • [cyan]head -5 <path>[/cyan] (preview file content)")
         sys.exit(1)
     except PermissionError:
-        console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        console.print("❌ [bold red]Error: Permission Denied[/bold red]")
         console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Try one of these solutions:[/dim]")
         console.print(
@@ -3579,14 +3126,14 @@ def validate_raw_file(file_path: str, console: Console) -> str:
     """
     # Check if path exists
     if not os.path.exists(file_path):
-        console.print(f"❌ [bold red]Error: File Not Found[/bold red]")
+        console.print("❌ [bold red]Error: File Not Found[/bold red]")
         console.print(f"   Raw file does not exist: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Please check the file path and try again.[/dim]")
         sys.exit(1)
 
     # Check if it's actually a file
     if os.path.isdir(file_path):
-        console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+        console.print("❌ [bold red]Error: Directory Provided[/bold red]")
         console.print(f"   Expected a file but got directory: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Please specify the audit.log file path, not the directory.[/dim]"
@@ -3595,7 +3142,7 @@ def validate_raw_file(file_path: str, console: Console) -> str:
 
     # Check file permissions
     if not os.access(file_path, os.R_OK):
-        console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        console.print("❌ [bold red]Error: Permission Denied[/bold red]")
         console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Please check file permissions or run with appropriate privileges.[/dim]"
@@ -3604,7 +3151,7 @@ def validate_raw_file(file_path: str, console: Console) -> str:
 
     # Check if file is empty
     if os.path.getsize(file_path) == 0:
-        console.print(f"❌ [bold red]Error: Empty File[/bold red]")
+        console.print("❌ [bold red]Error: Empty File[/bold red]")
         console.print(f"   Raw audit file is empty: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Possible solutions:[/dim]")
         console.print(
@@ -3621,14 +3168,14 @@ def validate_raw_file(file_path: str, console: Console) -> str:
         with open(file_path, "r", encoding="utf-8") as f:
             f.read(1024)  # Try to read first 1KB as text
     except UnicodeDecodeError:
-        console.print(f"❌ [bold red]Error: Binary File Detected[/bold red]")
+        console.print("❌ [bold red]Error: Binary File Detected[/bold red]")
         console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Raw audit files should be text files. Please check the file format.[/dim]"
         )
         sys.exit(1)
     except PermissionError:
-        print_error(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        print_error("❌ [bold red]Error: Permission Denied[/bold red]")
         print_error(f"   Cannot read file: [cyan]{file_path}[/cyan]")
         print_error(
             "   [dim]Please check file permissions or run with appropriate privileges.[/dim]"
@@ -3654,14 +3201,14 @@ def validate_avc_file(file_path: str, console: Console) -> str:
     """
     # Check if path exists
     if not os.path.exists(file_path):
-        console.print(f"❌ [bold red]Error: File Not Found[/bold red]")
+        console.print("❌ [bold red]Error: File Not Found[/bold red]")
         console.print(f"   AVC file does not exist: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Please check the file path and try again.[/dim]")
         sys.exit(1)
 
     # Check if it's actually a file
     if os.path.isdir(file_path):
-        console.print(f"❌ [bold red]Error: Directory Provided[/bold red]")
+        console.print("❌ [bold red]Error: Directory Provided[/bold red]")
         console.print(f"   Expected a file but got directory: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Please specify the AVC log file path, not the directory.[/dim]"
@@ -3670,7 +3217,7 @@ def validate_avc_file(file_path: str, console: Console) -> str:
 
     # Check file permissions
     if not os.access(file_path, os.R_OK):
-        console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        console.print("❌ [bold red]Error: Permission Denied[/bold red]")
         console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Please check file permissions or run with appropriate privileges.[/dim]"
@@ -3679,7 +3226,7 @@ def validate_avc_file(file_path: str, console: Console) -> str:
 
     # Check if file is empty
     if os.path.getsize(file_path) == 0:
-        console.print(f"❌ [bold red]Error: Empty File[/bold red]")
+        console.print("❌ [bold red]Error: Empty File[/bold red]")
         console.print(f"   Pre-processed AVC file is empty: [cyan]{file_path}[/cyan]")
         console.print("   [dim]Possible solutions:[/dim]")
         console.print(
@@ -3698,7 +3245,7 @@ def validate_avc_file(file_path: str, console: Console) -> str:
 
         # Basic content validation - should contain audit-like content
         if not re.search(r"(type=AVC|msg=audit|avc:)", content, re.IGNORECASE):
-            console.print(f"⚠️  [bold yellow]Warning: File Content Check[/bold yellow]")
+            console.print("⚠️  [bold yellow]Warning: File Content Check[/bold yellow]")
             console.print(
                 f"   File does not appear to contain AVC records: [cyan]{file_path}[/cyan]"
             )
@@ -3707,14 +3254,14 @@ def validate_avc_file(file_path: str, console: Console) -> str:
             )
 
     except UnicodeDecodeError:
-        console.print(f"❌ [bold red]Error: Binary File Detected[/bold red]")
+        console.print("❌ [bold red]Error: Binary File Detected[/bold red]")
         console.print(f"   File appears to be binary: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]AVC files should be text files from ausearch output.[/dim]"
         )
         sys.exit(1)
     except PermissionError:
-        console.print(f"❌ [bold red]Error: Permission Denied[/bold red]")
+        console.print("❌ [bold red]Error: Permission Denied[/bold red]")
         console.print(f"   Cannot read file: [cyan]{file_path}[/cyan]")
         console.print(
             "   [dim]Please check file permissions or run with appropriate privileges.[/dim]"
@@ -3900,7 +3447,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         except Exception as e:
             # This should rarely happen due to pre-validation, but handle gracefully
             console.print(
-                f"❌ [bold red]Error: Unexpected file reading error[/bold red]"
+                "❌ [bold red]Error: Unexpected file reading error[/bold red]"
             )
             console.print(f"   {str(e)}")
             sys.exit(1)
@@ -3984,7 +3531,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             else:
                 other_warnings.append(warning)
 
-        console.print(f"\n📋 [bold cyan]Input Processing Summary:[/bold cyan]")
+        console.print("\n📋 [bold cyan]Input Processing Summary:[/bold cyan]")
         if malformed_lines > 0:
             console.print(f"   • Processed {len(valid_blocks)} audit record sections")
             console.print(
@@ -3998,7 +3545,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             for warning in other_warnings:
                 console.print(f"   • {warning}")
         console.print(
-            f"   • [bold green]Successfully processed all AVC data[/bold green]"
+            "   • [bold green]Successfully processed all AVC data[/bold green]"
         )
         console.print()  # Extra line for readability
 
@@ -4275,9 +3822,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 if dontaudit_detected:
                     indicators_str = ", ".join(found_indicators)
                     # Create a prominent warning panel
-                    from rich.panel import Panel
                     from rich.align import Align
                     from rich.console import Group
+                    from rich.panel import Panel
 
                     warning_lines = [
                         Align.center(
@@ -4308,9 +3855,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display permissive mode warning if found
                 if permissive_detected:
-                    from rich.panel import Panel
                     from rich.align import Align
                     from rich.console import Group
+                    from rich.panel import Panel
 
                     warning_lines = [
                         Align.center(
@@ -4337,9 +3884,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display custom paths warning if found
                 if custom_paths_detected:
-                    from rich.panel import Panel
                     from rich.align import Align
                     from rich.console import Group
+                    from rich.panel import Panel
 
                     patterns_str = ", ".join(found_custom_patterns[:3])
                     if len(found_custom_patterns) > 3:
@@ -4370,9 +3917,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display container issues warning if found
                 if container_issues_detected:
-                    from rich.panel import Panel
                     from rich.align import Align
                     from rich.console import Group
+                    from rich.panel import Panel
 
                     # Show sample path to help users understand the issue
                     sample_path_lines = []
@@ -4388,7 +3935,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 actual_base = parts[0] + "/containers/storage/overlay/"
                                 sample_path_lines = [
                                     f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                    f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                    "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                 ]
                         elif "/.local/share/containers/" in sample_path:
                             # Extract the actual base path up to /.local/share/containers/storage/overlay/
@@ -4400,19 +3947,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 )
                                 sample_path_lines = [
                                     f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                    f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                    "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                 ]
                         elif "/var/lib/containers/" in sample_path:
                             # System container storage (alternative location)
                             sample_path_lines = [
-                                f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
-                                f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
+                                "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                             ]
 
                         # Fallback for other container patterns
                         if not sample_path_lines:
                             sample_path_lines = [
-                                f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
+                                "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
                             ]
 
                     # Create individual centered lines using Group
@@ -4500,6 +4047,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         if args.pager and sys.stdout.isatty() and not args.json:
             # Capture output with colors preserved for pager
             import io
+
             from rich.console import Console as RichConsole
 
             # Create a string buffer to capture colored output
@@ -4509,9 +4057,6 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             )
 
             try:
-                # Temporarily switch console for content generation
-                original_console = console
-
                 # Create a modified display function that uses the pager console
                 def display_all_content_pager():
                     # Display detection and processing messages first
@@ -4563,9 +4108,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         if dontaudit_detected:
                             indicators_str = ", ".join(found_indicators)
                             # Create a prominent warning panel
-                            from rich.panel import Panel
                             from rich.align import Align
                             from rich.console import Group
+                            from rich.panel import Panel
 
                             warning_lines = [
                                 Align.center(
@@ -4600,9 +4145,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display permissive mode warning if found
                         if permissive_detected:
-                            from rich.panel import Panel
                             from rich.align import Align
                             from rich.console import Group
+                            from rich.panel import Panel
 
                             warning_lines = [
                                 Align.center(
@@ -4633,9 +4178,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display custom paths warning if found
                         if custom_paths_detected:
-                            from rich.panel import Panel
                             from rich.align import Align
                             from rich.console import Group
+                            from rich.panel import Panel
 
                             patterns_str = ", ".join(found_custom_patterns[:3])
                             if len(found_custom_patterns) > 3:
@@ -4672,9 +4217,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display container issues warning if found
                         if container_issues_detected:
-                            from rich.panel import Panel
                             from rich.align import Align
                             from rich.console import Group
+                            from rich.panel import Panel
 
                             # Show sample path to help users understand the issue
                             sample_path_lines = []
@@ -4694,7 +4239,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                         )
                                         sample_path_lines = [
                                             f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                            "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                         ]
                                 elif "/.local/share/containers/" in sample_path:
                                     # Extract the actual base path up to /.local/share/containers/storage/overlay/
@@ -4708,19 +4253,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                         )
                                         sample_path_lines = [
                                             f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                            f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                            "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                         ]
                                 elif "/var/lib/containers/" in sample_path:
                                     # System container storage (alternative location)
                                     sample_path_lines = [
-                                        f"[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
-                                        f"[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                        "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
+                                        "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                     ]
 
                                 # Fallback for other container patterns
                                 if not sample_path_lines:
                                     sample_path_lines = [
-                                        f"[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
+                                        "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
                                     ]
 
                             # Create individual centered lines using Group
@@ -4843,7 +4388,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 if not pager_found:
                     # Fallback: just print normally if no pager available
                     console.print(
-                        f"[yellow]No pager available, showing output directly:[/yellow]"
+                        "[yellow]No pager available, showing output directly:[/yellow]"
                     )
                     display_all_content()
 
