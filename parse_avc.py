@@ -3295,7 +3295,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         "-f",
         "--file",
         type=str,
-        help="Path to audit file (auto-detects raw audit.log vs pre-processed format).",
+        help="Path to audit file (auto-detects raw audit.log vs pre-processed format). Note: processes one file at a time.",
     )
     parser.add_argument(
         "-rf",
