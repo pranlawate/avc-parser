@@ -3417,9 +3417,28 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 file_path,
             ]
             result = subprocess.run(
-                ausearch_cmd, capture_output=True, text=True, check=True
+                ausearch_cmd, capture_output=True, text=True, check=False
             )
-            log_string = result.stdout
+
+            # Check if ausearch found no matches (normal case)
+            if "<no matches>" in result.stderr:
+                # No AVC records found - this is normal, not an error
+                console.print("ℹ️  [blue]No AVC records found in the audit log.[/blue]")
+                console.print(
+                    "   This means no SELinux denials occurred during the logged period."
+                )
+                console.print(
+                    "   [dim]This is often a good sign - your system's SELinux policy is working correctly.[/dim]"
+                )
+                sys.exit(0)
+            elif result.returncode == 0:
+                # Success - ausearch found records
+                log_string = result.stdout
+            else:
+                # Actual error - ausearch failed for other reasons
+                raise subprocess.CalledProcessError(
+                    result.returncode, ausearch_cmd, stderr=result.stderr
+                )
         except FileNotFoundError:
             print_error("❌ [bold red]Error: ausearch Command Not Found[/bold red]")
             print_error(

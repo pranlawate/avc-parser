@@ -70,14 +70,14 @@ def format_bionic_text(text: str, base_color: str = "green") -> str:
             emphasized = word[:2]
             rest = word[2:]
             formatted_words.append(
-                f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]"
+                f"[bold {base_color}]{emphasized}[/bold {base_color}][{base_color}]{rest}[/{base_color}]"
             )
         else:
             # Longer words: emphasize first 3 characters
             emphasized = word[:3]
             rest = word[3:]
             formatted_words.append(
-                f"[bold {base_color}]{emphasized}[/bold {base_color}][dim {base_color}]{rest}[/dim {base_color}]"
+                f"[bold {base_color}]{emphasized}[/bold {base_color}][{base_color}]{rest}[/{base_color}]"
             )
 
     return " ".join(formatted_words)
