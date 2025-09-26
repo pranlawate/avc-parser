@@ -95,9 +95,9 @@ test:
 
 # Install winning tools
 install-tools:
-	@echo "🛠️ Installing winning dev tools..."
-	@pip install ruff pydeps
-	@echo "✅ Winning tools installed (ruff, pydeps)"
+	@echo "🛠️ Installing optimized dev tools..."
+	@pip install -r dev-requirements.txt
+	@echo "✅ All dev tools installed from dev-requirements.txt"
 
 # Cleanup
 clean:
@@ -111,7 +111,7 @@ all: format quick-check test security flow-diagram deps-graph
 	@echo "🎉 Complete workflow finished - ready for safe modularization"
 
 # === TOOL EVOLUTION NOTES ===
-# WINNERS (adopted): ruff (197x faster than pyflakes+isort+black), pydeps, unittest
+# WINNERS (adopted): ruff (all-in-one: formatting + linting + imports), pydeps, unittest
 # REJECTED: pytest (timeout), flake8 (broken pipe), radon (pipe issues), pylint (slow)
 # REPLACED: pyflakes + isort + black → ruff (single tool, 197x performance improvement)
 #
