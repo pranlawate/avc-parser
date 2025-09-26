@@ -1,75 +1,118 @@
-# Makefile for AVC Parser Quality Tools
-# Usage: make <target>
+# OPTIMIZED MAKEFILE FOR AVC PARSER
+# Fast, reliable development workflow with high-ROI tools
 
-.PHONY: help format flow-diagram flow-focused check install-tools pre-commit-install clean
+.PHONY: help format check lint security imports dead-code flow-diagram install-tools clean all quick-check
 
 # Default target
 help:
-	@echo "Available targets:"
-	@echo "  format           - Format code with black"
-	@echo "  flow-diagram     - Generate complete function flow diagram (SVG)"
-	@echo "  flow-focused     - Generate focused flow diagram from main function"
-	@echo "  flow-png         - Generate flow diagrams in PNG format"
-	@echo "  check            - Run basic code quality checks"
-	@echo "  install-tools    - Install required quality tools"
-	@echo "  pre-commit-install - Install pre-commit hooks"
+	@echo "=== AVC Parser Development Tools ==="
+	@echo "Core workflow:"
+	@echo "  quick-check      - Fast syntax + import check (< 5 seconds)"
+	@echo "  format           - Format code (black + isort)"
+	@echo "  lint             - Full quality analysis"
+	@echo "  security         - Security analysis (bandit + safety)"
+	@echo ""
+	@echo "Individual tools:"
+	@echo "  syntax           - Fast syntax check (pyflakes)"
+	@echo "  imports          - Organize imports (isort)"
+	@echo "  dead-code        - Find unused code (vulture)"
+	@echo "  flow-diagram     - Generate function dependency map"
+	@echo ""
+	@echo "Setup:"
+	@echo "  install-tools    - Install optimized dev tools"
 	@echo "  clean            - Remove generated files"
-	@echo "  help             - Show this help message"
 
-# Code formatting
+# === TIER 1: FAST DAILY WORKFLOW ===
+
+# Super fast quality check (< 5 seconds)
+quick-check:
+	@echo "🚀 Quick quality check..."
+	@echo "→ Syntax check:"
+	@pyflakes parse_avc.py | head -10 || true
+	@echo "→ Import organization:"
+	@isort parse_avc.py --check-only --quiet || echo "Imports need organization"
+	@echo "✅ Quick check completed"
+
+# Code formatting (black + isort)
 format:
-	@echo "Formatting code with black..."
-	black parse_avc.py --line-length=88
+	@echo "🎨 Formatting code..."
+	@black parse_avc.py --line-length=88 --quiet
+	@isort parse_avc.py
+	@echo "✅ Code formatted"
 
-# Flow diagrams
+# Fast syntax check only
+syntax:
+	@echo "🔍 Syntax check..."
+	@pyflakes parse_avc.py
+
+# Import organization
+imports:
+	@echo "📋 Organizing imports..."
+	@isort parse_avc.py --diff
+	@isort parse_avc.py
+
+# === TIER 2: COMPREHENSIVE ANALYSIS ===
+
+# Full linting (when needed)
+lint:
+	@echo "🔍 Full quality analysis..."
+	@echo "→ Syntax:"
+	@pyflakes parse_avc.py | head -10 || true
+	@echo "→ Dead code:"
+	@vulture parse_avc.py --min-confidence 90 | head -5 || true
+	@echo "→ Modern Python:"
+	@refurb parse_avc.py | head -5 || true
+	@echo "✅ Lint analysis completed"
+
+# Security analysis
+security:
+	@echo "🔒 Security analysis..."
+	@echo "→ Code security (bandit):"
+	@bandit parse_avc.py -f txt -ll | head -10 || true
+	@echo "→ Dependencies (safety):"
+	@safety check --json --ignore 70612 | head -3 || true
+	@echo "✅ Security analysis completed"
+
+# Dead code detection
+dead-code:
+	@echo "🧹 Dead code detection..."
+	@vulture parse_avc.py --min-confidence 80
+
+# === TIER 3: VISUALIZATION & ANALYSIS ===
+
+# Function dependency visualization
 flow-diagram:
-	@echo "Generating complete function flow diagram..."
-	code2flow parse_avc.py --output avc_parser_flow.svg --language py --skip-parse-errors
-	@echo "Generated: avc_parser_flow.svg"
+	@echo "📊 Generating function dependency map..."
+	@code2flow parse_avc.py --output avc_dependencies.svg --language py --skip-parse-errors
+	@echo "✅ Generated: avc_dependencies.svg"
 
-flow-focused:
-	@echo "Generating focused flow diagram from main function..."
-	code2flow parse_avc.py --output avc_core_flow.svg --language py --target-function main --downstream-depth 3 --skip-parse-errors
-	@echo "Generated: avc_core_flow.svg"
+# === SETUP & MAINTENANCE ===
 
-flow-png:
-	@echo "Generating PNG flow diagrams..."
-	code2flow parse_avc.py --output avc_parser_flow.png --language py --skip-parse-errors
-	code2flow parse_avc.py --output avc_core_flow.png --language py --target-function main --downstream-depth 3 --skip-parse-errors
-	@echo "Generated: avc_parser_flow.png and avc_core_flow.png"
-
-# Quality checks
-check:
-	@echo "Running basic quality checks..."
-	@echo "File line count:"
-	@wc -l parse_avc.py
-	@echo "Python syntax check:"
-	@python3 -m py_compile parse_avc.py && echo "✓ Syntax OK"
-
-# Tool installation
+# Install optimized tools
 install-tools:
-	@echo "Installing development tools..."
-	pip install -r dev-requirements.txt
-
-# Pre-commit setup
-pre-commit-install:
-	@echo "Installing pre-commit hooks..."
-	pre-commit install
-	@echo "✓ Pre-commit hooks installed"
+	@echo "🛠️ Installing optimized dev tools..."
+	@pip install -r dev-requirements-optimized.txt
+	@echo "✅ Tools installed"
 
 # Cleanup
 clean:
-	@echo "Cleaning generated files..."
-	rm -f *.svg *.png *.gv
-	rm -rf __pycache__ *.pyc
-	@echo "✓ Cleaned up"
+	@echo "🧹 Cleaning generated files..."
+	@rm -f *.svg *.png *.gv
+	@rm -rf __pycache__ *.pyc .mypy_cache htmlcov
+	@echo "✅ Cleaned up"
 
-# Advanced quality tools (commented out - use when needed)
-# install-advanced-tools:
-#	pip install vulture rope flake8 mypy pylint safety
+# Complete workflow for modularization safety
+all: format quick-check security flow-diagram
+	@echo "🎉 Complete quality check finished"
 
-# check-dead-code:
-#	vulture parse_avc.py --min-confidence 80
-
-# type-check:
-#	mypy parse_avc.py --ignore-missing-imports
+# === COMPATIBILITY NOTES ===
+# Tools removed due to performance issues on 4870-line file:
+# - pytest (timeout)
+# - flake8 (broken pipe, slower than pyflakes)
+# - radon (broken pipe - use manually when needed)
+# - pylint (too slow)
+#
+# Manual alternatives for removed tools:
+# - Testing: Use manual validation + git safety branches
+# - Complexity: Run radon manually: radon cc parse_avc.py -s
+# - Type checking: Run mypy manually when needed

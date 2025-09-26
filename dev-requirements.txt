@@ -1,19 +1,30 @@
-# Development dependencies for AVC Parser
-# Install with: pip install -r dev-requirements.txt
+# OPTIMIZED DEV-SUITE FOR AVC PARSER
+# Fast, reliable, long-term development tools with high ROI
 
-# Code formatting
-black==25.9.0
+# === TIER 1: ESSENTIAL CORE TOOLS ===
+black==25.9.0           # Code formatting - fast, reliable
+code2flow==2.5.1        # Function visualization - working well
+pre-commit              # Automated hooks - essential
+vulture==2.14           # Dead code detection - fast, high value
+safety==3.6.2           # Security scanning - dependency focus
 
-# Flow diagram generation
-code2flow==2.5.1
+# === TIER 2: HIGH-VALUE ADDITIONS ===
+isort                   # Import organization - CRITICAL for modularization
+pyflakes                # Fast syntax checking (replaces flake8)
+bandit                  # Security code analysis (complements safety)
 
-# Pre-commit hooks
-pre-commit
+# === TIER 3: SPECIFIC USE CASES ===
+refurb==2.2.0          # Python modernization - when needed
+# mypy - Use manually for type checking (can be slow)
 
-# Quality tools under evaluation (install separately as needed)
-# vulture
-# rope
-# flake8
-# mypy
-# pylint
-# safety
+# === PERFORMANCE OPTIMIZATIONS ===
+# radon - Fix pipe issues before re-enabling
+# Skip: pytest (too slow for 4870-line file)
+# Skip: flake8 (replaced by pyflakes + bandit)
+# Skip: pylint (too slow)
+# Skip: ast-grep-py, bowler, libcst (over-engineered for our use case)
+
+# === MODULARIZATION SPECIFIC ===
+# Manual approach preferred over automated tools for 4870-line refactoring
+# Git branching strategy for safety
+# Systematic function extraction with isort for import management

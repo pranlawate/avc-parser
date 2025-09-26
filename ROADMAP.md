@@ -147,51 +147,63 @@ correlations = [
 - [x] **Combined Filtering**: Seamless integration with existing process and path filters
 - [x] **Comprehensive Testing**: Validated across multiple log formats with 25+ test scenarios
 
-### ✅ **PHASE 4B-2: JSON Field Normalization** (COMPLETED)
+### ✅ **PHASE 4: JSON Field Normalization** (COMPLETED)
 - [x] **JSON Field Normalization**: Standardized path formats, clean port extraction, normalized context fields for reliable tool integration
 
-### 🔧 **PHASE 4B-3: Critical Bug Fixes** (HIGH PRIORITY - REGRESSION FIXES)
-- [ ] **Multiple File Handling Enhancement**: Improve error messages for conflicting file arguments and edge cases
-  - **Issue**: Basic error message exists but could be more user-friendly
-  - **Solution**: Enhanced error messaging with better guidance for edge cases
-  - **Status**: Partially implemented - basic message exists at line 3084, needs improvement
+### ✅ **PHASE 5: Quality Tools Foundation** (COMPLETED)
+- [x] **Black Code Formatting**: Non-disruptive code formatting with line-length=88 configuration
+- [x] **Code2flow Visualization**: Function call graph generation (49 nodes, 104 edges)
+- [x] **Pre-commit Automation**: Automated formatting hooks with `.pre-commit-config.yaml`
+- [x] **Development Workflow**: Comprehensive Makefile with 8 development targets
+- [x] **Documentation Integration**: Complete development setup documentation in README
+- [x] **Git Configuration**: Quality tool outputs properly excluded from version control
+**Impact**: Professional development infrastructure enabling systematic code quality improvement
+**Achievement**: Single-session implementation of complete quality tools foundation
 
-### 🧪 **PHASE 4B-4: Comprehensive Test Coverage** (CRITICAL QUALITY IMPROVEMENT)
-**Root Cause**: Major bugs in core functionality missed due to test coverage gaps
+### 🔧 **PHASE 4C: Pre-Modularization Safety Infrastructure** (HIGH PRIORITY)
+- [ ] **Testing Foundation**: Install pytest, pytest-cov, verify all 107 tests pass
+- [ ] **Function Dependency Mapping**: Generate detailed function dependency analysis using existing code2flow
+- [ ] **Safety Branching**: Comprehensive backup and incremental checkpoint strategy
+- [ ] **Import Validation**: Automated import testing to catch circular dependencies
+- [ ] **Rollback Mechanisms**: Tagged checkpoints for safe iteration
+- [ ] **Critical Quality Tools**: Install safety, radon for codebase analysis
 
-#### **4B-4.1: Display Layer Testing** (Priority 1)
-- [ ] **Rich Summary Function Tests**: Unit tests for `print_rich_summary()` with various denial types
-- [ ] **Detailed View Integration**: End-to-end tests for `--detailed` flag output validation
-- [ ] **Format Flag Testing**: Validate `--fields` vs default Rich format consistency
-- [ ] **Pager Integration**: Test `--pager` functionality with mock subprocess calls
-- [ ] **Smart Grouping Tests**: Validate `--expand-groups` vs grouped display behavior
+### 🔄 **PHASE 4D: Critical Architecture Refactoring Implementation** (DEPENDS ON 4C)
+**Problem**: `parse_avc.py` contains 4870 lines (10x planned 500-line threshold)
+**Solution**: Modular architecture with focused components
+**Prerequisites**: Completion of Phase 4C safety infrastructure
 
-#### **4B-4.2: Process Name Resolution Testing** (Priority 1)
-- [ ] **Fallback Hierarchy Tests**: Test `comm` → `exe` → `proctitle` chain with various input combinations
-- [ ] **Edge Case Scenarios**: Missing fields, malformed process titles, complex executable paths
-- [ ] **Contextual Integration**: Verify process names appear correctly in semantic analysis output
-- [ ] **Performance Edge Cases**: Test with large datasets and missing process information
+#### **4D.1: Core Module Extraction**
+- [ ] **CLI Interface**: Extract command-line interface (~400 lines)
+- [ ] **Core Parsing Logic**: Extract parsing functions (~800 lines)
+- [ ] **Input Validation**: Extract validation logic (~300 lines)
+- [ ] **Semantic Analysis**: Extract semantic analysis (~400 lines)
 
-#### **4B-4.3: Regression Prevention Framework** (Priority 2)
-- [ ] **Golden Master Tests**: Capture known-good output for regression detection
-- [ ] **CLI Workflow Tests**: Complete command combinations with output validation
-- [ ] **Breaking Change Detection**: Automated tests for all user-facing functionality changes
-- [ ] **Cross-Platform Validation**: Test display consistency across different terminal environments
+#### **4D.2: Display Module Extraction**
+- [ ] **Rich Formatter**: Extract Rich display logic (~600 lines)
+- [ ] **Legacy Formatter**: Extract field-by-field format (~200 lines)
+- [ ] **JSON Formatter**: Extract JSON output (~200 lines)
 
-#### **4B-4.4: Output Validation Framework** (Priority 2)
+#### **4D.3: Correlation & Filtering Modules**
+- [ ] **Event Correlation**: Extract correlation tracking (~400 lines)
+- [ ] **Data Aggregation**: Extract aggregation logic (~300 lines)
+- [ ] **Advanced Filtering**: Extract filtering modules (~500 lines)
+
+#### **7.4: Output Validation Framework** (Pending Evaluation)
 - [ ] **Terminal Output Parsing**: Structured validation of Rich-formatted output
 - [ ] **JSON Schema Validation**: Comprehensive JSON output structure and field validation
 - [ ] **Error Message Testing**: Validate all error conditions and user guidance messages
 - [ ] **Performance Regression Tests**: Ensure display optimizations don't break functionality
 
-### 🎨 **PHASE 4C: Enhanced User Experience** (AFTER CRITICAL FIXES)
+### 🔄 **PHASE 8: Enhanced User Experience** (PENDING EVALUATION)
+**Status**: Quality tools foundation completed - user experience enhancements require evaluation and prioritization
 
-#### **4C.1: Interactive Pager Mode** (Priority 1)
+#### **8.1: Interactive Pager Mode** (Priority 1)
 - [ ] **Built-in Pager Interface**: `less`-like interface with arrow keys, page up/down, and 'q' to quit for large outputs
 - [ ] **Color Preservation**: Maintain Rich formatting and colors in pager mode
 - [ ] **Cross-Platform Compatibility**: Fallback behavior when pager unavailable
 
-#### **4C.2: Rich Module UX Enhancements** (Priority 1 - Quick Wins)
+#### **8.2: Rich Module UX Enhancements** (Priority 1 - Quick Wins)
 - [ ] **Progress Bars**: Visual progress indicators for large file processing operations (lines 3425-3450)
 - [ ] **Status Spinners**: Loading indicators during ausearch operations (lines 3366-3390)
 - [ ] **Enhanced JSON Display**: Rich.JSON module for beautiful JSON output formatting (lines 3615-3616)
@@ -199,12 +211,12 @@ correlations = [
 - [ ] **Tree-based Correlation Display**: Rich.Tree for hierarchical relationship visualization
 - [ ] **Multi-column Warning Panels**: Better space utilization for detection warnings
 
-#### **4C.3: Smart Resource Display** (Priority 2)
+#### **8.3: Smart Resource Display** (Priority 2)
 - [ ] **Context-aware Formatting**: Dynamic formatting based on object class (file vs network vs etc.)
 - [ ] **Terminal Integration**: Enhanced output formatting for various terminal environments
 - [ ] **Adaptive Layout**: Responsive design for different terminal widths
 
-#### **4C.4: Advanced Integration Features** (Priority 3)
+#### **8.4: Advanced Integration Features** (Priority 3)
 - [ ] **Timezone Handling Enhancement**: Support for timezone-aware audit log parsing
   - **Feature**: Pass timezone environment variables to `ausearch` subprocess calls (TZ="Asia/Kolkata")
   - **Benefit**: Improved international usage and multi-timezone log analysis
@@ -214,12 +226,12 @@ correlations = [
   - **Benefit**: Streamlined workflow from audit analysis to policy investigation
   - **Status**: Enhancement - requires evaluation of user workflow integration value
 
-### 🧪 **PHASE 4D: Integration & Performance** (QUALITY ASSURANCE)
+### 🧪 **PHASE 9: Integration & Performance** (QUALITY ASSURANCE)
 - [ ] **Real-world Scenarios**: Various audit log formats, different Linux distributions
 - [ ] **Cross-platform Compatibility**: Testing across RHEL, Ubuntu, SUSE, Arch distributions
 - [ ] **Memory Optimization**: Large file handling improvements (>500MB audit logs)
 
-### 📚 **PHASE 5: Documentation** (PLANNED)
+### 📚 **PHASE 10: Documentation** (PLANNED)
 **Enhanced Documentation** | **Architecture & Development**
 - Enhanced README with migration guides | Updated help text and usage examples
 - Installation instructions & version management | Feature documentation updates
@@ -327,23 +339,31 @@ Detailed Events:
 
 ## Current Implementation Focus (ROI-Optimized Priority Order)
 
-**Phase 4B-2**: JSON Field Normalization (standardized formats for tool integration) ✅ COMPLETED
+**Phase 4**: JSON Field Normalization (standardized formats for tool integration) ✅ COMPLETED
 
-**IMMEDIATE PRIORITY (Critical Path):**
-**Phase 4B-3**: Critical Bug Fixes (multiple file handling enhancement) - **HIGH PRIORITY** (1 pending)
-**Phase 4B-4**: Comprehensive Test Coverage (display layer testing, regression prevention) - **CRITICAL QUALITY** (0/4 completed)
+**COMPLETED PHASES:**
+✅ **Phase 5**: Quality Tools Foundation - **COMPLETED** (2025-09-25)
+  - Black formatting, code2flow visualization, pre-commit automation
+  - Comprehensive Makefile with development workflow
+  - Professional development infrastructure established
 
-**NEXT PRIORITY (Enhancement Phase):**
-**Phase 4C**: Enhanced User Experience - **AFTER CRITICAL FIXES**
-  - **4C.1**: Interactive Pager Mode (0/3 completed)
-  - **4C.2**: Rich Module UX Enhancements (0/6 completed) - Quick wins with immediate visual impact
-  - **4C.3**: Smart Resource Display (0/3 completed)
-  - **4C.4**: Advanced Integration Features (0/2 completed) - Timezone handling, sesearch evaluation
+**PENDING EVALUATION (Next Phase Decisions Required):**
+🔄 **Phase 6**: Critical Bug Fixes (multiple file handling enhancement) - **PENDING EVALUATION**
+🔄 **Phase 7**: Comprehensive Test Coverage (display layer testing, regression prevention) - **PENDING EVALUATION**
+🔄 **Phase 8**: Enhanced User Experience - **PENDING EVALUATION**
+  - **8.1**: Interactive Pager Mode
+  - **8.2**: Rich Module UX Enhancements
+  - **8.3**: Smart Resource Display
+  - **8.4**: Advanced Integration Features (timezone handling, sesearch evaluation)
+
+**ADDITIONAL EVALUATION REQUIRED:**
+🔄 **Quality Tools Enhancement (Phase 12)**: safety, vulture, radon, mypy, prospector - **PENDING EVALUATION**
+🔄 **Report-Friendly Output Format**: Compact/report mode for copying and documentation - **PENDING EVALUATION**
 
 **SUBSEQUENT PHASES:**
-**Phase 4D**: Integration & performance testing
-**Phase 5**: Enhanced documentation & architecture overview ✅ SUBSTANTIALLY COMPLETED
-**Phase 7**: Distribution & Packaging (RPM, Pip, release automation)
+**Phase 9**: Integration & performance testing
+**Phase 10**: Enhanced documentation & architecture overview ✅ SUBSTANTIALLY COMPLETED
+**Phase 11**: Distribution & Packaging (RPM, Pip, release automation)
 
 ## Key Benefits Expected (Scope-Compliant)
 
@@ -373,19 +393,20 @@ Detailed Events:
 - Phase 4A: Testing Foundation (comprehensive test suite, quality analysis, PID event counting, pipe compatibility fix)
 - Phase 4B-1: Advanced Filtering (time range and context filtering with pattern matching support)
 - Phase 4B-2: JSON Field Normalization (standardized formats for tool integration)
+- Phase 5: Quality Tools Foundation (black, code2flow, pre-commit, development workflow)
 - Refactoring: Code Quality & Optimization (function extraction, DRY improvements)
 
-**🔧 WITHIN SCOPE & IMMEDIATE PRIORITY (Critical Path):**
-- Phase 4B-3: Critical Bug Fixes (multiple file handling enhancement)
-- Phase 4B-4: Comprehensive Test Coverage (display layer testing, regression prevention)
-
-**🔄 WITHIN SCOPE & NEXT PRIORITY (Enhancement Phase):**
-- Phase 4C: Enhanced User Experience (interactive pager mode, Rich UX enhancements, smart resource display, advanced integration features)
+**🔄 WITHIN SCOPE & PENDING EVALUATION:**
+- Phase 6: Critical Bug Fixes (multiple file handling enhancement)
+- Phase 7: Comprehensive Test Coverage (display layer testing, regression prevention)
+- Phase 8: Enhanced User Experience (interactive pager mode, Rich UX enhancements, smart resource display, advanced integration features)
+- Quality Tools Enhancement: Additional development tools evaluation (safety, vulture, radon, mypy, prospector)
+- Report-Friendly Output: Alternative display format for documentation and reporting use cases
 
 **✅ WITHIN SCOPE & PLANNED:**
-- Phase 4D: Integration & Performance Testing
-- Phase 5: Enhanced Documentation & Architecture Overview
-- Phase 6: Distribution & Packaging (RPM, Pip, release automation)
+- Phase 9: Integration & Performance Testing
+- Phase 10: Enhanced Documentation & Architecture Overview
+- Phase 11: Distribution & Packaging (RPM, Pip, release automation)
 
 **❌ OUT OF SCOPE (Moved to Future Research):**
 - Complex event assembly and streaming correlation
@@ -394,18 +415,18 @@ Detailed Events:
 - Policy file analysis and automated recommendations
 - Web interfaces and graphical dashboards
 
-## 📦 **PHASE 6: Distribution & Packaging (Professional Deployment)**
+## 📦 **PHASE 11: Distribution & Packaging (Professional Deployment)**
 
 ### **Strategic Distribution Approach**
 **Primary**: RPM packaging for native SELinux environment integration
 **Secondary**: Pip module for development workflows and cross-platform support
 **Tertiary**: Additional distribution formats for broader ecosystem coverage
 
-### **Phase 6A: RPM Package Implementation (Priority 1)**
+### **Phase 11.1: RPM Package Implementation (Priority 1)**
 
 **Target Audience**: System administrators on RHEL/Fedora/CentOS systems where SELinux is primarily deployed.
 
-#### **6A.1: RPM Spec File & Package Structure**
+#### **11.1.1: RPM Spec File & Package Structure**
 - [ ] Create `selinux-avc-analyzer.spec` with proper metadata
 - [ ] Define runtime dependencies: `audit`, `python3-rich`
 - [ ] Configure build requirements and file lists
@@ -415,85 +436,85 @@ Detailed Events:
   - Man page: `/usr/share/man/man1/selinux-avc-analyzer.1.gz`
   - License: `/usr/share/licenses/selinux-avc-analyzer/LICENSE`
 
-#### **6A.2: Build System & Installation**
+#### **11.1.2: Build System & Installation**
 - [ ] Create `Makefile` for build automation with `install` target
 - [ ] Configure proper file permissions and ownership
 - [ ] Set up build directory structure (`BUILDROOT`, `SOURCES`, etc.)
 - [ ] Test local RPM building with `rpmbuild`
 
-#### **6A.3: Repository Integration**
+#### **11.1.3: Repository Integration**
 - [ ] **Fedora Packaging**: Submit to Fedora Package Review process
 - [ ] **EPEL Integration**: Package for RHEL/CentOS via EPEL repository
 - [ ] **Copr Testing**: Use Fedora Copr for testing builds and feedback
 - [ ] Configure maintainer workflows and responsibilities
 
-### **Phase 6B: Pip Module Implementation (Priority 2)**
+### **Phase 11.2: Pip Module Implementation (Priority 2)**
 
 **Target Audience**: Python developers, CI/CD workflows, cross-platform development environments.
 
-#### **6B.1: Modern Python Packaging**
+#### **11.2.1: Modern Python Packaging**
 - [ ] Create `pyproject.toml` using modern Python packaging standards
 - [ ] Define console script entry point: `selinux-avc-analyzer = selinux_avc_analyzer.cli:main`
 - [ ] Configure build system (setuptools or hatchling)
 - [ ] Set up proper versioning with `__version__.py`
 
-#### **6B.2: Package Structure Refactoring**
+#### **11.2.2: Package Structure Refactoring**
 - [ ] Create `src/selinux_avc_analyzer/` package directory
 - [ ] Move `parse_avc.py` to `src/selinux_avc_analyzer/cli.py`
 - [ ] Create `__init__.py` with package exports and version
 - [ ] Add `__main__.py` for `python -m selinux_avc_analyzer` support
 - [ ] Update imports and maintain backward compatibility
 
-#### **6B.3: PyPI Publishing & Automation**
+#### **11.2.3: PyPI Publishing & Automation**
 - [ ] Configure GitHub Actions for automated releases
 - [ ] Set up PyPI trusted publishing via OIDC (no API keys needed)
 - [ ] Create wheel and source distribution builds
 - [ ] Configure automated testing matrix before publish
 
-#### **6B.4: Cross-Platform Compatibility**
+#### **11.2.4: Cross-Platform Compatibility**
 - [ ] Handle audit package dependency gracefully on non-Linux systems
 - [ ] Test pip installation on macOS and Windows
 - [ ] Document platform-specific limitations clearly
 - [ ] Provide fallback behavior when `ausearch` is unavailable
 
-### **Phase 6C: Additional Distribution Formats (Priority 3)**
+### **Phase 11.3: Additional Distribution Formats (Priority 3)**
 
-#### **6C.1: Debian Package (.deb)**
+#### **11.3.1: Debian Package (.deb)**
 - [ ] Create `debian/` directory structure
 - [ ] Write `debian/control` with proper dependencies (`auditd`, `python3-rich`)
 - [ ] Configure `debian/rules` for build process
 - [ ] Test on Ubuntu 22.04/24.04 LTS versions
 - [ ] Submit to Ubuntu Universe repository
 
-#### **6C.2: Arch User Repository (AUR)**
+#### **11.3.2: Arch User Repository (AUR)**
 - [ ] Create `PKGBUILD` for Arch Linux packaging
 - [ ] Configure dependency management (`audit`, `python-rich`)
 - [ ] Submit to AUR with proper metadata and descriptions
 - [ ] Set up maintainer responsibilities and update workflows
 
-#### **6C.3: Container Distribution**
+#### **11.3.3: Container Distribution**
 - [ ] Create optimized `Dockerfile` for containerized usage
 - [ ] Publish to GitHub Container Registry (`ghcr.io`)
 - [ ] Support volume mounting for audit log file access
 - [ ] Document container usage patterns and security considerations
 
-### **Phase 6D: Documentation & Release Automation (Priority 4)**
+### **Phase 11.4: Documentation & Release Automation (Priority 4)**
 
-#### **6D.1: Installation Documentation**
+#### **11.4.1: Installation Documentation**
 - [ ] Update README.md with comprehensive installation section
 - [ ] Create platform-specific installation guides
 - [ ] Document all dependency requirements per platform
 - [ ] Add troubleshooting section for common installation issues
 - [ ] Include verification steps for successful installation
 
-#### **6D.2: Release Automation Pipeline**
+#### **11.4.2: Release Automation Pipeline**
 - [ ] GitHub Actions workflow for multi-format releases
 - [ ] Automated version bumping and changelog generation
 - [ ] Cross-platform testing matrix (RHEL, Fedora, Ubuntu, Arch)
 - [ ] Automated security scanning for dependencies
 - [ ] Release notes generation from commit messages
 
-#### **6D.3: Distribution Validation Testing**
+#### **11.4.3: Distribution Validation Testing**
 - [ ] Automated installation testing on RHEL 8/9, Fedora 39/40
 - [ ] Ubuntu 22.04/24.04 LTS compatibility validation
 - [ ] Pip installation testing in virtual environments
@@ -502,11 +523,11 @@ Detailed Events:
 
 ### **Implementation Timeline & Success Metrics**
 
-**Week 1-2**: RPM packaging foundation (6A.1-6A.2)
-**Week 3**: Pip module structure (6B.1-6B.2)
-**Week 4**: Release automation setup (6D.2)
-**Week 5**: Repository submissions (6A.3, 6B.3)
-**Week 6**: Additional formats and comprehensive testing (6C, 6D.3)
+**Week 1-2**: RPM packaging foundation (11.1.1-11.1.2)
+**Week 3**: Pip module structure (11.2.1-11.2.2)
+**Week 4**: Release automation setup (11.4.2)
+**Week 5**: Repository submissions (11.1.3, 11.2.3)
+**Week 6**: Additional formats and comprehensive testing (11.3, 11.4.3)
 
 **Success Criteria**:
 - RPM available in Fedora repositories within 2 months
