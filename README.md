@@ -284,15 +284,19 @@ make help
 - **✅ refurb**: Python modernization suggestions
 
 **❌ Excluded Tools** (Performance issues or replaced)
-- pytest (timeout), flake8 (broken pipe), radon (pipe issues), pylint (too slow)
+- pytest (timeout), flake8 (broken pipe), pylint (too slow)
 - black, isort, pyflakes (replaced by single ruff tool)
+
+**🔄 Pending Tools** (Fix submitted upstream)
+- radon (SIGPIPE fix submitted, PR awaiting merge) - Use `make radon-check-local` with local fix
 
 ### Development Workflow
 1. Use `make format` to format code with ruff (no automatic hooks)
 2. Use `make quick-check` for ultra-fast quality validation
 3. Use `make test-regression` for comprehensive test coverage and regression prevention
-4. Use `make flow-diagram` to visualize function relationships after major changes
-5. All quality tools are managed through the Makefile for consistency
+4. Use `make radon-check-local` for complexity analysis (requires local radon fix at ../radon)
+5. Use `make flow-diagram` to visualize function relationships after major changes
+6. All quality tools are managed through the Makefile for consistency
 
 ### Architecture Overview
 

@@ -1838,9 +1838,7 @@ def sort_denials(denials: list, sort_order: str) -> list:
         )
 
 
-def print_summary(
-    console: Console, denial_info: dict, denial_num: int
-):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def print_summary(console: Console, denial_info: dict, denial_num: int):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Prints a formatted, color-coded summary of an AVC denial with aggregated information.
 
@@ -1877,8 +1875,11 @@ def print_summary(
         " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
     )
 
-    header = f"[bold green]Unique Denial #{
-        denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago}){dontaudit_indicator}{permissive_indicator}"
+    header = f"[bold green]Unique Denial #{denial_num}[/bold green] ({
+        count
+    } occurrences, last seen {last_seen_ago}){dontaudit_indicator}{
+        permissive_indicator
+    }"
     console.print(Rule(header))
 
     if not parsed_log:
@@ -3067,7 +3068,7 @@ def validate_file_with_auto_detection(
 
         if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
             console.print("⚠️  [bold yellow]Warning: Large File Detected[/bold yellow]")
-            console.print(f"   File size: {file_size / (1024*1024):.1f}MB")
+            console.print(f"   File size: {file_size / (1024 * 1024):.1f}MB")
             console.print("   [dim]Processing may take some time...[/dim]")
 
         # Auto-detect format type
@@ -3506,7 +3507,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             if not args.json:
                 console.print(
                     f"⚠️  [bold yellow]Warning: Skipping invalid log block {
-                        i + 1}[/bold yellow]"
+                        i + 1
+                    }[/bold yellow]"
                 )
                 for warning in warnings:
                     console.print(f"   [dim]• {warning}[/dim]")
@@ -3803,7 +3805,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             # Display initial count message
             console.print(
                 f"Found {total_events} AVC events. Displaying {
-                    len(unique_denials)} unique denials..."
+                    len(unique_denials)
+                } unique denials..."
             )
 
             # Display filtering info if applicable
@@ -4044,15 +4047,18 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 if args.process or args.path:
                     console.print(
                         f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                            len(log_blocks)} log blocks and found {
-                            len(unique_denials)} unique denials. Displayed {
-                            len(filtered_denials)} after filtering."
+                            len(log_blocks)
+                        } log blocks and found {
+                            len(unique_denials)
+                        } unique denials. Displayed {
+                            len(filtered_denials)
+                        } after filtering."
                     )
                 else:
                     console.print(
                         f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                            len(log_blocks)} log blocks and found {
-                            len(unique_denials)} unique denials."
+                            len(log_blocks)
+                        } log blocks and found {len(unique_denials)} unique denials."
                     )
 
                 # --- Added: Print the list of unparsed types found ---
@@ -4089,7 +4095,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     # Display initial count message
                     pager_console.print(
                         f"Found {total_events} AVC events. Displaying {
-                            len(unique_denials)} unique denials..."
+                            len(unique_denials)
+                        } unique denials..."
                     )
 
                     # Display filtering info if applicable
@@ -4354,15 +4361,20 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         if args.process or args.path:
                             pager_console.print(
                                 f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                                    len(log_blocks)} log blocks and found {
-                                    len(unique_denials)} unique denials. Displayed {
-                                    len(filtered_denials)} after filtering."
+                                    len(log_blocks)
+                                } log blocks and found {
+                                    len(unique_denials)
+                                } unique denials. Displayed {
+                                    len(filtered_denials)
+                                } after filtering."
                             )
                         else:
                             pager_console.print(
                                 f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                                    len(log_blocks)} log blocks and found {
-                                    len(unique_denials)} unique denials."
+                                    len(log_blocks)
+                                } log blocks and found {
+                                    len(unique_denials)
+                                } unique denials."
                             )
 
                         # Print unparsed types if any

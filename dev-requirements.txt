@@ -16,7 +16,8 @@ refurb==2.2.0          # Python modernization - when needed
 # mypy - Use manually for type checking (can be slow)
 
 # === PERFORMANCE OPTIMIZATIONS ===
-# radon - Fix pipe issues before re-enabling
+# radon - PENDING: SIGPIPE fix submitted upstream (PR pending merge)
+# Temporary: Use local fixed version at ../radon for complexity analysis
 # Skip: pytest (too slow for 4870-line file)
 # Skip: flake8 (replaced by pyflakes + bandit)
 # Skip: pylint (too slow)

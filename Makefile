@@ -118,9 +118,21 @@ all: format quick-check test security flow-diagram deps-graph
 
 # === TOOL EVOLUTION NOTES ===
 # WINNERS (adopted): ruff (all-in-one: formatting + linting + imports), pydeps, unittest
-# REJECTED: pytest (timeout), flake8 (broken pipe), radon (pipe issues), pylint (slow)
+# REJECTED: pytest (timeout), flake8 (broken pipe), pylint (slow)
 # REPLACED: pyflakes + isort + black → ruff (single tool, 197x performance improvement)
+# PENDING: radon (SIGPIPE fix submitted upstream, PR awaiting merge)
 #
 # Manual alternatives for specialized needs:
 # - Type checking: Run mypy manually when needed
-# - Complexity analysis: Run radon manually: radon cc parse_avc.py -s
+# radon-check: # DISABLED until upstream PR merged
+# 	@echo "🔍 Running complexity analysis..."
+# 	@radon cc parse_avc.py --show-complexity --average
+# 	@echo "📊 Modularized files complexity:"
+# 	@radon cc context.py utils.py --average
+#
+# Temporary workaround for radon complexity analysis:
+radon-check-local:
+	@echo "🔍 Running complexity analysis with local radon fix..."
+	@cd ../radon && python -m radon cc ../avc-parser/parse_avc.py --show-complexity --average
+	@echo "📊 Modularized files complexity:"
+	@cd ../radon && python -m radon cc ../avc-parser/context.py ../avc-parser/utils.py --average
