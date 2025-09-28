@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.3.0** | Complete command-line reference, data fields, and troubleshooting guide with Advanced Filtering
+**Version 1.4.0** | Complete command-line reference, data fields, and troubleshooting guide with SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
@@ -273,7 +273,7 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 
 ### JSON Format Structure
 
-> **🔬 Enhanced JSON Normalization**: Version 1.3.0 includes comprehensive field normalization for reliable tool integration, SIEM compatibility, and automated analysis workflows.
+> **🔬 Enhanced JSON Normalization**: Version 1.4.0 includes comprehensive field normalization and SELinux policy investigation commands for reliable tool integration, SIEM compatibility, and automated analysis workflows.
 
 #### Core Structure
 ```json

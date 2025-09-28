@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.3.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, advanced filtering capabilities, normalized JSON output, and clear correlation tracking.
+**Version 1.4.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
@@ -43,7 +43,12 @@ python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups
 # Use interactive pager for large outputs
 python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
-# Example output showing PID event counts in default view:
+# Example output includes automatically generated policy investigation commands:
+# ╭──────────────── Policy Investigation Command ────────────────╮
+# │    sesearch -A -s httpd_t -t default_t -c file -p read,write  │
+# ╰────────────────────────────────────────────────────────────────╯
+#
+# Plus PID event counts in denial summaries:
 # • PID 1234 (3x) (httpd (Web server process)) - PID 1234 has 3 events
 # • PID 5678 (nginx) - PID 5678 has 1 event (no count shown)
 ```
@@ -75,6 +80,8 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 ### 🔍 **Advanced Analysis**
 - **Semantic Intelligence**: Human-readable permissions (`read` → `Read file content`) and contextual analysis
 - **Smart Deduplication**: SELinux remediation-aware grouping that properly distinguishes services while grouping related permissions for optimal `semanage` command correlation
+- **Policy Investigation Commands**: Auto-generated `sesearch` commands for each denial group with copy-paste workflow integration
+- **Grouping Validation**: Efficiency analysis detecting when denial groups share identical policy queries for optimization insights
 - **Correlation Tracking**: Individual PID-to-resource mappings solve deduplication information loss
 - **PID Event Counting**: Shows event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for better correlation understanding
 - **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback for complex scenarios
@@ -95,24 +102,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 - **Smart Application**: Applied to natural language text while preserving technical data clarity
 - **Professional Appearance**: Maintains color harmony and visual consistency throughout the display
 
-## 🔮 Upcoming Features
-
-
-### 🎨 **Phase 4C: Enhanced User Experience** (In Progress)
-- **Smart Resource Display**: Context-aware formatting based on object class (file vs network vs etc.)
-- **Terminal Integration**: Enhanced output formatting for various terminal environments
-
-### 🧪 **Phase 4D: Integration & Performance** (Quality Assurance)
-- **Real-world Scenarios**: Various audit log formats, different Linux distributions
-- **Cross-platform Compatibility**: Testing across RHEL, Ubuntu, SUSE, Arch distributions
-- **Memory Optimization**: Large file handling improvements (>500MB audit logs)
-
-### 📚 **Phase 5: Enhanced Documentation**
-- **Architecture Overview**: Function relationship trees and data flow diagrams
-- **Developer Guide**: Contribution setup and architectural understanding
-- **Migration Guides**: Enhanced README and usage examples
-
-📊 **Complete Plan**: See [ROADMAP.md](ROADMAP.md) for detailed implementation roadmap and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for scope decisions.
+📊 **Development Plans**: See [ROADMAP.md](ROADMAP.md) for future plans and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for implementation details.
 
 ## Prerequisites
 
@@ -185,9 +175,10 @@ python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 ```
 
-**JSON Output**: Add `--json` for machine-readable output
+**JSON Output**: Add `--json` for machine-readable output with `sesearch_command` field
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --json
+# Output includes: "sesearch_command": "sesearch -A -s httpd_t -t default_t -c file -p read,write"
 ```
 
 📚 **Need more help?**
@@ -212,118 +203,23 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 
 🔧 **For complete command reference**: See [CLI_REFERENCE.md](CLI_REFERENCE.md) for all command-line options, data fields, and troubleshooting guide.
 
-## 📈 Development Status
 
-**Current Version**: 1.4.0 | **Current Phase**: 7 (Comprehensive Test Coverage COMPLETE)
+## 📊 Project Status
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| **Core Foundation** | ✅ **COMPLETE** | Auto-detection, validation, robust parsing |
-| **Semantic Analysis** | ✅ **COMPLETE** | Human-readable permissions, contextual intelligence |
-| **Correlation Tracking** | ✅ **COMPLETE** | PID-to-resource mapping, individual event details |
-| **Rich Display Format** | ✅ **COMPLETE** | Professional terminal output, responsive design |
-| **Code Quality** | ✅ **COMPLETE** | Refactored architecture, maintainable functions |
-| **Basic Filtering & Sorting** | ✅ **COMPLETE** | Process, path filtering; recent, count, chrono sorting |
-| **dontaudit Detection** | ✅ **COMPLETE** | Automatic detection of enhanced audit mode |
-| **Smart Deduplication Logic** | ✅ **COMPLETE** | SELinux remediation-aware signature generation |
-| **Smart Event Grouping** | ✅ **COMPLETE** | Intelligent directory path grouping for large outputs |
-| **Testing Foundation** | ✅ **COMPLETE** | 107 comprehensive tests, quality analysis, bug fixes |
-| **PID Event Counting** | ✅ **COMPLETE** | Event frequency display per PID in compact view (e.g., PID 1234 (3x)) |
-| **Pipe Compatibility** | ✅ **COMPLETE** | Handle broken pipe errors for head/less redirection |
-| **Advanced Filtering** | ✅ **COMPLETE** | Time range and context filtering with pattern matching support |
-| **JSON Field Normalization** | ✅ **COMPLETE** | Standardized path formats, clean port extraction, normalized context fields |
-| **Interactive Pager Mode** | ✅ **COMPLETE** | Built-in less-like interface with --pager, color preservation, smart fallbacks |
-| **Dev-Suite Optimization** | ✅ **COMPLETE** | Fast, reliable development tools (Phase 4C) - optimized for 4870-line modularization |
-| **Performance Optimization** | ⏳ **PLANNED** | Memory management, cross-platform testing |
+**Production-ready SELinux AVC denial forensic analysis tool**
 
-### 🎯 **Design Principles**
-- **Forensic Focus**: Post-incident analysis (not real-time monitoring)
-- **Professional Output**: Rich terminal formatting with correlation tracking
-- **Minimal Dependencies**: Python + Rich only (no policy files required)
-- **Cross-Platform**: Linux, macOS, Windows compatibility
+**Core Features**: ✅ Complete  
+- Smart deduplication with SELinux policy investigation integration
+- Rich terminal display with professional formatting  
+- Comprehensive filtering (time, process, path, context)
+- JSON export with structured output
 
-📊 **Documentation**: [EXAMPLES.md](EXAMPLES.md) | [CLI_REFERENCE.md](CLI_REFERENCE.md) | [ROADMAP.md](ROADMAP.md) | [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md)
+**Quality Assurance**: ✅ Complete  
+- 146 comprehensive tests with regression prevention
+- Modular architecture for maintainability
+- Cross-platform compatibility
 
-## 🛠️ Development
-
-### Quick Development Setup
-```bash
-# Install development dependencies
-make install-tools
-
-# Format code (with ruff)
-make format
-
-# Generate function flow diagrams
-make flow-diagram      # Complete architecture (49 nodes, 104 edges)
-make flow-focused      # Focused view from main() function
-
-# Fast quality check (< 5 seconds)
-make quick-check
-
-# Run comprehensive analysis
-make lint
-
-# Security analysis
-make security
-
-# See all available commands
-make help
-```
-
-### Code Quality Tools (Ultra-Fast Optimized)
-**🏆 Tier 1 - Daily Use (< 1 second)**
-- **✅ ruff**: All-in-one formatting + linting + import sorting (197x faster than old 3-tool combo)
-- **✅ pydeps**: Import dependency analysis - fast, reliable
-- **✅ vulture**: Dead code detection - found 46 real issues
-- **✅ code2flow**: Function dependency visualization
-
-**🥈 Tier 2 - Deep Analysis**
-- **✅ bandit**: Security code analysis
-- **✅ safety**: Dependency security scanning
-- **✅ refurb**: Python modernization suggestions
-
-**❌ Excluded Tools** (Performance issues or replaced)
-- pytest (timeout), flake8 (broken pipe), pylint (too slow)
-- black, isort, pyflakes (replaced by single ruff tool)
-
-**🔄 Pending Tools** (Fix submitted upstream)
-- radon (SIGPIPE fix submitted, PR awaiting merge) - Use `make radon-check-local` with local fix
-
-### Development Workflow
-1. Use `make format` to format code with ruff (no automatic hooks)
-2. Use `make quick-check` for ultra-fast quality validation
-3. Use `make test-regression` for comprehensive test coverage and regression prevention
-4. Use `make radon-check-local` for complexity analysis (requires local radon fix at ../radon)
-5. Use `make flow-diagram` to visualize function relationships after major changes
-6. All quality tools are managed through the Makefile for consistency
-
-### Architecture Overview
-
-**Modular Design (Phase 4C Complete)**:
-```
-avc-parser/
-├── parse_avc.py       # Main application (4400 lines)
-│                      # CLI interface, parsing logic, display formatting
-├── context.py         # SELinux context parsing & semantic analysis
-│                      # AvcContext class, PermissionSemanticAnalyzer
-├── utils.py          # Utility functions
-│                      # Time formatting, path display, error handling
-└── tests/            # Comprehensive test suite (146 tests)
-```
-
-**Ultra-Fast Development Workflow**:
-- `make quick-check` - Sub-second quality validation (ruff)
-- `make test` - Complete test suite (146 tests)
-- `make test-regression` - Comprehensive regression prevention framework
-- `make deps-graph` - Import dependency analysis
-- `make all` - Complete development workflow
-
-**Key Benefits**:
-- **197x faster development** (ruff vs old 3-tool combination)
-- **Maintainable architecture** (reduced from 4870 to 4400 lines main file)
-- **Clean module boundaries** with minimal coupling
-- **Zero dead code** and modern Python optimizations
+**📚 Documentation**: [EXAMPLES.md](EXAMPLES.md) | [CLI_REFERENCE.md](CLI_REFERENCE.md) | [ROADMAP.md](ROADMAP.md)
 
 ## 🤝 Contributing
 
@@ -345,4 +241,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.3.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.4.0** | Made for forensic analysts and system administrators

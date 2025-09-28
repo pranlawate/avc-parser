@@ -9,7 +9,7 @@ post-incident SELinux audit log analysis for complex denial patterns.
 
 Author: Pranav Lawate
 License: MIT
-Version: 1.3.0
+Version: 1.4.0
 """
 
 import argparse
@@ -1161,6 +1161,124 @@ def get_path_pattern(path: str, tclass: str) -> str:
 
     # Keep the exact path for other cases
     return path
+
+
+def validate_grouping_optimality(unique_denials: dict) -> dict:
+    """
+    Validate grouping optimality by analyzing sesearch command uniqueness.
+
+    This function checks if our current grouping produces optimal distinct policy queries
+    by identifying groups that generate identical sesearch commands.
+
+    Args:
+        unique_denials (dict): Dictionary of grouped denials with signatures as keys
+
+    Returns:
+        dict: Validation report containing:
+            - total_groups: Number of current groups
+            - unique_sesearch_commands: Number of distinct sesearch commands
+            - optimization_potential: Groups that could be merged
+            - efficiency_score: Ratio of unique commands to total groups (1.0 = optimal)
+    """
+    sesearch_to_groups = {}
+    optimization_potential = []
+
+    # Group denials by their sesearch commands
+    for signature, denial_info in unique_denials.items():
+        sesearch_cmd = generate_sesearch_command(denial_info["log"])
+        if sesearch_cmd:
+            if sesearch_cmd not in sesearch_to_groups:
+                sesearch_to_groups[sesearch_cmd] = []
+            sesearch_to_groups[sesearch_cmd].append(signature)
+
+    # Identify optimization opportunities (multiple groups with same sesearch command)
+    for sesearch_cmd, group_signatures in sesearch_to_groups.items():
+        if len(group_signatures) > 1:
+            # Multiple groups have the same sesearch command - potential for merging
+            group_details = []
+            for signature in group_signatures:
+                denial_info = unique_denials[signature]
+                group_details.append({
+                    "signature": signature,
+                    "count": denial_info["count"],
+                    "sample_process": denial_info["log"].get("comm", "unknown"),
+                    "sample_path": denial_info["log"].get("path", "unknown")
+                })
+
+            optimization_potential.append({
+                "sesearch_command": sesearch_cmd,
+                "duplicate_groups": group_details,
+                "merge_potential": len(group_signatures)
+            })
+
+    # Calculate efficiency metrics
+    total_groups = len(unique_denials)
+    unique_commands = len(sesearch_to_groups)
+    efficiency_score = unique_commands / total_groups if total_groups > 0 else 1.0
+
+    return {
+        "total_groups": total_groups,
+        "unique_sesearch_commands": unique_commands,
+        "optimization_potential": optimization_potential,
+        "efficiency_score": efficiency_score,
+        "is_optimal": len(optimization_potential) == 0
+    }
+
+
+def generate_sesearch_command(parsed_log: dict) -> str:
+    """
+    Generate sesearch command for policy investigation based on AVC denial data.
+
+    Args:
+        parsed_log (dict): Parsed AVC log data containing scontext, tcontext, tclass, permission
+
+    Returns:
+        str: sesearch command string, or empty string if required data is missing
+
+    Example:
+        Input: scontext="system_u:system_r:httpd_t:s0", tcontext="unconfined_u:object_r:default_t:s0",
+               tclass="file", permission="read"
+        Output: "sesearch -A -s httpd_t -t default_t -c file -p read"
+    """
+    try:
+        # Extract required fields
+        scontext = parsed_log.get("scontext", "")
+        tcontext = parsed_log.get("tcontext", "")
+        tclass = parsed_log.get("tclass", "")
+        permission = parsed_log.get("permission", "")
+
+        # Validate required fields
+        if not all([scontext, tcontext, tclass, permission]):
+            return ""
+
+        # Extract type from SELinux contexts (user:role:type:mls format)
+        # Convert context objects to strings if necessary, then split on ':' and take index [2] for type component
+        try:
+            scontext_str = str(scontext)
+            tcontext_str = str(tcontext)
+            source_type = scontext_str.split(":")[2]
+            target_type = tcontext_str.split(":")[2]
+        except (IndexError, AttributeError):
+            # Handle malformed contexts gracefully
+            return ""
+
+        # Handle multiple permissions (convert from "{ read write }" format)
+        if permission.startswith("{ ") and permission.endswith(" }"):
+            # Multiple permissions: "{ read write execute }" -> "read,write,execute"
+            perms = permission[2:-2].split()
+            permission_str = ",".join(perms)
+        else:
+            # Single permission: "read" -> "read"
+            permission_str = permission.strip()
+
+        # Generate sesearch command
+        sesearch_cmd = f"sesearch -A -s {source_type} -t {target_type} -c {tclass} -p {permission_str}"
+
+        return sesearch_cmd
+
+    except Exception:
+        # Return empty string for any parsing errors
+        return ""
 
 
 def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tuple:
@@ -2909,6 +3027,31 @@ def print_rich_summary(
                     f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}"
                 )
 
+    # Generate and display sesearch command for policy investigation
+    # Use aggregated permissions if available for more complete sesearch command
+    sesearch_log = parsed_log.copy()
+    if (
+        "permissions" in denial_info
+        and denial_info["permissions"]
+        and len(denial_info["permissions"]) > 1
+    ):
+        # Use aggregated permissions for more complete sesearch command
+        permissions_list = sorted(list(denial_info["permissions"]))
+        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
+
+    sesearch_cmd = generate_sesearch_command(sesearch_log)
+    if sesearch_cmd:
+        # Create sesearch command panel
+        sesearch_text = f"[bold green]{sesearch_cmd}[/bold green]"
+        sesearch_panel = Panel(
+            Align.center(sesearch_text),
+            title="[bold yellow]Policy Investigation Command[/bold yellow]",
+            border_style="yellow",
+            padding=(0, 2)
+        )
+        panel_width = min(max(int(console.width * 0.8), 60), 140)
+        console.print(Align.center(sesearch_panel, width=panel_width))
+
     console.print()  # Space after events
 
 
@@ -3714,6 +3857,17 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         value.replace("\x00", "").replace("\r", "").replace("\n", "\\n")
                     )
 
+            # Add sesearch command for policy investigation
+            # Use aggregated permissions if available, otherwise use single permission from log
+            sesearch_log = denial_info["log"].copy()
+            if "permissions" in json_denial and json_denial["permissions"]:
+                # Use aggregated permissions for more complete sesearch command
+                sesearch_log["permission"] = "{ " + " ".join(json_denial["permissions"]) + " }"
+
+            sesearch_cmd = generate_sesearch_command(sesearch_log)
+            if sesearch_cmd:
+                json_denial["sesearch_command"] = sesearch_cmd
+
             output_list.append(json_denial)
 
         # Create structured JSON output with summary
@@ -3744,6 +3898,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
         # Apply sorting based on user preference
         sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
+
+        # Validate grouping optimality (analyze sesearch command uniqueness)
+        validation_report = validate_grouping_optimality(unique_denials)
 
         # Apply filtering if specified
         try:
@@ -3808,6 +3965,15 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     len(unique_denials)
                 } unique denials..."
             )
+
+            # Display grouping optimality validation if there are optimization opportunities
+            if not validation_report["is_optimal"]:
+                efficiency = validation_report["efficiency_score"] * 100
+                console.print(
+                    f"⚠️  [yellow]Grouping efficiency: {efficiency:.1f}% "
+                    f"({validation_report['unique_sesearch_commands']} unique policy queries "
+                    f"vs {validation_report['total_groups']} groups)[/yellow]"
+                )
 
             # Display filtering info if applicable
             if (

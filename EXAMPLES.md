@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - Examples & Usage Patterns
 
-**Version 1.3.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Advanced Filtering
+**Version 1.4.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with SELinux Policy Investigation Integration
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
 
@@ -215,7 +215,7 @@ Showing 2 of 45 unique denials after filtering.
 
 ## 🔧 **Process Name Resolution Examples**
 
-### Improved Contextual Analysis (Version 1.3.0+)
+### Improved Contextual Analysis (Version 1.4.0+)
 The tool now uses actual process names instead of SELinux type descriptions in contextual analysis:
 
 ```bash
