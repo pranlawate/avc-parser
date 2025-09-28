@@ -9,7 +9,7 @@ post-incident SELinux audit log analysis for complex denial patterns.
 
 Author: Pranav Lawate
 License: MIT
-Version: 1.4.0
+Version: 1.5.0
 """
 
 import argparse
@@ -2034,7 +2034,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
         " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
     )
 
-    header = f"[bold green]Unique Denial #{denial_num}[/bold green] ({
+    header = f"[bold green]Unique Denial Group #{denial_num}[/bold green] ({
         count
     } occurrences, last seen {last_seen_ago}){dontaudit_indicator}{
         permissive_indicator
@@ -2471,7 +2471,7 @@ def print_rich_summary(
 
     # Rich Rule header with responsive design using BIONIC reading format
     header_text = (
-        f"Unique Denial #{denial_num} • {count} occurrences • last seen {last_seen_ago}"
+        f"Unique Denial Group #{denial_num} • {count} occurrences • last seen {last_seen_ago}"
     )
     header_bionic = format_bionic_text(header_text, "green")
 
@@ -3096,6 +3096,333 @@ def print_rich_summary(
     console.print()  # Space after events
 
 
+def display_report_sealert_format(
+    console: Console,
+    denial_info: dict,
+    denial_num: int,
+    expand_groups: bool = False,
+):
+    """
+    Display denial information in sealert-inspired technical report format.
+
+    Technical analysis format with complete forensic detail in two-column layout.
+    Based on setroubleshoot's sealert format but preserves our grouping advantages.
+
+    Args:
+        console (Console): Rich console object for formatted output
+        denial_info (dict): Aggregated denial information with correlation data
+        denial_num (int): Sequential denial number for display
+        expand_groups (bool): Whether to show individual events instead of grouped view
+    """
+    parsed_log = denial_info["log"]
+    count = denial_info["count"]
+    correlations = denial_info.get("correlations", [])
+    last_seen_dt = denial_info["last_seen_obj"]
+    last_seen_ago = human_time_ago(last_seen_dt)
+
+    # Header with denial group information (sealert-inspired)
+    unique_pids = len(set(corr.get("pid") for corr in correlations if corr.get("pid")))
+    console.print("-" * 80)
+    console.print(f"SELinux Unique Denial Group #{denial_num} - {count} total events, {unique_pids} unique PIDs, last seen {last_seen_ago}")
+    console.print()
+
+    # Action-focused summary line
+    source_context_obj = parsed_log.get("scontext")
+    target_context_obj = parsed_log.get("tcontext")
+
+    # Extract type from AvcContext objects (they have a .type attribute)
+    source_type = "unknown"
+    target_type = "unknown"
+
+    if source_context_obj and hasattr(source_context_obj, 'type'):
+        source_type = source_context_obj.type
+
+    if target_context_obj and hasattr(target_context_obj, 'type'):
+        target_type = target_context_obj.type
+
+    permission = parsed_log.get("permission", "unknown")
+    permissions_display = parsed_log.get("permissions_display", permission)
+    tclass = parsed_log.get("tclass", "unknown")
+
+    console.print(f"{source_type} attempted {permissions_display} access to {target_type} {tclass} and was denied.")
+    console.print()
+
+    # Raw audit message context
+    comm = parsed_log.get("comm", "unknown")
+    pid = parsed_log.get("pid", "unknown")
+    path = parsed_log.get("path", "")
+    dest_port = parsed_log.get("dest_port", "")
+
+    console.print("Raw Audit Message:")
+    audit_parts = []
+    audit_parts.append(f"avc: denied {{ {permissions_display} }}")
+    audit_parts.append(f"for pid={pid} comm=\"{comm}\"")
+
+    if path:
+        audit_parts.append(f"path=\"{path}\"")
+    elif dest_port:
+        audit_parts.append(f"dest={dest_port}")
+
+    console.print(f"  {' '.join(audit_parts)}")
+    console.print()
+
+    # Analysis Details in two-column format
+    console.print("Analysis Details:")
+
+    # Source and target contexts
+    source_context = parsed_log.get("scontext", "unknown")
+    target_context = parsed_log.get("tcontext", "unknown")
+    source_desc = parsed_log.get("source_type_description", "")
+    target_desc = parsed_log.get("target_type_description", "")
+
+    source_line = f"  Source Context        {source_context}"
+    if source_desc:
+        source_line += f" ({source_desc})"
+    console.print(source_line)
+
+    target_line = f"  Target Context        {target_context}"
+    if target_desc:
+        target_line += f" ({target_desc})"
+    console.print(target_line)
+
+    # Target path or port information
+    if path:
+        console.print(f"  Target Path           {path}")
+    elif dest_port:
+        port_desc = parsed_log.get("port_description", "")
+        port_line = f"  Target Port           {dest_port}"
+        if port_desc:
+            port_line += f" ({port_desc})"
+        console.print(port_line)
+
+        # Socket address if available
+        saddr = parsed_log.get("saddr", "")
+        if saddr:
+            console.print(f"  Socket Address        {saddr}")
+
+    # Permission details
+    permission_semantic = parsed_log.get("permission_semantic", permissions_display)
+    console.print(f"  Permissions           {permissions_display} ({permission_semantic})")
+
+    # Object class
+    console.print(f"  Object Class          {tclass}")
+
+    # Process information
+    exe = parsed_log.get("exe", "")
+    cwd = parsed_log.get("cwd", "")
+    if exe and cwd:
+        console.print(f"  Process Info          {comm} ({exe}) in {cwd}")
+    elif exe:
+        console.print(f"  Process Info          {comm} ({exe})")
+    elif comm != "unknown":
+        console.print(f"  Process Info          {comm}")
+
+    # SELinux mode and status
+    is_permissive = parsed_log.get("permissive") == "1"
+    status_symbol = "⚠️  ALLOWED" if is_permissive else "✗ BLOCKED"
+    mode = "Permissive" if is_permissive else "Enforcing"
+    console.print(f"  SELinux Mode          {mode} ({status_symbol})")
+
+    # Time range if multiple events
+    if count > 1:
+        first_seen_dt = denial_info.get("first_seen_obj")
+        if first_seen_dt and last_seen_dt:
+            first_seen_str = first_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
+            last_seen_str = last_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
+            console.print(f"  Time Range            {first_seen_str} - {last_seen_str}")
+
+    console.print()
+
+    # Event Distribution - always show in report mode when there are multiple events
+    if correlations and len(correlations) > 1:
+        console.print("Event Distribution:")
+
+        # Group correlations by PID and show distribution
+        pid_events = {}
+        for corr in correlations:
+            pid = corr.get("pid")
+            if pid:
+                if pid not in pid_events:
+                    pid_events[pid] = {
+                        "count": 0,
+                        "comm": corr.get("comm", "unknown"),
+                        "timestamp": corr.get("timestamp", "unknown")
+                    }
+                pid_events[pid]["count"] += 1
+
+        for pid, info in sorted(pid_events.items()):
+            count_str = f"({info['count']}x)" if info["count"] > 1 else ""
+            console.print(f"  PID {pid} {count_str}      {info['comm']} at {info['timestamp']}")
+
+        console.print()
+
+    # Policy Investigation
+    sesearch_command = generate_sesearch_command(parsed_log)
+    console.print("Policy Investigation:")
+    console.print(f"  Command: {sesearch_command}")
+    console.print()
+    console.print("  This command shows existing allow rules for this access pattern.")
+
+    # Contextual Analysis
+    contextual_analysis = parsed_log.get("contextual_analysis", "")
+    if contextual_analysis:
+        console.print()
+        console.print("Contextual Analysis:")
+        console.print(f"  {contextual_analysis}")
+
+    console.print()
+
+
+def display_report_brief_format(
+    console: Console,
+    denial_info: dict,
+    denial_num: int,
+    expand_groups: bool = False,
+):
+    """
+    Display denial information in executive brief format for management reporting.
+
+    Executive summary format with business impact focus and visual hierarchy.
+    Designed for incident reports, compliance documentation, and management briefings.
+
+    Args:
+        console (Console): Rich console object for formatted output
+        denial_info (dict): Aggregated denial information with correlation data
+        denial_num (int): Sequential denial number for display
+        expand_groups (bool): Whether to show individual events instead of grouped view
+    """
+    parsed_log = denial_info["log"]
+    count = denial_info["count"]
+    correlations = denial_info.get("correlations", [])
+    last_seen_dt = denial_info["last_seen_obj"]
+    last_seen_ago = human_time_ago(last_seen_dt)
+
+    # Extract key information
+    source_context_obj = parsed_log.get("scontext")
+    target_context_obj = parsed_log.get("tcontext")
+
+    source_type = "unknown"
+    target_type = "unknown"
+    if source_context_obj and hasattr(source_context_obj, 'type'):
+        source_type = source_context_obj.type
+    if target_context_obj and hasattr(target_context_obj, 'type'):
+        target_type = target_context_obj.type
+
+    permission = parsed_log.get("permission", "unknown")
+    permissions_display = parsed_log.get("permissions_display", permission)
+    tclass = parsed_log.get("tclass", "unknown")
+    comm = parsed_log.get("comm", "unknown")
+    path = parsed_log.get("path", "")
+    dest_port = parsed_log.get("dest_port", "")
+    unique_pids = len(set(corr.get("pid") for corr in correlations if corr.get("pid")))
+    is_permissive = parsed_log.get("permissive") == "1"
+
+    # Determine priority level based on denial characteristics
+    priority = "HIGH PRIORITY"
+    if is_permissive:
+        priority = "MEDIUM PRIORITY"
+    elif tclass in ["file", "dir"] and "var" not in str(target_type).lower():
+        priority = "MEDIUM PRIORITY"
+
+    # Determine business impact
+    impact_descriptions = {
+        "httpd_t": "Service disruption - web server cannot access required resources",
+        "nginx_t": "Service disruption - web server cannot access required resources",
+        "mysqld_t": "Database service disruption - data access blocked",
+        "sshd_t": "Remote access disruption - SSH service blocked",
+        "systemd_t": "System service disruption - core system process blocked",
+        "unconfined_t": "User application disruption - unconfined process blocked",
+    }
+
+    impact = impact_descriptions.get(source_type, f"Application disruption - {comm} process cannot access required resources")
+
+    # Resource description
+    if path:
+        if "config" in path.lower() or "conf" in path.lower():
+            resource_desc = "configuration files"
+        elif "/var/log" in path:
+            resource_desc = "log files"
+        elif "/etc" in path:
+            resource_desc = "system configuration"
+        elif "/home" in path:
+            resource_desc = "user data"
+        elif "/tmp" in path:
+            resource_desc = "temporary files"
+        else:
+            resource_desc = "files"
+    elif dest_port:
+        resource_desc = f"network services (port {dest_port})"
+    else:
+        resource_desc = f"{tclass} resources"
+
+    # Action description
+    action_map = {
+        "read": "reading",
+        "write": "writing",
+        "open": "opening",
+        "getattr": "accessing",
+        "name_connect": "connecting to",
+        "name_bind": "binding to",
+    }
+    action = action_map.get(permission, f"performing {permission} on")
+
+    # Time range for multiple events
+    time_info = f"({count} events across {unique_pids} processes)"
+    if count > 1:
+        first_seen_dt = denial_info.get("first_seen_obj")
+        if first_seen_dt and last_seen_dt:
+            first_seen_str = first_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
+            last_seen_str = last_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
+            time_info = f"{first_seen_str} - {last_seen_str} {time_info}"
+
+    # Executive Summary Block
+    console.print("=" * 80)
+    console.print(f"SELINUX SECURITY INCIDENT #{denial_num}                                    [{priority}]")
+    console.print()
+    console.print(f"WHAT: {source_type.replace('_t', '').title()} blocked from {action} {resource_desc}")
+    console.print(f"WHEN: {time_info}")
+    console.print(f"WHO:  {comm} processes (PIDs: {', '.join(str(corr.get('pid', 'unknown')) for corr in correlations[:3])}{'...' if len(correlations) > 3 else ''})")
+
+    if path:
+        # Show path info, truncate if too long
+        path_display = path if len(path) <= 50 else path[:47] + "..."
+        if count > 1 and len(correlations) > 1:
+            path_display += f" + {count-1} other files"
+        console.print(f"WHERE: {path_display}")
+    elif dest_port:
+        port_desc = parsed_log.get("port_description", "")
+        port_info = f"port {dest_port}"
+        if port_desc:
+            port_info += f" ({port_desc})"
+        console.print(f"WHERE: Network connection to {port_info}")
+
+    console.print()
+    console.print(f"IMPACT: {impact}")
+    status_text = "⚠️  ALLOWED due to permissive mode" if is_permissive else "✗ BLOCKED by SELinux policy (Enforcing mode)"
+    console.print(f"STATUS: {status_text}")
+    console.print("=" * 80)
+    console.print()
+
+    # Simple remediation section for brief format
+    console.print("REMEDIATION:")
+    sesearch_command = generate_sesearch_command(parsed_log)
+    console.print(f"$ {sesearch_command}")
+
+    if tclass == "file" and "httpd" in source_type:
+        console.print("$ # Consider: setsebool -P httpd_read_user_content 1")
+    elif "name_connect" in permission and "httpd" in source_type:
+        console.print("$ # Consider: setsebool -P httpd_can_network_connect 1")
+    else:
+        console.print("$ # If no rules exist, create custom policy or fix file contexts")
+
+    # Security alerts at the end
+    if is_permissive:
+        console.print()
+        console.print("⚠️  SECURITY ALERT: System running in permissive mode - denials logged but allowed")
+
+    console.print()
+
+
 def validate_arguments(args, console: Console) -> str:
     """
     Comprehensive argument validation with detailed error messages.
@@ -3507,12 +3834,19 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     parser.add_argument(
         "--fields",
         action="store_true",
-        help="Use field-by-field display format instead of compact Rich format.",
+        help="Field-by-field technical breakdown for deep-dive analysis.",
     )
     parser.add_argument(
         "--detailed",
         action="store_true",
         help="Show enhanced detailed view with expanded correlation events and context information.",
+    )
+    parser.add_argument(
+        "--report",
+        nargs="?",
+        const="brief",
+        choices=["brief", "sealert"],
+        help="Professional report format: 'brief' (default) for executive summaries, 'sealert' for technical analysis.",
     )
     parser.add_argument(
         "--process",
@@ -4052,190 +4386,260 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 )
 
             if filtered_denials:
-                console.print(Rule("[dim]Parsed Log Summary[/dim]"))
+                if not args.report:
+                    console.print(Rule("[dim]Parsed Log Summary[/dim]"))
 
                 # Display detection warnings at the top
                 if dontaudit_detected:
                     indicators_str = ", ".join(found_indicators)
-                    # Create a prominent warning panel
-                    from rich.align import Align
-                    from rich.console import Group
-                    from rich.panel import Panel
 
-                    warning_lines = [
-                        Align.center(
-                            "[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"
-                        ),
-                        Align.center(""),
-                        Align.center(
-                            "[yellow]Enhanced audit mode is active on this system.[/yellow]"
-                        ),
-                        Align.center(
-                            f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"
-                        ),
-                        Align.center(""),
-                        Align.center(
-                            "[dim]This means you're seeing permissions that are normally hidden.[/dim]"
-                        ),
-                    ]
+                    if args.report:
+                        # Simple text format for report mode
+                        console.print("═" * 79)
+                        console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
+                        console.print("Enhanced audit mode is active on this system.")
+                        console.print(f"Typically suppressed permissions detected: {indicators_str}")
+                        console.print("This means you're seeing permissions that are normally hidden.")
+                        console.print("═" * 79)
+                        console.print()
+                    else:
+                        # Create a prominent warning panel for Rich format
+                        from rich.align import Align
+                        from rich.console import Group
+                        from rich.panel import Panel
 
-                    warning_panel = Panel(
-                        Group(*warning_lines),
-                        title="[bold red]Security Notice[/bold red]",
-                        border_style="bright_yellow",
-                        padding=(1, 4),
-                    )
-                    panel_width = min(max(int(console.width * 0.6), 60), 120)
-                    console.print(Align.center(warning_panel, width=panel_width))
-                    console.print()
+                        warning_lines = [
+                            Align.center(
+                                "[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"
+                            ),
+                            Align.center(""),
+                            Align.center(
+                                "[yellow]Enhanced audit mode is active on this system.[/yellow]"
+                            ),
+                            Align.center(
+                                f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"
+                            ),
+                            Align.center(""),
+                            Align.center(
+                                "[dim]This means you're seeing permissions that are normally hidden.[/dim]"
+                            ),
+                        ]
+
+                        warning_panel = Panel(
+                            Group(*warning_lines),
+                            title="[bold red]Security Notice[/bold red]",
+                            border_style="bright_yellow",
+                            padding=(1, 4),
+                        )
+                        panel_width = min(max(int(console.width * 0.6), 60), 120)
+                        console.print(Align.center(warning_panel, width=panel_width))
+                        console.print()
 
                 # Display permissive mode warning if found
                 if permissive_detected:
-                    from rich.align import Align
-                    from rich.console import Group
-                    from rich.panel import Panel
+                    if args.report:
+                        # Simple text format for report mode
+                        console.print("═" * 79)
+                        console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
+                        console.print(f"{permissive_count} of {total_events} events were in permissive mode.")
+                        console.print("These denials were logged but not enforced.")
+                        console.print("═" * 79)
+                        console.print()
+                    else:
+                        # Rich panel format for default mode
+                        from rich.align import Align
+                        from rich.console import Group
+                        from rich.panel import Panel
 
-                    warning_lines = [
-                        Align.center(
-                            "[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"
-                        ),
-                        Align.center(""),
-                        Align.center(
-                            f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"
-                        ),
-                        Align.center(
-                            "[dim]These denials were logged but not enforced.[/dim]"
-                        ),
-                    ]
+                        warning_lines = [
+                            Align.center(
+                                "[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"
+                            ),
+                            Align.center(""),
+                            Align.center(
+                                f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"
+                            ),
+                            Align.center(
+                                "[dim]These denials were logged but not enforced.[/dim]"
+                            ),
+                        ]
 
-                    permissive_panel = Panel(
-                        Group(*warning_lines),
-                        title="[bold blue]Mode Notice[/bold blue]",
-                        border_style="bright_blue",
-                        padding=(1, 4),
-                    )
-                    panel_width = min(max(int(console.width * 0.6), 60), 120)
-                    console.print(Align.center(permissive_panel, width=panel_width))
-                    console.print()
+                        permissive_panel = Panel(
+                            Group(*warning_lines),
+                            title="[bold blue]Mode Notice[/bold blue]",
+                            border_style="bright_blue",
+                            padding=(1, 4),
+                        )
+                        panel_width = min(max(int(console.width * 0.6), 60), 120)
+                        console.print(Align.center(permissive_panel, width=panel_width))
+                        console.print()
 
                 # Display custom paths warning if found
                 if custom_paths_detected:
-                    from rich.align import Align
-                    from rich.console import Group
-                    from rich.panel import Panel
-
                     patterns_str = ", ".join(found_custom_patterns[:3])
                     if len(found_custom_patterns) > 3:
                         patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                    warning_lines = [
-                        Align.center(
-                            "[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"
-                        ),
-                        Align.center(""),
-                        Align.center(
-                            f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"
-                        ),
-                        Align.center(
-                            "[dim]These may require custom fcontext rules.[/dim]"
-                        ),
-                    ]
+                    if args.report:
+                        # Simple text format for report mode
+                        console.print("═" * 79)
+                        console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
+                        console.print(f"Non-standard paths found: {patterns_str}")
+                        console.print("These may require custom fcontext rules.")
+                        console.print("═" * 79)
+                        console.print()
+                    else:
+                        # Rich panel format for default mode
+                        from rich.align import Align
+                        from rich.console import Group
+                        from rich.panel import Panel
 
-                    custom_panel = Panel(
-                        Group(*warning_lines),
-                        title="[bold magenta]Path Notice[/bold magenta]",
-                        border_style="bright_magenta",
-                        padding=(1, 4),
-                    )
-                    panel_width = min(max(int(console.width * 0.6), 60), 120)
-                    console.print(Align.center(custom_panel, width=panel_width))
-                    console.print()
+                        warning_lines = [
+                            Align.center(
+                                "[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"
+                            ),
+                            Align.center(""),
+                            Align.center(
+                                f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"
+                            ),
+                            Align.center(
+                                "[dim]These may require custom fcontext rules.[/dim]"
+                            ),
+                        ]
+
+                        custom_panel = Panel(
+                            Group(*warning_lines),
+                            title="[bold magenta]Path Notice[/bold magenta]",
+                            border_style="bright_magenta",
+                            padding=(1, 4),
+                        )
+                        panel_width = min(max(int(console.width * 0.6), 60), 120)
+                        console.print(Align.center(custom_panel, width=panel_width))
+                        console.print()
 
                 # Display container issues warning if found
                 if container_issues_detected:
-                    from rich.align import Align
-                    from rich.console import Group
-                    from rich.panel import Panel
+                    if args.report:
+                        # Simple text format for --report mode
+                        console.print("═" * 79)
+                        console.print("🐳  CONTAINER STORAGE DETECTED")
+                        console.print("═" * 79)
+                        console.print()
+                        console.print("SELinux denials accessing container overlay storage.")
+                        console.print()
 
-                    # Show sample path to help users understand the issue
-                    sample_path_lines = []
-                    if container_sample_paths:
-                        # Show generic patterns based on detected container storage types
-                        sample_path = container_sample_paths[0]
+                        # Show sample path information
+                        if container_sample_paths:
+                            sample_path = container_sample_paths[0]
+                            console.print("Complete path = Base path + Container path:")
 
-                        # Determine container storage type and show generic patterns
-                        if "/containers/storage/overlay/" in sample_path:
-                            # Extract the actual base path up to /containers/storage/overlay/
-                            parts = sample_path.split("/containers/storage/overlay/")
-                            if len(parts) == 2:
-                                actual_base = parts[0] + "/containers/storage/overlay/"
+                            if "/containers/storage/overlay/" in sample_path:
+                                parts = sample_path.split("/containers/storage/overlay/")
+                                if len(parts) == 2:
+                                    actual_base = parts[0] + "/containers/storage/overlay/"
+                                    console.print(f"Base path: {actual_base}")
+                                    console.print("Container path: [container-id]/diff/[container-files]")
+                            elif "/.local/share/containers/" in sample_path:
+                                parts = sample_path.split("/.local/share/containers/")
+                                if len(parts) == 2:
+                                    actual_base = parts[0] + "/.local/share/containers/storage/overlay/"
+                                    console.print(f"Base path: {actual_base}")
+                                    console.print("Container path: [container-id]/diff/[container-files]")
+                            elif "/var/lib/containers/" in sample_path:
+                                console.print("Base path: /var/lib/containers/storage/overlay/")
+                                console.print("Container path: [container-id]/diff/[container-files]")
+                            else:
+                                console.print("Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]")
+
+                        console.print()
+                        console.print("Recommendation: container-selinux policy package")
+                        console.print("═" * 79)
+                        console.print()
+                    else:
+                        # Rich panel format for other modes
+                        from rich.align import Align
+                        from rich.console import Group
+                        from rich.panel import Panel
+
+                        # Show sample path to help users understand the issue
+                        sample_path_lines = []
+                        if container_sample_paths:
+                            # Show generic patterns based on detected container storage types
+                            sample_path = container_sample_paths[0]
+
+                            # Determine container storage type and show generic patterns
+                            if "/containers/storage/overlay/" in sample_path:
+                                # Extract the actual base path up to /containers/storage/overlay/
+                                parts = sample_path.split("/containers/storage/overlay/")
+                                if len(parts) == 2:
+                                    actual_base = parts[0] + "/containers/storage/overlay/"
+                                    sample_path_lines = [
+                                        f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                        "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                    ]
+                            elif "/.local/share/containers/" in sample_path:
+                                # Extract the actual base path up to /.local/share/containers/storage/overlay/
+                                parts = sample_path.split("/.local/share/containers/")
+                                if len(parts) == 2:
+                                    actual_base = (
+                                        parts[0]
+                                        + "/.local/share/containers/storage/overlay/"
+                                    )
+                                    sample_path_lines = [
+                                        f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                        "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                    ]
+                            elif "/var/lib/containers/" in sample_path:
+                                # System container storage (alternative location)
                                 sample_path_lines = [
-                                    f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                    "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
                                     "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                 ]
-                        elif "/.local/share/containers/" in sample_path:
-                            # Extract the actual base path up to /.local/share/containers/storage/overlay/
-                            parts = sample_path.split("/.local/share/containers/")
-                            if len(parts) == 2:
-                                actual_base = (
-                                    parts[0]
-                                    + "/.local/share/containers/storage/overlay/"
-                                )
+
+                            # Fallback for other container patterns
+                            if not sample_path_lines:
                                 sample_path_lines = [
-                                    f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                    "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                    "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
                                 ]
-                        elif "/var/lib/containers/" in sample_path:
-                            # System container storage (alternative location)
-                            sample_path_lines = [
-                                "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
-                                "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
-                            ]
 
-                        # Fallback for other container patterns
-                        if not sample_path_lines:
-                            sample_path_lines = [
-                                "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
-                            ]
-
-                    # Create individual centered lines using Group
-                    warning_lines = [
-                        Align.center(
-                            "[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"
-                        ),
-                        Align.center(""),  # Empty line
-                        Align.center(
-                            "[cyan]SELinux denials accessing container overlay storage.[/cyan]"
-                        ),
-                        Align.center(""),  # Empty line
-                        Align.center(
-                            "[dim]Complete path = Base path + Container path:[/dim]"
-                        ),
-                    ]
-
-                    # Add the sample path lines if available
-                    if sample_path_lines:
-                        for path_line in sample_path_lines:
-                            warning_lines.append(Align.center(path_line))
-
-                    warning_lines.extend(
-                        [
+                        # Create individual centered lines using Group
+                        warning_lines = [
+                            Align.center(
+                                "[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"
+                            ),
                             Align.center(""),  # Empty line
                             Align.center(
-                                "[dim]Recommendation: container-selinux policy package[/dim]"
+                                "[cyan]SELinux denials accessing container overlay storage.[/cyan]"
+                            ),
+                            Align.center(""),  # Empty line
+                            Align.center(
+                                "[dim]Complete path = Base path + Container path:[/dim]"
                             ),
                         ]
-                    )
 
-                    container_panel = Panel(
-                        Group(*warning_lines),
-                        title="[bold cyan]Container Notice[/bold cyan]",
-                        border_style="bright_cyan",
-                        padding=(1, 4),
-                    )
-                    panel_width = min(max(int(console.width * 0.6), 60), 120)
-                    console.print(Align.center(container_panel, width=panel_width))
-                    console.print()
+                        # Add the sample path lines if available
+                        if sample_path_lines:
+                            for path_line in sample_path_lines:
+                                warning_lines.append(Align.center(path_line))
+
+                        warning_lines.extend(
+                            [
+                                Align.center(""),  # Empty line
+                                Align.center(
+                                    "[dim]Recommendation: container-selinux policy package[/dim]"
+                                ),
+                            ]
+                        )
+
+                        container_panel = Panel(
+                            Group(*warning_lines),
+                            title="[bold cyan]Container Notice[/bold cyan]",
+                            border_style="bright_cyan",
+                            padding=(1, 4),
+                        )
+                        panel_width = min(max(int(console.width * 0.6), 60), 120)
+                        console.print(Align.center(container_panel, width=panel_width))
+                        console.print()
 
                 # Display denials
                 for i, denial_info in enumerate(filtered_denials):
@@ -4248,6 +4652,21 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     # Choose display format based on flags
                     if args.fields:
                         print_summary(console, denial_info, i + 1)
+                    elif args.report:
+                        if args.report == "sealert":
+                            display_report_sealert_format(
+                                console,
+                                denial_info,
+                                i + 1,
+                                expand_groups=args.expand_groups,
+                            )
+                        else:  # brief format (default)
+                            display_report_brief_format(
+                                console,
+                                denial_info,
+                                i + 1,
+                                expand_groups=args.expand_groups,
+                            )
                     else:
                         print_rich_summary(
                             console,
@@ -4347,209 +4766,283 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Display detection warnings at the top
                         if dontaudit_detected:
                             indicators_str = ", ".join(found_indicators)
-                            # Create a prominent warning panel
-                            from rich.align import Align
-                            from rich.console import Group
-                            from rich.panel import Panel
+                            if args.report:
+                                # Simple text format for --report mode
+                                pager_console.print("═" * 79)
+                                pager_console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                                pager_console.print("Enhanced audit mode is active on this system.")
+                                pager_console.print(f"Typically suppressed permissions detected: {indicators_str}")
+                                pager_console.print("This means you're seeing permissions that are normally hidden.")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                            else:
+                                # Rich panel format for other modes
+                                from rich.align import Align
+                                from rich.console import Group
+                                from rich.panel import Panel
 
-                            warning_lines = [
-                                Align.center(
-                                    "[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"
-                                ),
-                                Align.center(""),
-                                Align.center(
-                                    "[yellow]Enhanced audit mode is active on this system.[/yellow]"
-                                ),
-                                Align.center(
-                                    f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"
-                                ),
-                                Align.center(""),
-                                Align.center(
-                                    "[dim]This means you're seeing permissions that are normally hidden.[/dim]"
-                                ),
-                            ]
+                                warning_lines = [
+                                    Align.center(
+                                        "[bold bright_yellow]⚠️  DONTAUDIT RULES DISABLED[/bold bright_yellow]"
+                                    ),
+                                    Align.center(""),
+                                    Align.center(
+                                        "[yellow]Enhanced audit mode is active on this system.[/yellow]"
+                                    ),
+                                    Align.center(
+                                        f"[dim]Typically suppressed permissions detected: [bright_yellow]{indicators_str}[/bright_yellow][/dim]"
+                                    ),
+                                    Align.center(""),
+                                    Align.center(
+                                        "[dim]This means you're seeing permissions that are normally hidden.[/dim]"
+                                    ),
+                                ]
 
-                            warning_panel = Panel(
-                                Group(*warning_lines),
-                                title="[bold red]Security Notice[/bold red]",
-                                border_style="bright_yellow",
-                                padding=(1, 4),
-                            )
-                            panel_width = min(
-                                max(int(pager_console.width * 0.6), 60), 120
-                            )
-                            pager_console.print(
-                                Align.center(warning_panel, width=panel_width)
-                            )
-                            pager_console.print()
+                                warning_panel = Panel(
+                                    Group(*warning_lines),
+                                    title="[bold red]Security Notice[/bold red]",
+                                    border_style="bright_yellow",
+                                    padding=(1, 4),
+                                )
+                                panel_width = min(
+                                    max(int(pager_console.width * 0.6), 60), 120
+                                )
+                                pager_console.print(
+                                    Align.center(warning_panel, width=panel_width)
+                                )
+                                pager_console.print()
 
                         # Display permissive mode warning if found
                         if permissive_detected:
-                            from rich.align import Align
-                            from rich.console import Group
-                            from rich.panel import Panel
+                            if args.report:
+                                # Simple text format for --report mode
+                                pager_console.print("═" * 79)
+                                pager_console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                                pager_console.print(f"{permissive_count} of {total_events} events were in permissive mode.")
+                                pager_console.print("These denials were logged but not enforced.")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                            else:
+                                # Rich panel format for other modes
+                                from rich.align import Align
+                                from rich.console import Group
+                                from rich.panel import Panel
 
-                            warning_lines = [
-                                Align.center(
-                                    "[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"
-                                ),
-                                Align.center(""),
-                                Align.center(
-                                    f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"
-                                ),
-                                Align.center(
-                                    "[dim]These denials were logged but not enforced.[/dim]"
-                                ),
-                            ]
+                                warning_lines = [
+                                    Align.center(
+                                        "[bold bright_blue]🛡️  PERMISSIVE MODE DETECTED[/bold bright_blue]"
+                                    ),
+                                    Align.center(""),
+                                    Align.center(
+                                        f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"
+                                    ),
+                                    Align.center(
+                                        "[dim]These denials were logged but not enforced.[/dim]"
+                                    ),
+                                ]
 
-                            permissive_panel = Panel(
-                                Group(*warning_lines),
-                                title="[bold blue]Mode Notice[/bold blue]",
-                                border_style="bright_blue",
-                                padding=(1, 4),
-                            )
-                            panel_width = min(
-                                max(int(pager_console.width * 0.6), 60), 120
-                            )
-                            pager_console.print(
-                                Align.center(permissive_panel, width=panel_width)
-                            )
-                            pager_console.print()
+                                permissive_panel = Panel(
+                                    Group(*warning_lines),
+                                    title="[bold blue]Mode Notice[/bold blue]",
+                                    border_style="bright_blue",
+                                    padding=(1, 4),
+                                )
+                                panel_width = min(
+                                    max(int(pager_console.width * 0.6), 60), 120
+                                )
+                                pager_console.print(
+                                    Align.center(permissive_panel, width=panel_width)
+                                )
+                                pager_console.print()
 
                         # Display custom paths warning if found
                         if custom_paths_detected:
-                            from rich.align import Align
-                            from rich.console import Group
-                            from rich.panel import Panel
-
                             patterns_str = ", ".join(found_custom_patterns[:3])
                             if len(found_custom_patterns) > 3:
                                 patterns_str += (
                                     f" (+{len(found_custom_patterns) - 3} more)"
                                 )
 
-                            warning_lines = [
-                                Align.center(
-                                    "[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"
-                                ),
-                                Align.center(""),
-                                Align.center(
-                                    f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"
-                                ),
-                                Align.center(
-                                    "[dim]These may require custom fcontext rules.[/dim]"
-                                ),
-                            ]
+                            if args.report:
+                                # Simple text format for --report mode
+                                pager_console.print("═" * 79)
+                                pager_console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                                pager_console.print(f"Non-standard paths found: {patterns_str}")
+                                pager_console.print("These may require custom fcontext rules.")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                            else:
+                                # Rich panel format for other modes
+                                from rich.align import Align
+                                from rich.console import Group
+                                from rich.panel import Panel
 
-                            custom_panel = Panel(
-                                Group(*warning_lines),
-                                title="[bold magenta]Path Notice[/bold magenta]",
-                                border_style="bright_magenta",
-                                padding=(1, 4),
-                            )
-                            panel_width = min(
-                                max(int(pager_console.width * 0.6), 60), 120
-                            )
-                            pager_console.print(
-                                Align.center(custom_panel, width=panel_width)
-                            )
-                            pager_console.print()
+                                warning_lines = [
+                                    Align.center(
+                                        "[bold bright_magenta]📁  CUSTOM PATHS DETECTED[/bold bright_magenta]"
+                                    ),
+                                    Align.center(""),
+                                    Align.center(
+                                        f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"
+                                    ),
+                                    Align.center(
+                                        "[dim]These may require custom fcontext rules.[/dim]"
+                                    ),
+                                ]
+
+                                custom_panel = Panel(
+                                    Group(*warning_lines),
+                                    title="[bold magenta]Path Notice[/bold magenta]",
+                                    border_style="bright_magenta",
+                                    padding=(1, 4),
+                                )
+                                panel_width = min(
+                                    max(int(pager_console.width * 0.6), 60), 120
+                                )
+                                pager_console.print(
+                                    Align.center(custom_panel, width=panel_width)
+                                )
+                                pager_console.print()
 
                         # Display container issues warning if found
                         if container_issues_detected:
-                            from rich.align import Align
-                            from rich.console import Group
-                            from rich.panel import Panel
+                            if args.report:
+                                # Simple text format for --report mode
+                                pager_console.print("═" * 79)
+                                pager_console.print("🐳  CONTAINER STORAGE DETECTED")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                                pager_console.print("SELinux denials accessing container overlay storage.")
+                                pager_console.print()
 
-                            # Show sample path to help users understand the issue
-                            sample_path_lines = []
-                            if container_sample_paths:
-                                # Show generic patterns based on detected container storage types
-                                sample_path = container_sample_paths[0]
+                                # Show sample path information
+                                if container_sample_paths:
+                                    sample_path = container_sample_paths[0]
+                                    pager_console.print("Complete path = Base path + Container path:")
 
-                                # Determine container storage type and show generic patterns
-                                if "/containers/storage/overlay/" in sample_path:
-                                    # Extract the actual base path up to /containers/storage/overlay/
-                                    parts = sample_path.split(
-                                        "/containers/storage/overlay/"
-                                    )
-                                    if len(parts) == 2:
-                                        actual_base = (
-                                            parts[0] + "/containers/storage/overlay/"
+                                    if "/containers/storage/overlay/" in sample_path:
+                                        parts = sample_path.split("/containers/storage/overlay/")
+                                        if len(parts) == 2:
+                                            actual_base = parts[0] + "/containers/storage/overlay/"
+                                            pager_console.print(f"Base path: {actual_base}")
+                                            pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                    elif "/.local/share/containers/" in sample_path:
+                                        parts = sample_path.split("/.local/share/containers/")
+                                        if len(parts) == 2:
+                                            actual_base = parts[0] + "/.local/share/containers/storage/overlay/"
+                                            pager_console.print(f"Base path: {actual_base}")
+                                            pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                    elif "/var/lib/containers/" in sample_path:
+                                        pager_console.print("Base path: /var/lib/containers/storage/overlay/")
+                                        pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                    else:
+                                        pager_console.print("Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]")
+
+                                pager_console.print()
+                                pager_console.print("Recommendation: container-selinux policy package")
+                                pager_console.print("═" * 79)
+                                pager_console.print()
+                            else:
+                                # Rich panel format for other modes
+                                from rich.align import Align
+                                from rich.console import Group
+                                from rich.panel import Panel
+
+                                # Show sample path to help users understand the issue
+                                sample_path_lines = []
+                                if container_sample_paths:
+                                    # Show generic patterns based on detected container storage types
+                                    sample_path = container_sample_paths[0]
+
+                                    # Determine container storage type and show generic patterns
+                                    if "/containers/storage/overlay/" in sample_path:
+                                        # Extract the actual base path up to /containers/storage/overlay/
+                                        parts = sample_path.split(
+                                            "/containers/storage/overlay/"
                                         )
+                                        if len(parts) == 2:
+                                            actual_base = (
+                                                parts[0] + "/containers/storage/overlay/"
+                                            )
+                                            sample_path_lines = [
+                                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                                "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                            ]
+                                    elif "/.local/share/containers/" in sample_path:
+                                        # Extract the actual base path up to /.local/share/containers/storage/overlay/
+                                        parts = sample_path.split(
+                                            "/.local/share/containers/"
+                                        )
+                                        if len(parts) == 2:
+                                            actual_base = (
+                                                parts[0]
+                                                + "/.local/share/containers/storage/overlay/"
+                                            )
+                                            sample_path_lines = [
+                                                f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                                "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                            ]
+                                    elif "/var/lib/containers/" in sample_path:
+                                        # System container storage (alternative location)
                                         sample_path_lines = [
-                                            f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
+                                            "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
                                             "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                         ]
-                                elif "/.local/share/containers/" in sample_path:
-                                    # Extract the actual base path up to /.local/share/containers/storage/overlay/
-                                    parts = sample_path.split(
-                                        "/.local/share/containers/"
-                                    )
-                                    if len(parts) == 2:
-                                        actual_base = (
-                                            parts[0]
-                                            + "/.local/share/containers/storage/overlay/"
-                                        )
+
+                                    # Fallback for other container patterns
+                                    if not sample_path_lines:
                                         sample_path_lines = [
-                                            f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
-                                            "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
+                                            "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
                                         ]
-                                elif "/var/lib/containers/" in sample_path:
-                                    # System container storage (alternative location)
-                                    sample_path_lines = [
-                                        "[dim]Base path: [bright_cyan]/var/lib/containers/storage/overlay/[/bright_cyan][/dim]",
-                                        "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
-                                    ]
 
-                                # Fallback for other container patterns
-                                if not sample_path_lines:
-                                    sample_path_lines = [
-                                        "[dim]Generic pattern: [bright_cyan]\\[storage-location]/overlay/\\[container-id]/diff/\\[files][/bright_cyan][/dim]"
-                                    ]
-
-                            # Create individual centered lines using Group
-                            warning_lines = [
-                                Align.center(
-                                    "[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"
-                                ),
-                                Align.center(""),  # Empty line
-                                Align.center(
-                                    "[cyan]SELinux denials accessing container overlay storage.[/cyan]"
-                                ),
-                                Align.center(""),  # Empty line
-                                Align.center(
-                                    "[dim]Complete path = Base path + Container path:[/dim]"
-                                ),
-                            ]
-
-                            # Add the sample path lines if available
-                            if sample_path_lines:
-                                for path_line in sample_path_lines:
-                                    warning_lines.append(Align.center(path_line))
-
-                            warning_lines.extend(
-                                [
+                                # Create individual centered lines using Group
+                                warning_lines = [
+                                    Align.center(
+                                        "[bold bright_cyan]🐳  CONTAINER STORAGE DETECTED[/bold bright_cyan]"
+                                    ),
                                     Align.center(""),  # Empty line
                                     Align.center(
-                                        "[dim]Recommendation: container-selinux policy package[/dim]"
+                                        "[cyan]SELinux denials accessing container overlay storage.[/cyan]"
+                                    ),
+                                    Align.center(""),  # Empty line
+                                    Align.center(
+                                        "[dim]Complete path = Base path + Container path:[/dim]"
                                     ),
                                 ]
-                            )
 
-                            container_panel = Panel(
-                                Group(*warning_lines),
-                                title="[bold cyan]Container Notice[/bold cyan]",
-                                border_style="bright_cyan",
-                                padding=(1, 4),
-                            )
-                            panel_width = min(
-                                max(int(pager_console.width * 0.6), 60), 120
-                            )
-                            pager_console.print(
-                                Align.center(container_panel, width=panel_width)
-                            )
-                            pager_console.print()
+                                # Add the sample path lines if available
+                                if sample_path_lines:
+                                    for path_line in sample_path_lines:
+                                        warning_lines.append(Align.center(path_line))
+
+                                warning_lines.extend(
+                                    [
+                                        Align.center(""),  # Empty line
+                                        Align.center(
+                                            "[dim]Recommendation: container-selinux policy package[/dim]"
+                                        ),
+                                    ]
+                                )
+
+                                container_panel = Panel(
+                                    Group(*warning_lines),
+                                    title="[bold cyan]Container Notice[/bold cyan]",
+                                    border_style="bright_cyan",
+                                    padding=(1, 4),
+                                )
+                                panel_width = min(
+                                    max(int(pager_console.width * 0.6), 60), 120
+                                )
+                                pager_console.print(
+                                    Align.center(container_panel, width=panel_width)
+                                )
+                                pager_console.print()
 
                         # Display denials using pager console
                         for i, denial_info in enumerate(filtered_denials):
@@ -4562,6 +5055,21 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             # Choose display format based on flags
                             if args.fields:
                                 print_summary(pager_console, denial_info, i + 1)
+                            elif args.report:
+                                if args.report == "sealert":
+                                    display_report_sealert_format(
+                                        pager_console,
+                                        denial_info,
+                                        i + 1,
+                                        expand_groups=args.expand_groups,
+                                    )
+                                else:  # brief format (default)
+                                    display_report_brief_format(
+                                        pager_console,
+                                        denial_info,
+                                        i + 1,
+                                        expand_groups=args.expand_groups,
+                                    )
                             else:
                                 print_rich_summary(
                                     pager_console,

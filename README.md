@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.4.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
+**Version 1.5.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
@@ -31,8 +31,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 # Get field-by-field details (technical deep-dive)
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 
-# Get report-friendly format (documentation and copy-paste workflows)
-python3 parse_avc.py --file /var/log/audit/audit.log --report
+# Get report-friendly formats (different audiences)
+python3 parse_avc.py --file /var/log/audit/audit.log --report        # Brief format (executive summaries)
+python3 parse_avc.py --file /var/log/audit/audit.log --report sealert # Technical analysis format
 
 # Export to JSON
 python3 parse_avc.py --file /var/log/audit/audit.log --json
@@ -73,13 +74,19 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
 ## ✅ Key Features
 
-### 🎨 **Professional Display**
-- **Rich Terminal Format**: Default responsive panels with BIONIC reading, professional styling, and correlation events
-- **Interactive Pager Mode**: Built-in `less`-like interface with `--pager` for comfortable navigation of large outputs
-- **Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis with syscall details and context information
-- **Report-Friendly Format**: Use `--report` for professional documentation, copy-paste workflows, and incident reports with preserved grouping information
-- **Field-by-Field View**: Detailed technical breakdown using `--fields` flag for deep-dive analysis
-- **Normalized JSON Export**: Structured output with standardized field formats, semantic enrichment, and consistent data types for reliable tool integration and SIEM compatibility
+### 🎨 **Professional Display Modes**
+- **Rich Terminal Format** (default): Responsive panels with BIONIC reading and professional styling
+  - Compatible with: `--detailed` (enhanced correlation), `--expand-groups` (individual events), `--pager`
+- **Report Formats** (`--report [format]`): Professional text formats for different audiences
+  - `--report` or `--report brief`: Executive summaries for incident reports and management briefings
+  - `--report sealert`: Technical analysis format with comprehensive forensic details
+  - Compatible with: `--pager` only (standalone formats optimized for specific use cases)
+- **Technical Analysis** (`--fields`): Field-by-field breakdown for deep-dive technical analysis
+  - Compatible with: `--pager` only (standalone format for detailed investigation)
+- **Machine Integration** (`--json`): Normalized structured output for automation and SIEM integration
+  - Compatible with: All filtering options (works independently of display preferences)
+
+**Display Precedence**: `--json` > `--fields` > `--report [format]` > Rich (default)
 
 ### 🔍 **Advanced Analysis**
 - **Semantic Intelligence**: Human-readable permissions (`read` → `Read file content`) and contextual analysis
@@ -162,29 +169,27 @@ python3 parse_avc.py
 # Paste logs and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
 ```
 
-### **Output Formats:**
+### **Display Modes:**
 
-**Rich Display (Default)**: Professional terminal format with responsive panels and BIONIC reading
+**Rich Terminal Format** (default): Professional panels with correlation events
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log
+python3 parse_avc.py --file /var/log/audit/audit.log --detailed --expand-groups
 ```
 
-**Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis
+**Report Formats**: Professional text formats for different audiences
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --detailed
+python3 parse_avc.py --file /var/log/audit/audit.log --report        # Brief format (executive summaries)
+python3 parse_avc.py --file /var/log/audit/audit.log --report brief  # Brief format (explicit)
+python3 parse_avc.py --file /var/log/audit/audit.log --report sealert # Technical analysis format
 ```
 
-**Report-Friendly Format**: Use `--report` for professional documentation and copy-paste workflows
-```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --report
-```
-
-**Field-by-Field Display**: Use `--fields` for detailed technical breakdown and deep-dive analysis
+**Technical Analysis**: Field-by-field breakdown for deep investigation
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 ```
 
-**JSON Output**: Add `--json` for machine-readable output with `sesearch_command` field
+**Machine Integration**: Structured output for automation and SIEM
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --json
 # Output includes: "sesearch_command": "sesearch -A -s httpd_t -t default_t -c file -p read,write"
@@ -250,4 +255,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.4.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.5.0** | Made for forensic analysts and system administrators

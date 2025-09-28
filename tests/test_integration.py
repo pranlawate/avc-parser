@@ -558,5 +558,305 @@ class TestRegressionPrevention(unittest.TestCase):
         self.assertEqual(result1.stdout, result2.stdout)
 
 
+class TestReportFormat(unittest.TestCase):
+    """Test --report flag functionality with two-tier brief/sealert formats."""
+
+    def test_basic_report_brief_format(self):
+        """Test basic --report (brief) output format structure."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Check for brief format markers (executive style)
+        self.assertIn("=" * 80, output, "Brief report should contain executive separator lines")
+        self.assertIn("SELINUX SECURITY INCIDENT #", output, "Brief report should contain incident headers")
+        self.assertIn("WHAT:", output, "Brief report should contain WHAT section")
+        self.assertIn("WHEN:", output, "Brief report should contain WHEN section")
+        self.assertIn("WHO:", output, "Brief report should contain WHO section")
+        self.assertIn("WHERE:", output, "Brief report should contain WHERE section")
+        self.assertIn("IMPACT:", output, "Brief report should contain IMPACT section")
+        self.assertIn("STATUS:", output, "Brief report should contain STATUS section")
+        self.assertIn("REMEDIATION:", output, "Brief report should contain remediation commands")
+        self.assertIn("sesearch -A", output, "Brief report should contain sesearch commands")
+
+        # Verify no Rich panel formatting
+        self.assertNotIn("╭", output, "Brief report should not contain Rich panel borders")
+        self.assertNotIn("│", output, "Brief report should not contain Rich panel borders")
+        self.assertNotIn("╰", output, "Brief report should not contain Rich panel borders")
+
+    def test_report_brief_with_multiple_events(self):
+        """Test --report brief format with multiple events shows business impact summary."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Check for brief format business content (no Event Distribution in brief format)
+        self.assertIn("SELINUX SECURITY INCIDENT", output, "Brief report should show incident headers")
+        self.assertIn("WHAT:", output, "Brief report should show business impact summary")
+        self.assertIn("PIDs:", output, "Brief report should show PID information in WHO section")
+
+    def test_report_sealert_with_multiple_events_shows_event_distribution(self):
+        """Test --report sealert format with multiple events shows Event Distribution."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "sealert"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Sealert format should show Event Distribution
+        self.assertIn("Event Distribution:", output, "Sealert report should show Event Distribution")
+        self.assertIn("PID", output, "Sealert report should show PID information")
+        self.assertIn("SELinux Unique Denial Group", output, "Sealert report should use correct terminology")
+
+    def test_report_brief_precedence_over_detailed(self):
+        """Test that --report takes precedence when combined with --detailed."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "--detailed"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Should use brief report format (with = separators) not Rich detailed format
+        self.assertIn("=" * 80, output, "Should use brief report format separators")
+        self.assertNotIn("────", output, "Should not use Rich format separators")
+
+    def test_fields_precedence_over_report(self):
+        """Test that --fields takes precedence over --report."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "--fields"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Should use fields format, not report format
+        self.assertIn("Timestamp:", output, "Should use fields format")
+        self.assertIn("Process Name:", output, "Should use fields format")
+        self.assertNotIn("═" * 79, output, "Should not use report format separators")
+
+    def test_json_precedence_over_report(self):
+        """Test that --json takes precedence over --report."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "--json"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+        output = result.stdout
+
+        # Should be valid JSON, not report format
+        try:
+            json_data = json.loads(output)
+            self.assertIsInstance(json_data, dict)
+            self.assertIn("unique_denials", json_data)
+        except json.JSONDecodeError:
+            self.fail("Output should be valid JSON when --json flag is used")
+
+        # Should not contain report format elements
+        self.assertNotIn("═" * 79, output, "JSON output should not contain report separators")
+
+    def test_report_security_notices_format(self):
+        """Test that security notices appear in clean text format in --report mode."""
+        # Create a test file with conditions that trigger security notices
+        test_content = """----
+time->Fri Sep  8 10:15:23 2023
+type=AVC msg=audit(1694170523.456:123): avc:  denied  { noatsecure } for  pid=1234 comm="httpd" path="/var/www/html/test.php" dev="sda1" ino=98765 scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=1"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as tmp_file:
+            tmp_file.write(test_content)
+            tmp_file_path = tmp_file.name
+
+        try:
+            result = subprocess.run(
+                [sys.executable, "parse_avc.py", "--file", tmp_file_path, "--report"],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+
+            self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+            output = result.stdout
+
+            # If security notices appear, they should be in text format
+            if "SECURITY NOTICE" in output or "MODE NOTICE" in output:
+                # Should use text format separators, not Rich panels
+                self.assertNotIn("╭", output, "Security notices should not use Rich panels in report mode")
+                self.assertNotIn("│", output, "Security notices should not use Rich panels in report mode")
+
+        finally:
+            os.unlink(tmp_file_path)
+
+    def test_terminology_consistency_across_formats(self):
+        """Test that terminology is consistent across all formats."""
+        test_file = "testAVC/multi_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test Rich default format
+        result_rich = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        # Test fields format
+        result_fields = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--fields"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        # Test sealert format
+        result_sealert = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "sealert"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result_rich.returncode, 0, "Rich format should succeed")
+        self.assertEqual(result_fields.returncode, 0, "Fields format should succeed")
+        self.assertEqual(result_sealert.returncode, 0, "Sealert format should succeed")
+
+        # All technical formats should use "Unique Denial Group" terminology
+        self.assertIn("Unique Denial Group #1", result_rich.stdout, "Rich format should use Unique Denial Group")
+        self.assertIn("Unique Denial Group #1", result_fields.stdout, "Fields format should use Unique Denial Group")
+        self.assertIn("SELinux Unique Denial Group #1", result_sealert.stdout, "Sealert format should use SELinux Unique Denial Group")
+
+        # Brief format should use business terminology
+        result_brief = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "brief"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        self.assertEqual(result_brief.returncode, 0, "Brief format should succeed")
+        self.assertIn("SELINUX SECURITY INCIDENT #1", result_brief.stdout, "Brief format should use business terminology")
+
+    def test_report_format_argument_validation(self):
+        """Test that invalid report format arguments are rejected."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test invalid report format
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "invalid"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertNotEqual(result.returncode, 0, "Should reject invalid report format")
+        self.assertIn("invalid choice", result.stderr.lower(), "Should show invalid choice error")
+
+    def test_report_both_formats_work(self):
+        """Test that both brief and sealert formats process the same data correctly."""
+        test_file = "testAVC/network_AVC.log"
+
+        if not os.path.exists(test_file):
+            self.skipTest(f"Test file {test_file} not found")
+
+        # Test brief format
+        result_brief = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "brief"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        # Test sealert format
+        result_sealert = subprocess.run(
+            [sys.executable, "parse_avc.py", "--file", test_file, "--report", "sealert"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result_brief.returncode, 0, "Brief format should succeed")
+        self.assertEqual(result_sealert.returncode, 0, "Sealert format should succeed")
+
+        # Both should contain the same sesearch command
+        self.assertIn("sesearch -A -s httpd_t", result_brief.stdout, "Brief should contain sesearch command")
+        self.assertIn("sesearch -A -s httpd_t", result_sealert.stdout, "Sealert should contain sesearch command")
+
+        # Should have different format styles
+        self.assertIn("SELINUX SECURITY INCIDENT", result_brief.stdout, "Brief should have executive style")
+        self.assertIn("SELinux Unique Denial Group", result_sealert.stdout, "Sealert should have technical style")
+
+    def test_report_help_shows_format_options(self):
+        """Test that help output shows the new report format options."""
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--help"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("brief,sealert", result.stdout, "Help should show brief and sealert options")
+        self.assertIn("executive summaries", result.stdout, "Help should describe brief format")
+        self.assertIn("technical analysis", result.stdout, "Help should describe sealert format")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

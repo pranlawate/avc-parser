@@ -582,19 +582,24 @@ selinux-avc-analyzer = "avc_parser.cli:main"
 
 ## User Experience Enhancement (Phase 8D) - APPROVED FOR IMPLEMENTATION
 
-### ✅ ACCEPTED: Report-Friendly Output Format Implementation (Phase 8D)
-**Decision**: Implement `--report` flag for professional documentation and reporting workflows
-**Problem Solved**: Current formats have critical limitations for documentation workflows:
+### ✅ ACCEPTED: Two-Tier Professional Report System Implementation (Phase 8D)
+**Decision**: Implement `--report [format]` with brief and sealert formats for different audiences
+**Problem Solved**: Current formats have critical limitations for different reporting workflows:
 - **Rich Default**: Professional display but panels break copy-paste, not report-friendly
 - **--fields**: Copy-friendly but loses grouping information (no PID multipliers, event counts)
 - **--json**: Complete data but not human-readable for reports
-**Implementation Approach**: `--report` flag with professional text-based format
+- **Need for Multiple Audiences**: Management needs executive summaries, technical teams need detailed analysis
+**Implementation Approach**: Two-tier `--report [format]` system with audience-specific formatting
 **Key Features**:
-- **Preserve Grouping Information**: Maintain event counts, PID multipliers, correlation data
-- **Copy-Paste Friendly**: Text-based format without Rich panels that break in documents
-- **Professional Appearance**: Suitable for incident reports, compliance documentation, management summaries
-- **Complete Information**: All critical forensic data formatted for reporting
-- **Policy Investigation**: Include sesearch commands for workflow integration
+- **Two-Tier Format System**:
+  - `--report` or `--report brief`: Executive summaries with business impact focus
+  - `--report sealert`: Technical analysis with comprehensive forensic details
+- **Preserve Grouping Information**: Maintain event counts, PID multipliers, correlation data in both formats
+- **Copy-Paste Friendly**: Text-based formats without Rich panels that break in documents
+- **Audience-Specific**: Brief format for management/compliance, sealert format for technical analysis
+- **Complete Information**: All critical forensic data formatted appropriately for each audience
+- **Policy Investigation**: Include sesearch commands for workflow integration in both formats
+- **Terminology Consistency**: "Unique Denial Group" across all technical formats
 **Format Structure**:
 ```
 DENIAL GROUP #1 - 5 total events, 3 unique PIDs, last seen 2 hours ago
@@ -605,11 +610,18 @@ Policy Investigation:
 sesearch -A -s httpd_t -t jboss_management_port_t -c tcp_socket -p name_connect
 ```
 **Flag Architecture Decision**:
-- **--detailed**: Enhanced Rich format with extra correlation details
-- **--fields**: Field-by-field technical breakdown (maintained for deep-dive scenarios)
-- **--report**: Professional report/documentation format (NEW)
-- **--json**: Machine-readable structured output
-- **--expand-groups**: Show individual events instead of grouped summaries
+**Display Modes** (mutually exclusive, precedence: JSON > fields > report [format] > Rich):
+- **Default Rich**: Professional terminal display with panels and colors
+- **--report [brief|sealert]**: Professional text formats for different audiences (standalone)
+  - `--report` or `--report brief`: Executive summaries for management and incident reports
+  - `--report sealert`: Technical analysis format with comprehensive forensic details
+- **--fields**: Field-by-field technical breakdown for deep analysis (standalone)
+- **--json**: Machine-readable structured output (works with all filters)
+
+**Display Modifiers** (work with compatible modes):
+- **--detailed**: Enhanced Rich format with extra correlation details (Rich mode only)
+- **--expand-groups**: Show individual events instead of grouped summaries (Rich mode only)
+- **--pager**: Interactive pager for large outputs (all modes)
 **Use Cases Addressed**:
 - Internal incident response reports and documentation
 - Compliance documentation and audit summaries
@@ -621,7 +633,15 @@ sesearch -A -s httpd_t -t jboss_management_port_t -c tcp_socket -p name_connect
 **Implementation Complexity**: Medium - new display format with clear boundaries
 **Value Proposition**: Fills critical gap between terminal-optimized Rich display and human-readable reporting needs
 **Date**: 2025-09-28 (Phase 8D)
-**Status**: ACCEPTED FOR IMPLEMENTATION
+**Status**: COMPLETED
+**Implementation Results**:
+- **Two-Tier Report System**: Brief format for executive summaries, sealert format for technical analysis
+- **Terminology Consistency**: "Unique Denial Group" across all technical formats (Rich, fields, sealert)
+- **Business Format**: "SELINUX SECURITY INCIDENT" terminology for executive brief format
+- **Security notice panels**: Fixed for clean copy-paste compatibility in both report formats
+- **Complete Coverage**: Both formats preserve all grouping information and forensic data
+- **Enhanced Testing**: 11 comprehensive tests covering both formats and terminology consistency
+- **Full documentation updates**: Proper argument categorization and format descriptions across all docs
 
 ---
 

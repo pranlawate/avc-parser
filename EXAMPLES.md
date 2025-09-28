@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - Examples & Usage Patterns
 
-**Version 1.4.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with SELinux Policy Investigation Integration
+**Version 1.5.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Two-Tier Professional Report System and SELinux Policy Investigation Integration
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
 
@@ -215,7 +215,7 @@ Showing 2 of 45 unique denials after filtering.
 
 ## 🔧 **Process Name Resolution Examples**
 
-### Improved Contextual Analysis (Version 1.4.0+)
+### Improved Contextual Analysis (Version 1.5.0+)
 The tool now uses actual process names instead of SELinux type descriptions in contextual analysis:
 
 ```bash
@@ -499,4 +499,4 @@ python3 parse_avc.py --file audit.log | grep "PID"
 - [ROADMAP.md](ROADMAP.md) - Development roadmap and features
 - [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) - Feature scope and decisions
 
-**SELinux AVC Denial Analyzer v1.3.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.5.0** | Made for forensic analysts and system administrators

@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.4.0** | Complete command-line reference, data fields, and troubleshooting guide with SELinux Policy Investigation Integration
+**Version 1.5.0** | Complete command-line reference, data fields, and troubleshooting guide with Two-Tier Professional Report System and SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
@@ -15,13 +15,22 @@ This document provides comprehensive reference information for using the SELinux
 | `-rf, --raw-file` | Path to a raw audit.log file |
 | `-af, --avc-file` | Path to a pre-processed AVC file |
 
-### Output Format Options
-| Option | Description |
-|--------|-------------|
-| `--detailed` | Show enhanced detailed view with expanded correlation events and context |
-| `--report` | Professional report format for documentation and copy-paste workflows |
-| `--fields` | Field-by-field technical breakdown for deep-dive analysis |
-| `--json` | Output in JSON format |
+### Display Mode Options (Mutually Exclusive)
+| Mode | Description | Compatible Modifiers |
+|------|-------------|----------------------|
+| **Default Rich** | Professional terminal display with panels and colors | `--detailed`, `--expand-groups`, `--pager` |
+| `--report [brief\|sealert]` | Professional text formats: `brief` (executive summaries), `sealert` (technical analysis) | `--pager` |
+| `--fields` | Field-by-field technical breakdown for deep-dive analysis | `--pager` |
+| `--json` | Machine-readable structured output | Works with all filtering options |
+
+**Precedence Order**: `--json` > `--fields` > `--report [format]` > Default Rich
+
+### Display Modifiers (Work with Compatible Modes)
+| Modifier | Description | Compatible With |
+|----------|-------------|-----------------|
+| `--detailed` | Enhanced view with expanded correlation events and context | Default Rich mode only |
+| `--expand-groups` | Show individual events instead of resource-based groupings | Default Rich mode only |
+| `--pager` | Interactive pager for large outputs (like 'less' command) | All display modes |
 
 ### Filtering & Sorting Options
 | Option | Description |
@@ -54,19 +63,56 @@ python3 parse_avc.py --raw-file /var/log/audit/audit.log
 python3 parse_avc.py --avc-file avc_denials.log
 ```
 
-### Output Formats
+### Display Mode Examples
 ```bash
-# Default Rich format (recommended)
+# Default Rich format (professional terminal display)
 python3 parse_avc.py --file audit.log
 
-# Enhanced detailed view
+# Enhanced detailed view (Rich + more correlation details)
 python3 parse_avc.py --file audit.log --detailed
 
-# Field-by-field format
+# Professional report formats
+python3 parse_avc.py --file audit.log --report        # Brief format (executive summaries)
+python3 parse_avc.py --file audit.log --report brief  # Brief format (explicit)
+python3 parse_avc.py --file audit.log --report sealert # Technical analysis format
+
+# Field-by-field format (technical deep-dive)
 python3 parse_avc.py --file audit.log --fields
 
-# JSON output for automation
+# JSON output (automation/integration)
 python3 parse_avc.py --file audit.log --json
+```
+
+### Display Modifier Examples
+```bash
+# Rich mode modifiers (--detailed and --expand-groups work together)
+python3 parse_avc.py --file audit.log --detailed
+python3 parse_avc.py --file audit.log --expand-groups
+python3 parse_avc.py --file audit.log --detailed --expand-groups
+
+# Interactive pager (works with all modes)
+python3 parse_avc.py --file audit.log --pager
+python3 parse_avc.py --file audit.log --report --pager         # Brief + pager
+python3 parse_avc.py --file audit.log --report sealert --pager # Sealert + pager
+python3 parse_avc.py --file audit.log --fields --pager
+```
+
+### Argument Combination Rules
+```bash
+# Valid Rich mode combinations
+python3 parse_avc.py --file audit.log --detailed --expand-groups --pager
+
+# Standalone modes (no meaningful modifiers except --pager)
+python3 parse_avc.py --file audit.log --report brief --pager
+python3 parse_avc.py --file audit.log --report sealert --pager
+python3 parse_avc.py --file audit.log --fields --pager
+
+# JSON with filtering (works with any filter combination)
+python3 parse_avc.py --file audit.log --json --process httpd --since yesterday
+
+# Precedence examples (higher precedence wins, modifiers ignored)
+python3 parse_avc.py --file audit.log --report sealert --fields  # Uses --fields
+python3 parse_avc.py --file audit.log --json --detailed          # Uses --json
 ```
 
 ### Filtering Options
@@ -274,7 +320,7 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 
 ### JSON Format Structure
 
-> **🔬 Enhanced JSON Normalization**: Version 1.4.0 includes comprehensive field normalization and SELinux policy investigation commands for reliable tool integration, SIEM compatibility, and automated analysis workflows.
+> **🔬 Enhanced JSON Normalization**: Version 1.5.0 includes comprehensive field normalization, two-tier report system, and SELinux policy investigation commands for reliable tool integration, SIEM compatibility, and automated analysis workflows.
 
 #### Core Structure
 ```json
@@ -525,4 +571,4 @@ Look for these indicators in the output:
 
 ---
 
-**SELinux AVC Denial Analyzer v1.3.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.5.0** | Made for forensic analysts and system administrators
