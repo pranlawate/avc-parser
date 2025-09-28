@@ -28,8 +28,11 @@ python3 parse_avc.py --file /var/log/audit/audit.log --source httpd_t --target "
 # Get enhanced detailed analysis
 python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 
-# Get field-by-field details
+# Get field-by-field details (technical deep-dive)
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
+
+# Get report-friendly format (documentation and copy-paste workflows)
+python3 parse_avc.py --file /var/log/audit/audit.log --report
 
 # Export to JSON
 python3 parse_avc.py --file /var/log/audit/audit.log --json
@@ -74,7 +77,8 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 - **Rich Terminal Format**: Default responsive panels with BIONIC reading, professional styling, and correlation events
 - **Interactive Pager Mode**: Built-in `less`-like interface with `--pager` for comfortable navigation of large outputs
 - **Enhanced Detailed View**: Use `--detailed` for expanded correlation analysis with syscall details and context information
-- **Field-by-Field View**: Detailed breakdown using `--fields` flag for traditional analysis
+- **Report-Friendly Format**: Use `--report` for professional documentation, copy-paste workflows, and incident reports with preserved grouping information
+- **Field-by-Field View**: Detailed technical breakdown using `--fields` flag for deep-dive analysis
 - **Normalized JSON Export**: Structured output with standardized field formats, semantic enrichment, and consistent data types for reliable tool integration and SIEM compatibility
 
 ### 🔍 **Advanced Analysis**
@@ -170,7 +174,12 @@ python3 parse_avc.py --file /var/log/audit/audit.log
 python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 ```
 
-**Field-by-Field Display**: Use `--fields` for traditional detailed field breakdown
+**Report-Friendly Format**: Use `--report` for professional documentation and copy-paste workflows
+```bash
+python3 parse_avc.py --file /var/log/audit/audit.log --report
+```
+
+**Field-by-Field Display**: Use `--fields` for detailed technical breakdown and deep-dive analysis
 ```bash
 python3 parse_avc.py --file /var/log/audit/audit.log --fields
 ```

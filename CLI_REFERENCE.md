@@ -18,8 +18,9 @@ This document provides comprehensive reference information for using the SELinux
 ### Output Format Options
 | Option | Description |
 |--------|-------------|
-| `--fields` | Use field-by-field display format instead of compact Rich format |
 | `--detailed` | Show enhanced detailed view with expanded correlation events and context |
+| `--report` | Professional report format for documentation and copy-paste workflows |
+| `--fields` | Field-by-field technical breakdown for deep-dive analysis |
 | `--json` | Output in JSON format |
 
 ### Filtering & Sorting Options
