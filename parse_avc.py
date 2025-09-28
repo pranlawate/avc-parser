@@ -13,6 +13,7 @@ Version: 1.4.0
 """
 
 import argparse
+import io
 import json
 import os
 import re
@@ -494,14 +495,31 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                         value = value.strip()  # Remove any trailing whitespace
                         # Check if it's quoted
                         if value.startswith('"') and value.endswith('"'):
-                            shared_context[key] = value[1:-1]  # Remove quotes
-                        else:
-                            try:
-                                # Try hex decode first
-                                shared_context[key] = bytes.fromhex(value).decode()
-                            except ValueError:
-                                # If not hex, use as-is (plain text)
+                            value = value[1:-1]  # Remove quotes
+
+                        # Try hex decode first (for raw audit.log processing)
+                        try:
+                            if all(c in "0123456789ABCDEFabcdef" for c in value) and len(value) % 2 == 0:
+                                decoded = bytes.fromhex(value).decode()
+                                decoded_with_spaces = decoded.replace('\x00', ' ')
+
+                                # Check for audit system truncation (128 char limit for proctitle)
+                                if (len(value) == 256 and len(decoded_with_spaces) == 128 and
+                                    not decoded.endswith('\x00')):
+                                    decoded_with_spaces += " [TRUNCATED BY AUDIT]"
+
+                                shared_context[key] = decoded_with_spaces
+                            else:
+                                # Not hex - likely already decoded by ausearch -i
+                                # Check for truncation in already-decoded text (128 char limit)
+                                if len(value) == 128:
+                                    value += " [TRUNCATED BY AUDIT]"
                                 shared_context[key] = value
+                        except ValueError:
+                            # If hex decoding fails, use as-is and check for truncation
+                            if len(value) == 128:
+                                value += " [TRUNCATED BY AUDIT]"
+                            shared_context[key] = value
                     elif key == "path_unquoted":
                         # Only use unquoted path if we don't already have a quoted path
                         if "path" not in shared_context:
@@ -643,6 +661,29 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                     else:
                         # Fall back to raw string if parsing fails
                         avc_data[key] = context_string
+                elif key == "proctitle":
+                    # Handle hex-encoded proctitle in AVC records (same as shared context processing)
+                    raw_proctitle = field_match.group(1).strip()
+                    try:
+                        # Check if it's hex-encoded (all hex characters and even length)
+                        if all(c in "0123456789ABCDEFabcdef" for c in raw_proctitle) and len(raw_proctitle) % 2 == 0:
+                            decoded = bytes.fromhex(raw_proctitle).decode('utf-8', errors='ignore')
+                            # Replace null bytes with spaces (they're used as separators in proctitle)
+                            decoded_with_spaces = decoded.replace('\x00', ' ')
+
+                            # Check for audit system truncation (128 char limit for proctitle)
+                            if (len(raw_proctitle) == 256 and len(decoded_with_spaces) == 128 and
+                                not decoded.endswith('\x00')):
+                                # Add truncation indicator
+                                decoded_with_spaces += " [TRUNCATED BY AUDIT]"
+
+                            avc_data[key] = decoded_with_spaces.strip()
+                        else:
+                            # Not hex-encoded, use as-is
+                            avc_data[key] = raw_proctitle
+                    except (ValueError, UnicodeDecodeError):
+                        # If hex decoding fails, use raw value
+                        avc_data[key] = raw_proctitle
                 else:
                     avc_data[key] = field_match.group(1).strip()
 
@@ -3104,21 +3145,7 @@ def validate_arguments(args, console: Console) -> str:
         )
         sys.exit(1)
 
-    # Validate JSON flag requirements
-    if args.json and file_args_count == 0:
-        console.print("❌ [bold red]Error: Missing Required Arguments[/bold red]")
-        console.print("   [cyan]--json[/cyan] flag requires a file input to process.")
-        console.print(
-            "   [dim]JSON output cannot be generated without input data.[/dim]"
-        )
-        console.print("   [dim]Valid combinations:[/dim]")
-        console.print("   • [cyan]--json --file audit.log[/cyan] (recommended)")
-        console.print("   • [cyan]--json --raw-file audit.log[/cyan]")
-        console.print("   • [cyan]--json --avc-file processed.log[/cyan]")
-        console.print(
-            "   [dim]Example:[/dim] [cyan]python3 parse_avc.py --json --file /var/log/audit/audit.log[/cyan]"
-        )
-        sys.exit(1)
+    # JSON flag works with both file input and stdin input, so no validation needed
 
     # Handle new --file argument with auto-detection
     if args.file:
@@ -3134,15 +3161,36 @@ def validate_arguments(args, console: Console) -> str:
     elif args.avc_file:
         return validate_avc_file(args.avc_file, console)
 
-    # Interactive mode
+    # Stdin mode (could be interactive or piped)
     else:
-        if args.json:
-            console.print(
-                "❌ [bold red]Error: Interactive mode not supported with --json[/bold red]"
-            )
-            console.print("   JSON output requires file input for processing.")
-            sys.exit(1)
-        return "interactive"
+        # Check if stdin has data available (piped) vs waiting for interactive input
+        import select
+        try:
+            # Try to check if stdin has data available without blocking
+            if select.select([sys.stdin], [], [], 0.0)[0]:
+                # Data is available on stdin (piped input) - JSON is allowed
+                return "interactive"
+            else:
+                # No data on stdin - truly interactive mode
+                if args.json:
+                    console.print(
+                        "❌ [bold red]Error: Interactive mode not supported with --json[/bold red]"
+                    )
+                    console.print("   JSON output requires file input for processing.")
+                    console.print("   [dim]Tip: Use --file for JSON output or pipe data without --json flag[/dim]")
+                    sys.exit(1)
+                return "interactive"
+        except (OSError, io.UnsupportedOperation):
+            # stdin is redirected (test environment) or not available
+            # In test environments, treat as interactive mode for safety
+            if args.json:
+                console.print(
+                    "❌ [bold red]Error: Interactive mode not supported with --json[/bold red]"
+                )
+                console.print("   JSON output requires file input for processing.")
+                console.print("   [dim]Tip: Use --file for JSON output or pipe data without --json flag[/dim]")
+                sys.exit(1)
+            return "interactive"
 
 
 def validate_file_with_auto_detection(

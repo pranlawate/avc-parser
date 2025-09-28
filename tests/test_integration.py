@@ -59,6 +59,91 @@ class TestJSONOutput(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
 
+    def test_json_with_stdin_input(self):
+        """Test JSON output with piped stdin input."""
+        # Sample AVC data
+        avc_data = 'type=AVC msg=audit(01/15/2025 14:30:00.123:456): avc: denied { read } for pid=1234 comm="test" exe="/usr/bin/test" path="/etc/passwd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:passwd_file_t:s0 tclass=file permissive=0'
+
+        # Run parser with JSON output via stdin
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--json"],
+            input=avc_data,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+
+        # Parse JSON output
+        try:
+            json_data = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            self.fail(f"Invalid JSON output: {e}")
+
+        # Check expected structure
+        self.assertIsInstance(json_data, dict)
+        self.assertIn("unique_denials", json_data)
+        self.assertIn("summary", json_data)
+
+        # Verify the data was processed correctly
+        self.assertEqual(json_data["summary"]["total_events"], 1)
+        self.assertEqual(len(json_data["unique_denials"]), 1)
+
+        # Check that sesearch command is generated
+        self.assertIn("sesearch_command", json_data["unique_denials"][0])
+
+    def test_json_with_multiple_avc_stdin(self):
+        """Test JSON output with multiple AVC records via stdin."""
+        # Multiple AVC records
+        avc_data = '''type=AVC msg=audit(01/15/2025 14:30:00.123:456): avc: denied { read } for pid=1234 comm="test1" path="/etc/passwd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:passwd_file_t:s0 tclass=file permissive=0
+type=AVC msg=audit(01/15/2025 14:30:01.124:457): avc: denied { write } for pid=1235 comm="test2" path="/tmp/test" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:tmp_t:s0 tclass=file permissive=0'''
+
+        # Run parser with JSON output via stdin
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--json"],
+            input=avc_data,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+
+        # Parse JSON output
+        try:
+            json_data = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            self.fail(f"Invalid JSON output: {e}")
+
+        # Check that both events were processed
+        self.assertEqual(json_data["summary"]["total_events"], 2)
+
+    def test_json_with_stdin_and_detailed_flag(self):
+        """Test JSON output with stdin input and additional flags."""
+        avc_data = 'type=AVC msg=audit(01/15/2025 14:30:00.123:456): avc: denied { read } for pid=1234 comm="test" exe="/usr/bin/test" path="/etc/passwd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:passwd_file_t:s0 tclass=file permissive=0'
+
+        # Run parser with JSON and detailed flags via stdin
+        result = subprocess.run(
+            [sys.executable, "parse_avc.py", "--json", "--detailed"],
+            input=avc_data,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+
+        self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+
+        # Parse JSON output
+        try:
+            json_data = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            self.fail(f"Invalid JSON output: {e}")
+
+        # JSON output should be the same regardless of detailed flag
+        self.assertIn("unique_denials", json_data)
+        self.assertEqual(json_data["summary"]["total_events"], 1)
+
 
 class TestCommandLineInterface(unittest.TestCase):
     """Test command-line interface functionality."""

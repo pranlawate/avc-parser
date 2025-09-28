@@ -46,8 +46,8 @@ class TestArgumentValidation(unittest.TestCase):
         with self.assertRaises(SystemExit):
             validate_arguments(MockArgs(), self.console)
 
-    def test_json_requires_file_input(self):
-        """Test that JSON flag requires file input."""
+    def test_json_in_test_environment(self):
+        """Test that JSON flag behaves correctly in test environment (treated as interactive)."""
 
         class MockArgs:
             file = None
@@ -55,6 +55,8 @@ class TestArgumentValidation(unittest.TestCase):
             avc_file = None
             json = True
 
+        # In test environment, stdin is redirected and treated as interactive mode
+        # So JSON should still fail (for safety in test environments)
         with self.assertRaises(SystemExit):
             validate_arguments(MockArgs(), self.console)
 
