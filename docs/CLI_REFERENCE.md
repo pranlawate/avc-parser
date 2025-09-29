@@ -4,7 +4,9 @@
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
-> **🎯 New Advanced Filtering**: The tool now includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
+> **🎯 Production Ready v1.6.0**: Clean modular architecture with 28% code reduction, comprehensive testing, and ROI-optimized development roadmap. Tool includes advanced filtering, professional report formats, and policy investigation integration.
+
+> **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 
 ## 📋 **Command Line Options**
 
