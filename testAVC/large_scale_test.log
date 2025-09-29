@@ -1,0 +1,150 @@
+----
+type=AVC msg=audit(09/29/2025 16:00:00.100:1000): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5000 comm="large-test-0" path="/large/test/0" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:01.100:1001): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5001 comm="large-test-1" path="/large/test/1" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:02.100:1002): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5002 comm="large-test-2" path="/large/test/2" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:03.100:1003): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5003 comm="large-test-3" path="/large/test/3" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:04.100:1004): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5004 comm="large-test-4" path="/large/test/4" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:05.100:1005): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5005 comm="large-test-5" path="/large/test/5" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:06.100:1006): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5006 comm="large-test-6" path="/large/test/6" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:07.100:1007): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5007 comm="large-test-7" path="/large/test/7" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:08.100:1008): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5008 comm="large-test-8" path="/large/test/8" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:09.100:1009): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5009 comm="large-test-9" path="/large/test/9" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:10.100:1010): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5010 comm="large-test-10" path="/large/test/10" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:11.100:1011): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5011 comm="large-test-11" path="/large/test/11" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:12.100:1012): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5012 comm="large-test-12" path="/large/test/12" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:13.100:1013): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5013 comm="large-test-13" path="/large/test/13" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:14.100:1014): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5014 comm="large-test-14" path="/large/test/14" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:15.100:1015): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5015 comm="large-test-15" path="/large/test/15" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:16.100:1016): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5016 comm="large-test-16" path="/large/test/16" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:17.100:1017): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5017 comm="large-test-17" path="/large/test/17" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:18.100:1018): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5018 comm="large-test-18" path="/large/test/18" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:19.100:1019): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5019 comm="large-test-19" path="/large/test/19" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:20.100:1020): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5020 comm="large-test-20" path="/large/test/20" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:21.100:1021): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5021 comm="large-test-21" path="/large/test/21" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:22.100:1022): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5022 comm="large-test-22" path="/large/test/22" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:23.100:1023): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5023 comm="large-test-23" path="/large/test/23" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:24.100:1024): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5024 comm="large-test-24" path="/large/test/24" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:25.100:1025): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5025 comm="large-test-25" path="/large/test/25" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:26.100:1026): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5026 comm="large-test-26" path="/large/test/26" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:27.100:1027): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5027 comm="large-test-27" path="/large/test/27" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:28.100:1028): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5028 comm="large-test-28" path="/large/test/28" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:29.100:1029): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5029 comm="large-test-29" path="/large/test/29" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:30.100:1030): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5030 comm="large-test-30" path="/large/test/30" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:31.100:1031): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5031 comm="large-test-31" path="/large/test/31" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:32.100:1032): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5032 comm="large-test-32" path="/large/test/32" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:33.100:1033): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5033 comm="large-test-33" path="/large/test/33" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:34.100:1034): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5034 comm="large-test-34" path="/large/test/34" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:35.100:1035): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5035 comm="large-test-35" path="/large/test/35" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:36.100:1036): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5036 comm="large-test-36" path="/large/test/36" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:37.100:1037): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5037 comm="large-test-37" path="/large/test/37" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:38.100:1038): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5038 comm="large-test-38" path="/large/test/38" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:39.100:1039): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5039 comm="large-test-39" path="/large/test/39" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:40.100:1040): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5040 comm="large-test-40" path="/large/test/40" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:41.100:1041): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5041 comm="large-test-41" path="/large/test/41" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:42.100:1042): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5042 comm="large-test-42" path="/large/test/42" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:43.100:1043): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5043 comm="large-test-43" path="/large/test/43" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:44.100:1044): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5044 comm="large-test-44" path="/large/test/44" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:45.100:1045): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5045 comm="large-test-45" path="/large/test/45" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:46.100:1046): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5046 comm="large-test-46" path="/large/test/46" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:47.100:1047): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5047 comm="large-test-47" path="/large/test/47" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:48.100:1048): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5048 comm="large-test-48" path="/large/test/48" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----
+----
+type=AVC msg=audit(09/29/2025 16:00:49.100:1049): avc: denied { perm0 perm1 perm2 perm3 perm4 perm5 perm6 perm7 perm8 perm9 } for pid=5049 comm="large-test-49" path="/large/test/49" scontext=large_u:large_r:large_t:s0 tcontext=large_u:object_r:large_file_t:s0 tclass=file permissive=0
+----

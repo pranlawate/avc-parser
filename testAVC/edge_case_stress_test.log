@@ -1,0 +1,7 @@
+----
+type=AVC msg=audit(09/29/2025 14:30:00.100:700): avc: denied { read write open getattr ioctl lock append } for pid=1001 comm="test-process" path="/test/path" scontext=unconfined_u:unconfined_r:unconfined_t:s0 tcontext=unconfined_u:object_r:unlabeled_t:s0 tclass=file permissive=0
+----
+type=AVC msg=audit(09/29/2025 14:30:00.200:701): avc: denied { read write open getattr ioctl lock append create } for pid=1002 comm="test-process-2" path="/test/path2" scontext=unconfined_u:unconfined_r:unconfined_t:s0 tcontext=unconfined_u:object_r:unlabeled_t:s0 tclass=file permissive=0
+----
+type=AVC msg=audit(09/29/2025 14:30:00.300:702): avc: denied { name_bind name_connect create bind listen accept getopt setopt shutdown } for pid=2001 comm="network-test" dest=8080 scontext=unconfined_u:unconfined_r:unconfined_t:s0 tcontext=system_u:object_r:http_port_t:s0 tclass=tcp_socket permissive=1
+----

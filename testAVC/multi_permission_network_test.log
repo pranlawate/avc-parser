@@ -1,0 +1,13 @@
+----
+type=PROCTITLE msg=audit(09/29/2025 14:30:00.100:600): proctitle=/usr/sbin/httpd -D FOREGROUND
+type=SYSCALL msg=audit(09/29/2025 14:30:00.100:600): arch=x86_64 syscall=socket success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(09/29/2025 14:30:00.100:600): avc: denied { create } for pid=9001 comm="httpd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:httpd_t:s0 tclass=tcp_socket permissive=0
+----
+type=PROCTITLE msg=audit(09/29/2025 14:30:00.200:601): proctitle=/usr/sbin/httpd -D FOREGROUND
+type=SYSCALL msg=audit(09/29/2025 14:30:00.200:601): arch=x86_64 syscall=bind success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(09/29/2025 14:30:00.200:601): avc: denied { bind } for pid=9001 comm="httpd" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:httpd_t:s0 tclass=tcp_socket permissive=0
+----
+type=PROCTITLE msg=audit(09/29/2025 14:30:00.300:602): proctitle=/usr/sbin/httpd -D FOREGROUND
+type=SYSCALL msg=audit(09/29/2025 14:30:00.300:602): arch=x86_64 syscall=listen success=no exit=EACCES comm="httpd" exe="/usr/sbin/httpd" subj=system_u:system_r:httpd_t:s0
+type=AVC msg=audit(09/29/2025 14:30:00.300:602): avc: denied { listen } for pid=9002 comm="httpd-worker" scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:httpd_t:s0 tclass=tcp_socket permissive=0
+----

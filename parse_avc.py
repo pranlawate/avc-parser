@@ -2976,6 +2976,12 @@ def display_report_sealert_format(
 
     permission = parsed_log.get("permission", "unknown")
     permissions_display = parsed_log.get("permissions_display", permission)
+
+    # Use aggregated permissions for display if available
+    if "permissions" in denial_info and denial_info["permissions"] and len(denial_info["permissions"]) > 1:
+        permissions_list = sorted(list(denial_info["permissions"]))
+        permissions_display = ", ".join(permissions_list)
+
     tclass = parsed_log.get("tclass", "unknown")
 
     console.print(f"{source_type} attempted {permissions_display} access to {target_type} {tclass} and was denied.")
@@ -3091,7 +3097,18 @@ def display_report_sealert_format(
         console.print()
 
     # Policy Investigation
-    sesearch_command = generate_sesearch_command(parsed_log)
+    # Use aggregated permissions if available for more complete sesearch command
+    sesearch_log = parsed_log.copy()
+    if (
+        "permissions" in denial_info
+        and denial_info["permissions"]
+        and len(denial_info["permissions"]) > 1
+    ):
+        # Use aggregated permissions for more complete sesearch command
+        permissions_list = sorted(list(denial_info["permissions"]))
+        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
+
+    sesearch_command = generate_sesearch_command(sesearch_log)
     console.print("Policy Investigation:")
     console.print(f"  Command: {sesearch_command}")
     console.print()
@@ -3239,7 +3256,18 @@ def display_report_brief_format(
 
     # Simple remediation section for brief format
     console.print("REMEDIATION:")
-    sesearch_command = generate_sesearch_command(parsed_log)
+    # Use aggregated permissions if available for more complete sesearch command
+    sesearch_log = parsed_log.copy()
+    if (
+        "permissions" in denial_info
+        and denial_info["permissions"]
+        and len(denial_info["permissions"]) > 1
+    ):
+        # Use aggregated permissions for more complete sesearch command
+        permissions_list = sorted(list(denial_info["permissions"]))
+        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
+
+    sesearch_command = generate_sesearch_command(sesearch_log)
     console.print(f"$ {sesearch_command}")
 
     if tclass == "file" and "httpd" in source_type:
