@@ -4,6 +4,9 @@ __pycache__/
 testRAW/
 .vscode/
 
+# Performance profiling reports
+performance_profile_*.json
+
 # Quality tool outputs (now in docs/diagrams/)
 docs/diagrams/*.svg
 docs/diagrams/*.png

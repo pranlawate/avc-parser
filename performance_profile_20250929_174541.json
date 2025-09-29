@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-09-29T17:45:41.773560",
+  "system_info": {
+    "cpu_count": 16,
+    "memory_gb": 62.493778228759766,
+    "python_version": "3.13.5 (main, Jun 12 2025, 00:00:00) [GCC 14.3.1 20250523 (Red Hat 14.3.1-1)]",
+    "platform": "linux"
+  },
+  "results": {
+    "memory": {
+      "max_memory_mb": 0.359375,
+      "avg_memory_mb": 0.359375,
+      "max_cpu_percent": 0.0,
+      "samples": 1,
+      "success": true
+    },
+    "cpu": {
+      "execution_time": 0.0759286880493164,
+      "profile_data": "         109083 function calls (106034 primitive calls) in 0.076 seconds\n\n   Ordered by: cumulative time\n   List reduced from 1137 to 20 due to restriction <20>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n    114/1    0.002    0.000    0.076    0.076 {built-in method builtins.exec}\n    118/3    0.000    0.000    0.068    0.023 <frozen importlib._bootstrap>:1349(_find_and_load)\n    118/3    0.000    0.000    0.068    0.023 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)\n    116/3    0.000    0.000    0.067    0.022 <frozen importlib._bootstrap>:911(_load_unlocked)\n    107/3    0.000    0.000    0.067    0.022 <frozen importlib._bootstrap_external>:1020(exec_module)\n    249/6    0.000    0.000    0.066    0.011 <frozen importlib._bootstrap>:480(_call_with_frames_removed)\n        1    0.000    0.000    0.063    0.063 /home/plawate/git_space/avc-parser/parse_avc.py:1(<module>)\n        1    0.000    0.000    0.038    0.038 /usr/lib/python3.13/site-packages/rich/console.py:1(<module>)\n        1    0.000    0.000    0.018    0.018 /usr/lib/python3.13/site-packages/rich/align.py:1(<module>)\n        1    0.000    0.000    0.018    0.018 /usr/lib/python3.13/site-packages/rich/constrain.py:1(<module>)\n        1    0.000    0.000    0.017    0.017 /usr/lib/python3.13/site-packages/rich/jupyter.py:1(<module>)\n      205    0.000    0.000    0.017    0.000 /usr/lib64/python3.13/re/__init__.py:330(_compile)\n        1    0.000    0.000    0.017    0.017 /usr/lib/python3.13/site-packages/rich/segment.py:1(<module>)\n  251/249    0.002    0.000    0.016    0.000 {built-in method builtins.__build_class__}\n       86    0.000    0.000    0.016    0.000 /usr/lib64/python3.13/re/_compiler.py:743(compile)\n      107    0.001    0.000    0.014    0.000 <frozen importlib._bootstrap_external>:1093(get_code)\n      9/7    0.000    0.000    0.014    0.002 {built-in method builtins.__import__}\n        1    0.000    0.000    0.013    0.013 /usr/lib/python3.13/site-packages/rich/pretty.py:1(<module>)\n    29/25    0.000    0.000    0.013    0.001 <frozen importlib._bootstrap>:1390(_handle_fromlist)\n        1    0.000    0.000    0.012    0.012 /home/plawate/git_space/avc-parser/parse_avc.py:2442(main)\n\n\n",
+      "success": true
+    },
+    "io": {
+      "file_size_mb": 0.0012941360473632812,
+      "line_count": 6,
+      "read_time": 3.457069396972656e-05,
+      "read_throughput": 37.43448275862069,
+      "buffer_results": {
+        "8192": 126.23255813953489,
+        "65536": 187.17241379310346,
+        "262144": 37.69444444444444
+      },
+      "best_buffer_kb": 64
+    },
+    "scaling": [
+      {
+        "file": "test_pid_1039.log",
+        "size_mb": 0.0003681182861328125,
+        "execution_time": 0.0886240005493164,
+        "throughput": 0.004153708745386263,
+        "denials": 1,
+        "events": 1
+      },
+      {
+        "file": "dev_inode_only_test.log",
+        "size_mb": 0.00042724609375,
+        "execution_time": 0.0826718807220459,
+        "throughput": 0.005167973560278124,
+        "denials": 1,
+        "events": 1
+      },
+      {
+        "file": "network_AVC.log",
+        "size_mb": 0.0006237030029296875,
+        "execution_time": 0.08096575736999512,
+        "throughput": 0.00770329362917593,
+        "denials": 1,
+        "events": 1
+      },
+      {
+        "file": "file_context_AVC.log",
+        "size_mb": 0.0006923675537109375,
+        "execution_time": 0.08104777336120605,
+        "throughput": 0.008542709133109175,
+        "denials": 1,
+        "events": 1
+      },
+      {
+        "file": "malformed_permissions_test.log",
+        "size_mb": 0.0006923675537109375,
+        "execution_time": 0.08271217346191406,
+        "throughput": 0.008370805949498444,
+        "denials": 2,
+        "events": 2
+      }
+    ]
+  }
+}

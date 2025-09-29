@@ -122,10 +122,17 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
 
 ## 🛠 **Development Workflow**
 
-**Quality Assurance**: Ultra-fast ruff-based validation
-**Testing**: Automated regression prevention framework
+**Quality Assurance**: Ultra-fast syntax validation with comprehensive test coverage
+**Testing**: Automated regression prevention framework with CI/CD pipeline
 **Architecture**: Modular design with clear separation of concerns
 **Documentation**: User-focused guides with technical implementation details
+**CI/CD Platform**: Fedora 39 containers aligned with Red Hat/Fedora target environment
+**SELinux Integration**: Comprehensive validation of audit tools (ausearch/aureport) and policy tools (sesearch/seinfo)
+**SIEM Compatibility**: Automated testing of JSON normalization and structured output formats
+**Workflow Validation**: End-to-end testing from raw logs to policy investigation commands
+**Failure Scenarios**: Comprehensive testing of edge cases, malformed logs, and error conditions
+**Pipe Operations**: Validated fix for pipe compatibility (head, grep, wc, json parsing)
+**Security Scanning**: Automated dependency vulnerability detection with severity assessment
 
 ---
 
