@@ -15,14 +15,14 @@ from unittest.mock import patch, MagicMock
 # Add parent directory to path to import parse_avc
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from parse_avc import (
+from parse_avc import human_time_ago
+from validators import (
     validate_arguments,
     validate_raw_file,
     validate_avc_file,
     validate_file_with_auto_detection,
-    human_time_ago,
-    MAX_FILE_SIZE_MB,
 )
+from config import MAX_FILE_SIZE_MB
 from datetime import datetime, timedelta
 from rich.console import Console
 
@@ -127,7 +127,7 @@ class TestFileValidation(unittest.TestCase):
 
         try:
             # Mock os.path.getsize to return a large size
-            with patch("parse_avc.os.path.getsize") as mock_getsize:
+            with patch("validators.file_validator.os.path.getsize") as mock_getsize:
                 mock_getsize.return_value = (MAX_FILE_SIZE_MB + 1) * 1024 * 1024
                 # This should print a warning but not exit
                 result = validate_raw_file(tmp_path, self.console)
@@ -223,7 +223,7 @@ class TestEdgeCases(unittest.TestCase):
         try:
             # Mock open to raise PermissionError
             with patch(
-                "parse_avc.open", side_effect=PermissionError("Permission denied")
+                "validators.file_validator.open", side_effect=PermissionError("Permission denied")
             ):
                 with self.assertRaises(SystemExit):
                     validate_raw_file(tmp_path, self.console)
