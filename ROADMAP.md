@@ -37,9 +37,16 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
 
 ### **📋 PLANNED PHASES**
 
-**Phase 9: Integration & Performance Testing**
+**Phase 9A: Architectural Refactoring** (🔄 NEXT - HIGH PRIORITY)
+- **Objective**: Modularize 5,168-line monolithic parse_avc.py into maintainable architecture
+- **Drivers**: Code complexity, maintainability, and scalability concerns
+- **Scope**: Extract display formatters, argument handlers, and parsing logic into separate modules
+- **Benefits**: Improved testability, easier feature development, reduced technical debt
+- **Safety**: Create checkpoint branch before refactoring, comprehensive test validation
+
+**Phase 9B: Integration & Performance Testing**
 - Real-world scenario validation across distributions
-- Performance benchmarking and optimization
+- Performance benchmarking and optimization on refactored architecture
 - Cross-platform compatibility verification
 
 **Phase 10: Enhanced Documentation** (✅ Substantially Complete)
