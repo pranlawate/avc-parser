@@ -29,6 +29,7 @@ from rich.rule import Rule
 from context import AvcContext, PermissionSemanticAnalyzer
 
 # Local modules
+from config import AUDIT_RECORD_RE, FILE_ANALYSIS_LINES, MAX_FILE_SIZE_MB
 from utils import (
     format_bionic_text,
     format_path_for_display,
@@ -37,17 +38,6 @@ from utils import (
     signal_handler,
 )
 
-# Configuration constants
-MAX_FILE_SIZE_MB = 100
-FILE_ANALYSIS_LINES = 10
-
-
-# Enhanced audit record regex pattern from setroubleshoot for robust parsing
-# Handles: (node=XXX )?(type=XXX )?(msg=)?audit(timestamp:serial): body
-# Modified to handle optional whitespace before colon: ") :" or "):"
-AUDIT_RECORD_RE = re.compile(
-    r"(node=(\S+)\s+)?(type=(\S+)\s+)?(msg=)?audit\(((\d+)\.(\d+):(\d+))\)\s*:\s*(.*)"
-)
 
 
 def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:

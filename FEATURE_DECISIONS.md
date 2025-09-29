@@ -1342,6 +1342,90 @@ sesearch -A -s httpd_t -t jboss_management_port_t -c tcp_socket -p name_connect
 
 ---
 
+## ✅ APPROVED: Phase 9A Architectural Refactoring Strategy (Phase 9A)
+
+### **Decision Summary**
+**Proposal**: ROI-optimized modular refactoring of 5,168-line monolithic `parse_avc.py`
+**Strategy**: Extract 6 high/medium ROI modules while preserving core parsing engine
+**Approach**: Risk-minimized extraction focusing on isolated components first
+
+### **Architecture Decision**
+**Target Structure**:
+```
+avc-parser/
+├── parse_avc.py (main - reduced to ~3,500 lines)
+├── config/constants.py (regex patterns, configuration)
+├── validators/file_validator.py (file/argument validation)
+├── formatters/json_formatter.py (JSON output)
+├── formatters/report_formatter.py (brief/sealert reports)
+├── detectors/security_detector.py (security issue detection)
+├── cli/argument_parser.py (CLI setup)
+├── context.py (existing)
+├── utils.py (existing)
+└── tests/ (existing)
+```
+
+### **ROI Analysis Results**
+**High ROI Components (Extract First)**:
+- `config/constants.py`: 30 min effort, 8/10 ROI - Zero risk constant extraction
+- `validators/file_validator.py`: 2 hours, 9/10 ROI - Well-isolated validation logic
+- `formatters/json_formatter.py`: 1 hour, 9/10 ROI - Pure output formatting
+
+**Medium ROI Components (Second Priority)**:
+- `detectors/security_detector.py`: 3 hours, 6/10 ROI - Independent detection functions
+- `cli/argument_parser.py`: 3 hours, 6/10 ROI - CLI setup extraction
+- `formatters/report_formatter.py`: 4 hours, 6/10 ROI - Report format separation
+
+**Explicitly Excluded (Low ROI)**:
+- Core parsing engine (`parsers/audit_parser.py`): 10-15 hours, 3/10 ROI - High risk, complex dependencies
+- Data model refactoring (`models/denial.py`): 15+ hours, 2/10 ROI - Touches all code, extreme risk
+- Exception handling (`exceptions/`): 6-8 hours, 2/10 ROI - Marginal benefits vs effort
+
+### **Expected Benefits**
+- **Line Reduction**: 5,168 → 3,500 lines (32% reduction in main file)
+- **Maintainability**: 6 focused modules with single responsibilities
+- **Testability**: Individual components can be unit tested
+- **Risk Mitigation**: Core parsing logic remains untouched
+- **Development Velocity**: Easier to locate and modify specific functionality
+
+### **Implementation Timeline**
+**Total Effort**: 13-15 hours for 70% of maintainability benefits
+**Extraction Order** (risk-minimized):
+1. config/constants.py (30 min - zero risk)
+2. validators/file_validator.py (2 hours - very low risk)
+3. formatters/json_formatter.py (1 hour - very low risk)
+4. detectors/security_detector.py (3 hours - low risk)
+5. cli/argument_parser.py (3 hours - low risk)
+6. formatters/report_formatter.py (4 hours - medium risk)
+
+### **Safety Measures**
+- **Checkpoint Branch**: `phase-9a-safety` created as rollback point
+- **Test Validation**: All 156 tests must pass after each extraction
+- **Incremental Approach**: Extract one module at a time with validation
+- **Core Preservation**: No changes to parsing, semantic analysis, or correlation logic
+
+### **Success Criteria**
+- Main file reduced by 1,650+ lines (32% reduction achieved)
+- All existing functionality preserved (zero regression)
+- Test suite maintains 100% pass rate
+- Import structure simplified and clearly documented
+- Future feature development easier due to modular organization
+
+### **Rationale**
+**Technical Debt**: The 5,168-line monolithic file has reached maintainability limits, making feature development increasingly difficult and error-prone.
+
+**80/20 Principle**: Focusing on high-ROI extractions provides 70% of maintainability benefits with only 20% of the effort and risk of a complete refactoring.
+
+**Risk Management**: Preserving the core parsing engine (lowest ROI, highest risk) maintains system stability while achieving substantial organizational improvements.
+
+**Future-Proofing**: This refactoring establishes the foundation for easier feature development without requiring a complete architectural rewrite.
+
+**Date**: 2025-09-29 (Phase 9A Planning)
+**Status**: APPROVED - Ready for implementation
+**Review Trigger**: If implementation exceeds 20 hours total effort, reassess remaining extractions
+
+---
+
 ## Decision Process
 
 All feature decisions should follow this process:
