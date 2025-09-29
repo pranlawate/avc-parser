@@ -193,8 +193,7 @@ def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_c
     # Convert the dictionary of unique denials to a list for JSON output
     output_list = []
     for denial_info in unique_denials.values():
-        # Import AvcContext here to avoid circular dependency during transition
-        from parse_avc import AvcContext
+        # Handle AvcContext objects (avoid circular import by checking type name)
 
         # Create a JSON-safe copy of the denial info
         json_denial = {
@@ -233,7 +232,7 @@ def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_c
         for key, value in json_denial["log"].items():
             if isinstance(value, datetime):
                 json_denial["log"][key] = value.isoformat()
-            elif isinstance(value, AvcContext):
+            elif hasattr(value, '__class__') and value.__class__.__name__ == 'AvcContext':
                 # Convert AvcContext objects to strings for JSON serialization
                 json_denial["log"][key] = str(value)
             elif key == "timestamp" and isinstance(value, (int, float)):

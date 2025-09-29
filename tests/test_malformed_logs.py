@@ -16,7 +16,8 @@ from unittest.mock import patch
 # Add parent directory to path to import parse_avc
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from parse_avc import _parse_avc_log_internal, detect_file_format
+from parse_avc import _parse_avc_log_internal
+from utils import detect_file_format
 from rich.console import Console
 
 

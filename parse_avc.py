@@ -9,7 +9,7 @@ post-incident SELinux audit log analysis for complex denial patterns.
 
 Author: Pranav Lawate
 License: MIT
-Version: 1.5.0
+Version: 1.6.0
 """
 
 import argparse
@@ -26,16 +26,22 @@ from rich.align import Align
 from rich.console import Console, Group
 from rich.rule import Rule
 
-from context import AvcContext, PermissionSemanticAnalyzer
+from selinux.context import AvcContext, PermissionSemanticAnalyzer
 
 # Local modules
 from config import AUDIT_RECORD_RE, FILE_ANALYSIS_LINES, MAX_FILE_SIZE_MB
 from utils import (
+    context_matches,
+    detect_file_format,
     format_bionic_text,
     format_path_for_display,
+    generate_sesearch_command,
     human_time_ago,
+    parse_time_range,
+    path_matches,
     print_error,
     signal_handler,
+    sort_denials,
 )
 from validators import (
     validate_arguments,
@@ -43,7 +49,20 @@ from validators import (
     validate_file_with_auto_detection,
     validate_raw_file,
 )
-from formatters import format_as_json, normalize_json_fields
+from formatters import (
+    display_report_brief_format,
+    display_report_sealert_format,
+    format_as_json,
+    normalize_json_fields,
+)
+from detectors import (
+    detect_dontaudit_disabled,
+    detect_permissive_mode,
+    has_container_paths,
+    has_custom_paths,
+    has_dontaudit_indicators,
+    has_permissive_denials,
+)
 
 
 
@@ -78,51 +97,6 @@ def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
     return True, host, record_type, event_id, body_text
 
 
-def detect_file_format(file_path: str) -> str:
-    """
-    Analyze file content to detect if it's raw audit.log or pre-processed format.
-
-    Args:
-        file_path (str): Path to the file to analyze
-
-    Returns:
-        str: 'raw' for raw audit.log format, 'processed' for pre-processed format
-
-    Note:
-        Detection logic:
-        - Pre-processed: Contains 'type=AVC msg=audit(...)' patterns with human-readable timestamps
-        - Raw: Contains audit records without 'type=' prefix or with binary timestamps
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            # Read first few lines for analysis
-            lines = []
-            for i, line in enumerate(f):
-                if i >= FILE_ANALYSIS_LINES:
-                    break
-                lines.append(line.strip())
-
-        # Read more content to check for ausearch output markers
-        content_sample = "\n".join(lines)
-
-        # Definitive pre-processed indicators (ausearch output)
-        has_time_headers = "time->" in content_sample
-        has_separators = "----" in content_sample
-        has_human_timestamps = bool(
-            re.search(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", content_sample)
-        )
-
-        # If any ausearch marker is present, it's definitely pre-processed
-        if has_time_headers or has_separators or has_human_timestamps:
-            return "processed"
-        else:
-            # No ausearch markers = raw audit.log format
-            return "raw"
-
-    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
-        # Default to processed format if we can't read the file
-        # The file validation will catch and handle the actual error
-        return "processed"
 
 
 def validate_log_entry(
@@ -339,92 +313,6 @@ def parse_timestamp_from_audit_block(log_block: str) -> dict:
     return timestamp_context
 
 
-def parse_time_range(time_spec: str) -> datetime:
-    """
-    Parse time range specifications into datetime objects.
-
-    Args:
-        time_spec (str): Time specification (e.g., 'yesterday', 'today', '2025-01-15', 'recent', '2 hours ago')
-
-    Returns:
-        datetime: Parsed datetime object
-
-    Raises:
-        ValueError: If time specification cannot be parsed
-
-    Examples:
-        >>> parse_time_range('yesterday')
-        datetime(2025, 1, 14, 0, 0)
-        >>> parse_time_range('2025-01-15 14:30')
-        datetime(2025, 1, 15, 14, 30)
-    """
-    now = datetime.now()
-    time_spec_lower = time_spec.lower().strip()
-
-    # Handle relative time keywords
-    if time_spec_lower == "now":
-        return now
-    elif time_spec_lower == "today":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_spec_lower == "yesterday":
-        yesterday = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
-            days=1
-        )
-        return yesterday
-    elif time_spec_lower == "recent":
-        # Recent means last hour
-        return now - timedelta(hours=1)
-
-    # Handle "X ago" patterns
-    ago_match = re.match(
-        r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago", time_spec_lower
-    )
-    if ago_match:
-        amount = int(ago_match.group(1))
-        unit = ago_match.group(2)
-
-        if unit == "second":
-            return now - timedelta(seconds=amount)
-        elif unit == "minute":
-            return now - timedelta(minutes=amount)
-        elif unit == "hour":
-            return now - timedelta(hours=amount)
-        elif unit == "day":
-            return now - timedelta(days=amount)
-        elif unit == "week":
-            return now - timedelta(weeks=amount)
-        elif unit == "month":
-            # Approximate month as 30 days
-            return now - timedelta(days=amount * 30)
-        elif unit == "year":
-            # Approximate year as 365 days
-            return now - timedelta(days=amount * 365)
-
-    # Try parsing explicit date/time formats
-    time_formats = [
-        "%Y-%m-%d %H:%M:%S",  # 2025-01-15 14:30:45
-        "%Y-%m-%d %H:%M",  # 2025-01-15 14:30
-        "%Y-%m-%d",  # 2025-01-15 (assumes 00:00:00)
-        "%m/%d/%Y %H:%M:%S",  # 01/15/2025 14:30:45
-        "%m/%d/%Y %H:%M",  # 01/15/2025 14:30
-        "%m/%d/%Y",  # 01/15/2025 (assumes 00:00:00)
-        "%d/%m/%Y %H:%M:%S",  # 15/01/2025 14:30:45 (European format)
-        "%d/%m/%Y %H:%M",  # 15/01/2025 14:30
-        "%d/%m/%Y",  # 15/01/2025 (assumes 00:00:00)
-    ]
-
-    for fmt in time_formats:
-        try:
-            return datetime.strptime(time_spec, fmt)
-        except ValueError:
-            continue
-
-    # If no format matches, raise an error
-    raise ValueError(
-        f"Unable to parse time specification: '{time_spec}'. "
-        f"Supported formats include: 'yesterday', 'today', 'recent', "
-        f"'X hours/days/weeks ago', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM', etc."
-    )
 
 
 def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, set]:
@@ -1263,60 +1151,6 @@ def validate_grouping_optimality(unique_denials: dict) -> dict:
     }
 
 
-def generate_sesearch_command(parsed_log: dict) -> str:
-    """
-    Generate sesearch command for policy investigation based on AVC denial data.
-
-    Args:
-        parsed_log (dict): Parsed AVC log data containing scontext, tcontext, tclass, permission
-
-    Returns:
-        str: sesearch command string, or empty string if required data is missing
-
-    Example:
-        Input: scontext="system_u:system_r:httpd_t:s0", tcontext="unconfined_u:object_r:default_t:s0",
-               tclass="file", permission="read"
-        Output: "sesearch -A -s httpd_t -t default_t -c file -p read"
-    """
-    try:
-        # Extract required fields
-        scontext = parsed_log.get("scontext", "")
-        tcontext = parsed_log.get("tcontext", "")
-        tclass = parsed_log.get("tclass", "")
-        permission = parsed_log.get("permission", "")
-
-        # Validate required fields
-        if not all([scontext, tcontext, tclass, permission]):
-            return ""
-
-        # Extract type from SELinux contexts (user:role:type:mls format)
-        # Convert context objects to strings if necessary, then split on ':' and take index [2] for type component
-        try:
-            scontext_str = str(scontext)
-            tcontext_str = str(tcontext)
-            source_type = scontext_str.split(":")[2]
-            target_type = tcontext_str.split(":")[2]
-        except (IndexError, AttributeError):
-            # Handle malformed contexts gracefully
-            return ""
-
-        # Handle multiple permissions (convert from "{ read write }" format)
-        if permission.startswith("{ ") and permission.endswith(" }"):
-            # Multiple permissions: "{ read write execute }" -> "read,write,execute"
-            perms = permission[2:-2].split()
-            permission_str = ",".join(perms)
-        else:
-            # Single permission: "read" -> "read"
-            permission_str = permission.strip()
-
-        # Generate sesearch command
-        sesearch_cmd = f"sesearch -A -s {source_type} -t {target_type} -c {tclass} -p {permission_str}"
-
-        return sesearch_cmd
-
-    except Exception:
-        # Return empty string for any parsing errors
-        return ""
 
 
 def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tuple:
@@ -1385,220 +1219,6 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         )
 
     return signature
-
-
-def has_permissive_denials(denial_info: dict) -> bool:
-    """
-    Check if a specific denial contains permissive mode events.
-
-    Args:
-        denial_info (dict): Individual denial dictionary
-
-    Returns:
-        bool: True if denial contains permissive mode events
-    """
-    # Check aggregated permissive values if available
-    if "permissives" in denial_info and denial_info["permissives"]:
-        return "1" in denial_info["permissives"]
-
-    # Also check individual permissive field
-    parsed_log = denial_info.get("log", {})
-    permissive = parsed_log.get("permissive", "0")
-    return permissive == "1"
-
-
-def has_container_issues(denial_info: dict) -> tuple[bool, list[str], list[str]]:
-    """
-    Check if a specific denial contains container-related policy issues.
-
-    Args:
-        denial_info (dict): Individual denial dictionary
-
-    Returns:
-        tuple[bool, list[str], list[str]]: (has_issues, container_patterns, sample_paths)
-    """
-    container_patterns = [
-        "/containers/storage/overlay/",  # Podman/Docker overlay storage
-        "/.local/share/containers/",  # User container storage
-        "/var/lib/containers/",  # System container storage
-        "/var/lib/docker/",  # Docker storage
-    ]
-
-    found_patterns = set()
-    sample_paths = []
-
-    # Check main path in denial
-    parsed_log = denial_info.get("log", {})
-    main_path = parsed_log.get("path", "")
-    if main_path:
-        for pattern in container_patterns:
-            if pattern in main_path:
-                found_patterns.add(pattern.strip("/"))
-                if len(sample_paths) < 3:  # Keep sample paths for display
-                    sample_paths.append(main_path)
-
-    # Check correlation events for paths
-    if "correlations" in denial_info:
-        for correlation in denial_info["correlations"]:
-            corr_path = correlation.get("path", "")
-            if corr_path:
-                for pattern in container_patterns:
-                    if pattern in corr_path:
-                        found_patterns.add(pattern.strip("/"))
-                        if len(sample_paths) < 3:
-                            sample_paths.append(corr_path)
-
-    # Check aggregated paths if available
-    if "paths" in denial_info and denial_info["paths"]:
-        for path in denial_info["paths"]:
-            for pattern in container_patterns:
-                if pattern in path:
-                    found_patterns.add(pattern.strip("/"))
-                    if len(sample_paths) < 3:
-                        sample_paths.append(path)
-
-    found_patterns_list = sorted(list(found_patterns))
-    return len(found_patterns_list) > 0, found_patterns_list, sample_paths[:3]
-
-
-def has_custom_paths(denial_info: dict) -> tuple[bool, list[str]]:
-    """
-    Check if a specific denial contains custom/non-standard paths that may indicate policy issues.
-
-    Args:
-        denial_info (dict): Individual denial dictionary
-
-    Returns:
-        tuple[bool, list[str]]: (has_custom_paths, list of detected custom path patterns)
-    """
-    custom_path_patterns = [
-        "/usr/local",  # Non-standard local installations
-        "/opt",  # Optional software packages
-        "/home/",  # User home directories (when not user_home_t)
-        "/srv",  # Service data directories
-        "/data",  # Custom data directories
-        "/app",  # Application directories
-        "/apps",  # Application directories
-        "/software",  # Software installation directories
-        "/custom",  # Custom directories
-        "/local",  # Local directories outside /usr/local
-        "/var/local",  # Non-standard local variable data
-    ]
-
-    found_patterns = set()
-
-    # Check main path in denial
-    parsed_log = denial_info.get("log", {})
-    main_path = parsed_log.get("path", "")
-    if main_path:
-        for pattern in custom_path_patterns:
-            if main_path.startswith(pattern):
-                found_patterns.add(pattern)
-
-    # Check correlation events for paths
-    if "correlations" in denial_info:
-        for correlation in denial_info["correlations"]:
-            corr_path = correlation.get("path", "")
-            if corr_path:
-                for pattern in custom_path_patterns:
-                    if corr_path.startswith(pattern):
-                        found_patterns.add(pattern)
-
-    # Check aggregated paths if available
-    if "paths" in denial_info and denial_info["paths"]:
-        for path in denial_info["paths"]:
-            for pattern in custom_path_patterns:
-                if path.startswith(pattern):
-                    found_patterns.add(pattern)
-
-    found_patterns_list = sorted(list(found_patterns))
-    return len(found_patterns_list) > 0, found_patterns_list
-
-
-def detect_permissive_mode(unique_denials: list) -> tuple[bool, int, int]:
-    """
-    Detect permissive mode denials in the dataset.
-
-    Args:
-        unique_denials (list): List of unique denial dictionaries
-
-    Returns:
-        tuple[bool, int, int]: (has_permissive, permissive_count, total_count)
-    """
-    permissive_count = 0
-    total_count = 0
-
-    for denial_info in unique_denials:
-        denial_count = denial_info.get("count", 1)
-        total_count += denial_count
-
-        if has_permissive_denials(denial_info):
-            permissive_count += denial_count
-
-    return permissive_count > 0, permissive_count, total_count
-
-
-def has_dontaudit_permissions(denial_info: dict) -> tuple[bool, list[str]]:
-    """
-    Check if a specific denial contains dontaudit indicator permissions.
-
-    Args:
-        denial_info (dict): Individual denial dictionary
-
-    Returns:
-        tuple[bool, list[str]]: (has_indicators, list of found indicators)
-    """
-    dontaudit_indicators = ["noatsecure", "rlimitinh", "siginh"]
-    found_indicators = set()
-
-    # Check aggregated permissions set if available
-    if "permissions" in denial_info and denial_info["permissions"]:
-        for perm in denial_info["permissions"]:
-            if perm.lower().strip() in dontaudit_indicators:
-                found_indicators.add(perm.lower().strip())
-
-    # Also check individual permission field
-    parsed_log = denial_info.get("log", {})
-    permission = parsed_log.get("permission", "").lower().strip()
-    if permission in dontaudit_indicators:
-        found_indicators.add(permission)
-
-    found_indicators_list = sorted(list(found_indicators))
-    return len(found_indicators_list) > 0, found_indicators_list
-
-
-def detect_dontaudit_disabled(unique_denials: list) -> tuple[bool, list[str]]:
-    """
-    Detect if dontaudit rules are disabled based on presence of commonly suppressed permissions.
-
-    Args:
-        unique_denials (list): List of unique denial dictionaries
-
-    Returns:
-        tuple[bool, list[str]]: (detected, list of found indicators)
-
-    Note:
-        These permissions are almost always suppressed by dontaudit rules in normal systems.
-        If they appear in audit logs, it strongly indicates enhanced audit mode is active.
-    """
-    dontaudit_indicators = ["noatsecure", "rlimitinh", "siginh"]
-    found_indicators = set()
-
-    for denial_info in unique_denials:
-        # Check aggregated permissions set if available (for denials with multiple permissions)
-        if "permissions" in denial_info and denial_info["permissions"]:
-            for perm in denial_info["permissions"]:
-                if perm.lower().strip() in dontaudit_indicators:
-                    found_indicators.add(perm.lower().strip())
-
-        # Also check individual permission field for single-permission denials
-        parsed_log = denial_info.get("log", {})
-        permission = parsed_log.get("permission", "").lower().strip()
-        if permission in dontaudit_indicators:
-            found_indicators.add(permission)
-
-    found_indicators_list = sorted(list(found_indicators))
-    return len(found_indicators_list) > 0, found_indicators_list
 
 
 def filter_denials(
@@ -1675,14 +1295,14 @@ def filter_denials(
 
             # Check main path
             path = parsed_log.get("path", "")
-            if path and _path_matches(path, path_filter):
+            if path and path_matches(path, path_filter):
                 path_found = True
 
             # Check correlation events for paths
             if not path_found and "correlations" in denial_info:
                 for correlation in denial_info["correlations"]:
                     corr_path = correlation.get("path", "")
-                    if corr_path and _path_matches(corr_path, path_filter):
+                    if corr_path and path_matches(corr_path, path_filter):
                         path_found = True
                         break
 
@@ -1703,13 +1323,13 @@ def filter_denials(
         # Source context filtering
         if source_filter and include_denial:
             scontext = str(parsed_log.get("scontext", ""))
-            if not _context_matches(scontext, source_filter):
+            if not context_matches(scontext, source_filter):
                 include_denial = False
 
         # Target context filtering
         if target_filter and include_denial:
             tcontext = str(parsed_log.get("tcontext", ""))
-            if not _context_matches(tcontext, target_filter):
+            if not context_matches(tcontext, target_filter):
                 include_denial = False
 
         if include_denial:
@@ -1718,117 +1338,10 @@ def filter_denials(
     return filtered_denials
 
 
-def _path_matches(path: str, pattern: str) -> bool:
-    """
-    Check if a path matches a pattern with basic wildcard support.
-
-    Args:
-        path (str): The file path to check
-        pattern (str): The pattern (supports * wildcards)
-
-    Returns:
-        bool: True if path matches pattern
-    """
-    import fnmatch
-
-    return fnmatch.fnmatch(path, pattern)
-
-
-def _context_matches(context: str, pattern: str) -> bool:
-    """
-    Check if a SELinux context matches a pattern with wildcard support.
-
-    Args:
-        context (str): The SELinux context to check (e.g., 'system_u:system_r:httpd_t:s0')
-        pattern (str): The pattern to match against (supports * wildcards)
-                      Can match full context or individual components
-
-    Returns:
-        bool: True if context matches pattern
-
-    Examples:
-        >>> _context_matches('system_u:system_r:httpd_t:s0', 'httpd_t')
-        True
-        >>> _context_matches('system_u:system_r:httpd_t:s0', '*httpd*')
-        True
-        >>> _context_matches('unconfined_u:object_r:default_t:s0', '*default*')
-        True
-    """
-    import fnmatch
-
-    if not context or not pattern:
-        return False
-
-    context = context.strip()
-    pattern = pattern.strip()
-
-    # Case-insensitive matching for better user experience
-    context_lower = context.lower()
-    pattern_lower = pattern.lower()
-
-    # Direct substring match (for simple cases like 'httpd_t')
-    if pattern_lower in context_lower:
-        return True
-
-    # Wildcard pattern matching on full context
-    if fnmatch.fnmatch(context_lower, pattern_lower):
-        return True
-
-    # If pattern doesn't contain colons, try matching against individual context components
-    if ":" not in pattern:
-        context_parts = context_lower.split(":")
-        for part in context_parts:
-            if fnmatch.fnmatch(part, pattern_lower):
-                return True
-
-    return False
 
 
 
 
-def sort_denials(denials: list, sort_order: str) -> list:
-    """
-    Sort denials based on the specified sort order.
-
-    Args:
-        denials (list): List of denial dictionaries to sort
-        sort_order (str): Sort order - 'recent', 'count', or 'chrono'
-
-    Returns:
-        list: Sorted list of denials
-    """
-    if sort_order == "recent":
-        # Most recent first, then latest-starting as tiebreaker (reverse chronological for both)
-        return sorted(
-            denials,
-            key=lambda x: (
-                x.get("last_seen_obj") or datetime.fromtimestamp(0),
-                x.get("first_seen_obj") or datetime.fromtimestamp(0),
-            ),
-            reverse=True,
-        )
-    elif sort_order == "count":
-        # Highest count first, then by most recent as tiebreaker
-        return sorted(
-            denials,
-            key=lambda x: (
-                x.get("count", 0),
-                x.get("last_seen_obj") or datetime.fromtimestamp(0),
-            ),
-            reverse=True,
-        )
-    elif sort_order == "chrono":
-        # Chronological order (oldest first) using first_seen
-        return sorted(
-            denials, key=lambda x: x.get("first_seen_obj") or datetime.fromtimestamp(0)
-        )
-    else:
-        # Default to recent if unknown sort order
-        return sorted(
-            denials,
-            key=lambda x: x.get("last_seen_obj") or datetime.fromtimestamp(0),
-            reverse=True,
-        )
 
 
 def print_summary(console: Console, denial_info: dict, denial_num: int):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -1857,7 +1370,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     last_seen_ago = human_time_ago(last_seen_dt)
 
     # Check if this denial contains dontaudit permissions and add indicator
-    has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
+    has_dontaudit, dontaudit_perms = has_dontaudit_indicators(denial_info)
     dontaudit_indicator = (
         " [bright_yellow]⚠️ Enhanced Audit[/bright_yellow]" if has_dontaudit else ""
     )
@@ -1868,11 +1381,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
         " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
     )
 
-    header = f"[bold green]Unique Denial Group #{denial_num}[/bold green] ({
-        count
-    } occurrences, last seen {last_seen_ago}){dontaudit_indicator}{
-        permissive_indicator
-    }"
+    header = f"[bold green]Unique Denial Group #{denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago}){dontaudit_indicator}{permissive_indicator}"
     console.print(Rule(header))
 
     if not parsed_log:
@@ -2310,7 +1819,7 @@ def print_rich_summary(
     header_bionic = format_bionic_text(header_text, "green")
 
     # Check if this denial contains dontaudit permissions and add indicator after BIONIC formatting
-    has_dontaudit, dontaudit_perms = has_dontaudit_permissions(denial_info)
+    has_dontaudit, dontaudit_perms = has_dontaudit_indicators(denial_info)
     if has_dontaudit:
         dontaudit_indicator = " • [bright_yellow]⚠️ Enhanced Audit[/bright_yellow]"
         header_bionic += dontaudit_indicator
@@ -2334,7 +1843,7 @@ def print_rich_summary(
         header_bionic += custom_indicator
 
     # Check if this denial contains container issues and add indicator
-    has_container, container_patterns, sample_paths = has_container_issues(denial_info)
+    has_container, container_patterns, sample_paths = has_container_paths(denial_info)
     if has_container:
         container_indicator = " • [bright_cyan]🐳 container[/bright_cyan]"
         header_bionic += container_indicator
@@ -2930,363 +2439,6 @@ def print_rich_summary(
     console.print()  # Space after events
 
 
-def display_report_sealert_format(
-    console: Console,
-    denial_info: dict,
-    denial_num: int,
-    expand_groups: bool = False,
-):
-    """
-    Display denial information in sealert-inspired technical report format.
-
-    Technical analysis format with complete forensic detail in two-column layout.
-    Based on setroubleshoot's sealert format but preserves our grouping advantages.
-
-    Args:
-        console (Console): Rich console object for formatted output
-        denial_info (dict): Aggregated denial information with correlation data
-        denial_num (int): Sequential denial number for display
-        expand_groups (bool): Whether to show individual events instead of grouped view
-    """
-    parsed_log = denial_info["log"]
-    count = denial_info["count"]
-    correlations = denial_info.get("correlations", [])
-    last_seen_dt = denial_info["last_seen_obj"]
-    last_seen_ago = human_time_ago(last_seen_dt)
-
-    # Header with denial group information (sealert-inspired)
-    unique_pids = len(set(corr.get("pid") for corr in correlations if corr.get("pid")))
-    console.print("-" * 80)
-    console.print(f"SELinux Unique Denial Group #{denial_num} - {count} total events, {unique_pids} unique PIDs, last seen {last_seen_ago}")
-    console.print()
-
-    # Action-focused summary line
-    source_context_obj = parsed_log.get("scontext")
-    target_context_obj = parsed_log.get("tcontext")
-
-    # Extract type from AvcContext objects (they have a .type attribute)
-    source_type = "unknown"
-    target_type = "unknown"
-
-    if source_context_obj and hasattr(source_context_obj, 'type'):
-        source_type = source_context_obj.type
-
-    if target_context_obj and hasattr(target_context_obj, 'type'):
-        target_type = target_context_obj.type
-
-    permission = parsed_log.get("permission", "unknown")
-    permissions_display = parsed_log.get("permissions_display", permission)
-
-    # Use aggregated permissions for display if available
-    if "permissions" in denial_info and denial_info["permissions"] and len(denial_info["permissions"]) > 1:
-        permissions_list = sorted(list(denial_info["permissions"]))
-        permissions_display = ", ".join(permissions_list)
-
-    tclass = parsed_log.get("tclass", "unknown")
-
-    console.print(f"{source_type} attempted {permissions_display} access to {target_type} {tclass} and was denied.")
-    console.print()
-
-    # Raw audit message context
-    comm = parsed_log.get("comm", "unknown")
-    pid = parsed_log.get("pid", "unknown")
-    path = parsed_log.get("path", "")
-    dest_port = parsed_log.get("dest_port", "")
-
-    console.print("Raw Audit Message:")
-    audit_parts = []
-    audit_parts.append(f"avc: denied {{ {permissions_display} }}")
-    audit_parts.append(f"for pid={pid} comm=\"{comm}\"")
-
-    if path:
-        audit_parts.append(f"path=\"{path}\"")
-    elif dest_port:
-        audit_parts.append(f"dest={dest_port}")
-
-    console.print(f"  {' '.join(audit_parts)}")
-    console.print()
-
-    # Analysis Details in two-column format
-    console.print("Analysis Details:")
-
-    # Source and target contexts
-    source_context = parsed_log.get("scontext", "unknown")
-    target_context = parsed_log.get("tcontext", "unknown")
-    source_desc = parsed_log.get("source_type_description", "")
-    target_desc = parsed_log.get("target_type_description", "")
-
-    source_line = f"  Source Context        {source_context}"
-    if source_desc:
-        source_line += f" ({source_desc})"
-    console.print(source_line)
-
-    target_line = f"  Target Context        {target_context}"
-    if target_desc:
-        target_line += f" ({target_desc})"
-    console.print(target_line)
-
-    # Target path or port information
-    if path:
-        console.print(f"  Target Path           {path}")
-    elif dest_port:
-        port_desc = parsed_log.get("port_description", "")
-        port_line = f"  Target Port           {dest_port}"
-        if port_desc:
-            port_line += f" ({port_desc})"
-        console.print(port_line)
-
-        # Socket address if available
-        saddr = parsed_log.get("saddr", "")
-        if saddr:
-            console.print(f"  Socket Address        {saddr}")
-
-    # Permission details
-    permission_semantic = parsed_log.get("permission_semantic", permissions_display)
-    console.print(f"  Permissions           {permissions_display} ({permission_semantic})")
-
-    # Object class
-    console.print(f"  Object Class          {tclass}")
-
-    # Process information
-    exe = parsed_log.get("exe", "")
-    cwd = parsed_log.get("cwd", "")
-    if exe and cwd:
-        console.print(f"  Process Info          {comm} ({exe}) in {cwd}")
-    elif exe:
-        console.print(f"  Process Info          {comm} ({exe})")
-    elif comm != "unknown":
-        console.print(f"  Process Info          {comm}")
-
-    # SELinux mode and status
-    is_permissive = parsed_log.get("permissive") == "1"
-    status_symbol = "⚠️  ALLOWED" if is_permissive else "✗ BLOCKED"
-    mode = "Permissive" if is_permissive else "Enforcing"
-    console.print(f"  SELinux Mode          {mode} ({status_symbol})")
-
-    # Time range if multiple events
-    if count > 1:
-        first_seen_dt = denial_info.get("first_seen_obj")
-        if first_seen_dt and last_seen_dt:
-            first_seen_str = first_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
-            last_seen_str = last_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
-            console.print(f"  Time Range            {first_seen_str} - {last_seen_str}")
-
-    console.print()
-
-    # Event Distribution - always show in report mode when there are multiple events
-    if correlations and len(correlations) > 1:
-        console.print("Event Distribution:")
-
-        # Group correlations by PID and show distribution
-        pid_events = {}
-        for corr in correlations:
-            pid = corr.get("pid")
-            if pid:
-                if pid not in pid_events:
-                    pid_events[pid] = {
-                        "count": 0,
-                        "comm": corr.get("comm", "unknown"),
-                        "timestamp": corr.get("timestamp", "unknown")
-                    }
-                pid_events[pid]["count"] += 1
-
-        for pid, info in sorted(pid_events.items()):
-            count_str = f"({info['count']}x)" if info["count"] > 1 else ""
-            console.print(f"  PID {pid} {count_str}      {info['comm']} at {info['timestamp']}")
-
-        console.print()
-
-    # Policy Investigation
-    # Use aggregated permissions if available for more complete sesearch command
-    sesearch_log = parsed_log.copy()
-    if (
-        "permissions" in denial_info
-        and denial_info["permissions"]
-        and len(denial_info["permissions"]) > 1
-    ):
-        # Use aggregated permissions for more complete sesearch command
-        permissions_list = sorted(list(denial_info["permissions"]))
-        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
-
-    sesearch_command = generate_sesearch_command(sesearch_log)
-    console.print("Policy Investigation:")
-    console.print(f"  Command: {sesearch_command}")
-    console.print()
-    console.print("  This command shows existing allow rules for this access pattern.")
-
-    # Contextual Analysis
-    contextual_analysis = parsed_log.get("contextual_analysis", "")
-    if contextual_analysis:
-        console.print()
-        console.print("Contextual Analysis:")
-        console.print(f"  {contextual_analysis}")
-
-    console.print()
-
-
-def display_report_brief_format(
-    console: Console,
-    denial_info: dict,
-    denial_num: int,
-    expand_groups: bool = False,
-):
-    """
-    Display denial information in executive brief format for management reporting.
-
-    Executive summary format with business impact focus and visual hierarchy.
-    Designed for incident reports, compliance documentation, and management briefings.
-
-    Args:
-        console (Console): Rich console object for formatted output
-        denial_info (dict): Aggregated denial information with correlation data
-        denial_num (int): Sequential denial number for display
-        expand_groups (bool): Whether to show individual events instead of grouped view
-    """
-    parsed_log = denial_info["log"]
-    count = denial_info["count"]
-    correlations = denial_info.get("correlations", [])
-    last_seen_dt = denial_info["last_seen_obj"]
-    last_seen_ago = human_time_ago(last_seen_dt)
-
-    # Extract key information
-    source_context_obj = parsed_log.get("scontext")
-    target_context_obj = parsed_log.get("tcontext")
-
-    source_type = "unknown"
-    target_type = "unknown"
-    if source_context_obj and hasattr(source_context_obj, 'type'):
-        source_type = source_context_obj.type
-    if target_context_obj and hasattr(target_context_obj, 'type'):
-        target_type = target_context_obj.type
-
-    permission = parsed_log.get("permission", "unknown")
-    permissions_display = parsed_log.get("permissions_display", permission)
-    tclass = parsed_log.get("tclass", "unknown")
-    comm = parsed_log.get("comm", "unknown")
-    path = parsed_log.get("path", "")
-    dest_port = parsed_log.get("dest_port", "")
-    unique_pids = len(set(corr.get("pid") for corr in correlations if corr.get("pid")))
-    is_permissive = parsed_log.get("permissive") == "1"
-
-    # Determine priority level based on denial characteristics
-    priority = "HIGH PRIORITY"
-    if is_permissive:
-        priority = "MEDIUM PRIORITY"
-    elif tclass in ["file", "dir"] and "var" not in str(target_type).lower():
-        priority = "MEDIUM PRIORITY"
-
-    # Determine business impact
-    impact_descriptions = {
-        "httpd_t": "Service disruption - web server cannot access required resources",
-        "nginx_t": "Service disruption - web server cannot access required resources",
-        "mysqld_t": "Database service disruption - data access blocked",
-        "sshd_t": "Remote access disruption - SSH service blocked",
-        "systemd_t": "System service disruption - core system process blocked",
-        "unconfined_t": "User application disruption - unconfined process blocked",
-    }
-
-    impact = impact_descriptions.get(source_type, f"Application disruption - {comm} process cannot access required resources")
-
-    # Resource description
-    if path:
-        if "config" in path.lower() or "conf" in path.lower():
-            resource_desc = "configuration files"
-        elif "/var/log" in path:
-            resource_desc = "log files"
-        elif "/etc" in path:
-            resource_desc = "system configuration"
-        elif "/home" in path:
-            resource_desc = "user data"
-        elif "/tmp" in path:
-            resource_desc = "temporary files"
-        else:
-            resource_desc = "files"
-    elif dest_port:
-        resource_desc = f"network services (port {dest_port})"
-    else:
-        resource_desc = f"{tclass} resources"
-
-    # Action description
-    action_map = {
-        "read": "reading",
-        "write": "writing",
-        "open": "opening",
-        "getattr": "accessing",
-        "name_connect": "connecting to",
-        "name_bind": "binding to",
-    }
-    action = action_map.get(permission, f"performing {permission} on")
-
-    # Time range for multiple events
-    time_info = f"({count} events across {unique_pids} processes)"
-    if count > 1:
-        first_seen_dt = denial_info.get("first_seen_obj")
-        if first_seen_dt and last_seen_dt:
-            first_seen_str = first_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
-            last_seen_str = last_seen_dt.strftime("%Y-%m-%d %H:%M:%S")
-            time_info = f"{first_seen_str} - {last_seen_str} {time_info}"
-
-    # Executive Summary Block
-    console.print("=" * 80)
-    console.print(f"SELINUX SECURITY INCIDENT #{denial_num}                                    [{priority}]")
-    console.print()
-    console.print(f"WHAT: {source_type.replace('_t', '').title()} blocked from {action} {resource_desc}")
-    console.print(f"WHEN: {time_info}")
-    console.print(f"WHO:  {comm} processes (PIDs: {', '.join(str(corr.get('pid', 'unknown')) for corr in correlations[:3])}{'...' if len(correlations) > 3 else ''})")
-
-    if path:
-        # Show path info, truncate if too long
-        path_display = path if len(path) <= 50 else path[:47] + "..."
-        if count > 1 and len(correlations) > 1:
-            path_display += f" + {count-1} other files"
-        console.print(f"WHERE: {path_display}")
-    elif dest_port:
-        port_desc = parsed_log.get("port_description", "")
-        port_info = f"port {dest_port}"
-        if port_desc:
-            port_info += f" ({port_desc})"
-        console.print(f"WHERE: Network connection to {port_info}")
-
-    console.print()
-    console.print(f"IMPACT: {impact}")
-    status_text = "⚠️  ALLOWED due to permissive mode" if is_permissive else "✗ BLOCKED by SELinux policy (Enforcing mode)"
-    console.print(f"STATUS: {status_text}")
-    console.print("=" * 80)
-    console.print()
-
-    # Simple remediation section for brief format
-    console.print("REMEDIATION:")
-    # Use aggregated permissions if available for more complete sesearch command
-    sesearch_log = parsed_log.copy()
-    if (
-        "permissions" in denial_info
-        and denial_info["permissions"]
-        and len(denial_info["permissions"]) > 1
-    ):
-        # Use aggregated permissions for more complete sesearch command
-        permissions_list = sorted(list(denial_info["permissions"]))
-        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
-
-    sesearch_command = generate_sesearch_command(sesearch_log)
-    console.print(f"$ {sesearch_command}")
-
-    if tclass == "file" and "httpd" in source_type:
-        console.print("$ # Consider: setsebool -P httpd_read_user_content 1")
-    elif "name_connect" in permission and "httpd" in source_type:
-        console.print("$ # Consider: setsebool -P httpd_can_network_connect 1")
-    else:
-        console.print("$ # If no rules exist, create custom policy or fix file contexts")
-
-    # Security alerts at the end
-    if is_permissive:
-        console.print()
-        console.print("⚠️  SECURITY ALERT: System running in permissive mode - denials logged but allowed")
-
-    console.print()
-
-
-
-
 def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
     """
     Main entry point for the SELinux AVC Denial Analyzer.
@@ -3528,9 +2680,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         if not is_valid:
             if not args.json:
                 console.print(
-                    f"⚠️  [bold yellow]Warning: Skipping invalid log block {
-                        i + 1
-                    }[/bold yellow]"
+                    f"⚠️  [bold yellow]Warning: Skipping invalid log block {i + 1}[/bold yellow]"
                 )
                 for warning in warnings:
                     console.print(f"   [dim]• {warning}[/dim]")
@@ -3733,7 +2883,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             [],
         )
         for denial_info in sorted_denials:
-            has_container, container_patterns, sample_paths = has_container_issues(
+            has_container, container_patterns, sample_paths = has_container_paths(
                 denial_info
             )
             if has_container:
@@ -3755,9 +2905,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
             # Display initial count message
             console.print(
-                f"Found {total_events} AVC events. Displaying {
-                    len(unique_denials)
-                } unique denials..."
+                f"Found {total_events} AVC events. Displaying {len(unique_denials)} unique denials..."
             )
 
             # Display grouping optimality validation if there are optimization opportunities
@@ -4091,19 +3239,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 # Show filtering info in final summary if applicable
                 if args.process or args.path:
                     console.print(
-                        f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                            len(log_blocks)
-                        } log blocks and found {
-                            len(unique_denials)
-                        } unique denials. Displayed {
-                            len(filtered_denials)
-                        } after filtering."
+                        f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials. Displayed {len(filtered_denials)} after filtering."
                     )
                 else:
                     console.print(
-                        f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                            len(log_blocks)
-                        } log blocks and found {len(unique_denials)} unique denials."
+                        f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials."
                     )
 
                 # --- Added: Print the list of unparsed types found ---
@@ -4139,9 +3279,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                     # Display initial count message
                     pager_console.print(
-                        f"Found {total_events} AVC events. Displaying {
-                            len(unique_denials)
-                        } unique denials..."
+                        f"Found {total_events} AVC events. Displaying {len(unique_denials)} unique denials..."
                     )
 
                     # Display filtering info if applicable
@@ -4494,21 +3632,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Final summary
                         if args.process or args.path:
                             pager_console.print(
-                                f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                                    len(log_blocks)
-                                } log blocks and found {
-                                    len(unique_denials)
-                                } unique denials. Displayed {
-                                    len(filtered_denials)
-                                } after filtering."
+                                f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials. Displayed {len(filtered_denials)} after filtering."
                             )
                         else:
                             pager_console.print(
-                                f"\n[bold green]Analysis Complete:[/bold green] Processed {
-                                    len(log_blocks)
-                                } log blocks and found {
-                                    len(unique_denials)
-                                } unique denials."
+                                f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials."
                             )
 
                         # Print unparsed types if any

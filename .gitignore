@@ -4,14 +4,7 @@ __pycache__/
 testRAW/
 .vscode/
 
-# Quality tool outputs
-*.svg
-*.png
-*.gv
-.mypy_cache/
-
-# Pre-commit cache
-.pre-commit-cache/
-
-# Demo materials (internal use only)
-DEMO_CHEAT_SHEET.md
+# Quality tool outputs (now in docs/diagrams/)
+docs/diagrams/*.svg
+docs/diagrams/*.png
+docs/diagrams/*.gv

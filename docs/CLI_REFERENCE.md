@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.5.0** | Complete command-line reference, data fields, and troubleshooting guide with Two-Tier Professional Report System and SELinux Policy Investigation Integration
+**Version 1.6.0** | Complete command-line reference, data fields, and troubleshooting guide with Two-Tier Professional Report System and SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
@@ -571,4 +571,4 @@ Look for these indicators in the output:
 
 ---
 
-**SELinux AVC Denial Analyzer v1.5.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.6.0** | Made for forensic analysts and system administrators

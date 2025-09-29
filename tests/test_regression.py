@@ -15,7 +15,8 @@ from datetime import datetime
 # Add parent directory to path so we can import parse_avc
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from parse_avc import parse_avc_log, sort_denials, filter_denials
+from parse_avc import parse_avc_log, filter_denials
+from utils import sort_denials
 
 
 class TestExistingFunctionality(unittest.TestCase):

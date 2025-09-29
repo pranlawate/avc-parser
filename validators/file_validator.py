@@ -14,19 +14,7 @@ import sys
 from rich.console import Console
 
 from config import MAX_FILE_SIZE_MB
-from utils import print_error
-
-
-def detect_file_format(file_path: str) -> str:
-    """
-    Auto-detect audit file format (raw vs pre-processed).
-
-    This is imported from the main module to avoid circular dependencies.
-    Will be refactored when parsing module is extracted.
-    """
-    # Import here to avoid circular dependency during transition
-    from parse_avc import detect_file_format as _detect_file_format
-    return _detect_file_format(file_path)
+from utils import print_error, detect_file_format
 
 
 def validate_arguments(args, console: Console) -> str:

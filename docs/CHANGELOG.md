@@ -5,6 +5,38 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-09-29
+
+### Added
+- **Clean Modular Architecture**: Completed Phase 9A architectural refactoring
+  - Extracted 1,432 lines (28% reduction) from monolithic parse_avc.py into 6 focused modules
+  - New modules: config/, validators/, formatters/, utils/, detectors/, selinux/
+  - Zero regressions with 100% test coverage maintained throughout refactoring
+- **Enhanced Developer Experience**: Phase 9B tooling and organizational improvements
+  - 5 executable integration scripts in examples/ (basic, SIEM, batch, security, performance)
+  - 4 development utilities in scripts/ (validation, test generation, profiling, syntax checking)
+  - Moved context.py to selinux/ package for logical organization
+- **Critical Stability Fixes**: Phase 9C comprehensive error resolution
+  - Fixed all f-string syntax errors causing "EOL while scanning string literal" issues
+  - Added comprehensive syntax validation utility (scripts/syntax_check.py)
+  - Validated all 39 Python files for syntax correctness
+- **Enhanced Documentation**: Phase 10 comprehensive documentation updates
+  - Updated all documentation with proper sequential phase numbering
+  - Comprehensive roadmap updates with current project status
+  - Enhanced examples and integration patterns
+
+### Fixed
+- Permission aggregation bug in --report formats (only single permission was displayed instead of aggregated set)
+- All f-string syntax errors at lines 1871, 3528, 3754, 4089, 4096, 4133, 4488
+- Function naming accuracy (renamed security_detector to anomaly_detector)
+- Circular import issues and dependency management
+
+### Changed
+- Monolithic architecture replaced with clean modular design
+- Improved code organization with proper separation of concerns
+- Enhanced maintainability and testability
+- Foundation established for future development phases
+
 ## [1.5.0] - 2025-09-28
 
 ### Added

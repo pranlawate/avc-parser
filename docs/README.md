@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.5.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
+**Version 1.6.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
@@ -117,11 +117,11 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
 ## 🏗️ Architecture
 
-**Clean Modular Design** with progressive refactoring (Phase 9A in progress):
+**Clean Modular Design** with completed architectural refactoring (Phase 9A ✅):
 
 ```
 avc-parser/
-├── parse_avc.py              # Core application (4,552 lines, down from 5,168)
+├── parse_avc.py              # Core application (3,736 lines, down from 5,168)
 ├── config/                   # Configuration management
 │   ├── constants.py         # Audit patterns, size limits, analysis settings
 │   └── __init__.py
@@ -130,25 +130,88 @@ avc-parser/
 │   └── __init__.py
 ├── formatters/              # Output formatting and data serialization
 │   ├── json_formatter.py    # JSON output, field normalization, SIEM integration
+│   ├── report_formatter.py  # Report display formatting (brief/sealert)
 │   └── __init__.py
-├── context/                 # SELinux context and semantic analysis
-│   ├── avc_context.py       # Context parsing, type descriptions
-│   ├── semantic_analyzer.py # Permission analysis, contextual intelligence
+├── detectors/               # Anomaly detection and analysis
+│   ├── anomaly_detector.py  # Permissive mode, dontaudit, container, custom paths
 │   └── __init__.py
-├── utils/                   # Display utilities and helper functions
-│   ├── display_utils.py     # BIONIC formatting, path truncation
-│   ├── general_utils.py     # Time formatting, signal handling, error display
+├── utils/                   # Utility functions and helpers
+│   ├── file_utils.py        # File format detection
+│   ├── time_utils.py        # Time parsing and formatting
+│   ├── pattern_utils.py     # Pattern matching utilities
+│   ├── sort_utils.py        # Sorting utilities
+│   ├── selinux_utils.py     # SELinux command generation
+│   ├── legacy.py            # Legacy display and helper functions
 │   └── __init__.py
+├── selinux/                 # SELinux analysis and context parsing
+│   ├── context.py          # AvcContext class and semantic analysis
+│   └── __init__.py
+├── docs/                    # Documentation and diagrams
+│   ├── README.md           # Project documentation
+│   ├── ROADMAP.md          # Development roadmap
+│   ├── FEATURE_DECISIONS.md # Implementation decisions
+│   ├── EXAMPLES.md         # Command-line usage examples
+│   ├── diagrams/           # Architecture diagrams (*.gv, *.svg)
+│   └── *.md                # Additional documentation
+├── examples/                # Executable integration examples
+│   ├── basic_analysis.py   # Quick start demonstration
+│   ├── json_integration.py # SIEM integration patterns
+│   ├── batch_processing.py # Multi-file processing workflows
+│   ├── security_report.py  # Custom security reporting
+│   ├── performance_test.py # Performance benchmarking
+│   └── README.md           # Examples guide
+├── scripts/                 # Development and utility scripts
+│   ├── run_tests.py        # Test runner script
+│   ├── validate_logs.py    # Log file validation utility
+│   ├── generate_test_data.py # Synthetic test data generator
+│   ├── profile_performance.py # Performance profiling tool
+│   └── README.md           # Scripts documentation
 └── tests/                   # Comprehensive test suite (160 tests)
     ├── test_*.py           # Feature-specific test modules
-    └── test_data/          # Sample audit logs and test fixtures
+    └── testAVC/, testRAW/  # Sample audit logs and test fixtures
 ```
 
 **Architecture Benefits**:
-- **12% Code Reduction**: Main file reduced by 616 lines with zero functionality loss
-- **100% Test Coverage**: All 160 tests pass after each modular extraction
-- **Clear Separation**: Distinct responsibilities for validation, formatting, and display
-- **Future-Ready**: Foundation for easier feature development and maintenance
+- **28% Code Reduction**: Main file reduced by 1,432 lines (5,168→3,736) with zero functionality loss
+- **100% Test Coverage**: All 160 tests pass throughout entire refactoring process
+- **Enhanced Maintainability**: Clean modular structure with logical separation of concerns
+- **Developer Experience**: Comprehensive examples, utilities, and development tools
+- **Integration Ready**: SIEM patterns, batch processing, and performance tools included
+- **Quality Assurance**: Log validation, test data generation, and profiling utilities
+
+## 🚀 Quick Start
+
+### **Try the Examples**
+```bash
+# Quick demonstration
+python3 examples/basic_analysis.py
+
+# SIEM integration patterns
+python3 examples/json_integration.py
+
+# Batch processing workflow
+python3 examples/batch_processing.py
+```
+
+### **Validate Your Logs**
+```bash
+# Check if your log file will work well
+python3 scripts/validate_logs.py /var/log/audit/audit.log
+```
+
+### **Basic Usage**
+```bash
+# Analyze denials with rich output
+python3 parse_avc.py --file /var/log/audit/audit.log
+
+# Generate JSON for SIEM integration
+python3 parse_avc.py --file /var/log/audit/audit.log --json
+
+# Create security report
+python3 parse_avc.py --file /var/log/audit/audit.log --report brief
+```
+
+📖 **For comprehensive usage examples, see [`docs/EXAMPLES.md`](EXAMPLES.md)**
 
 ## Prerequisites
 
@@ -290,4 +353,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.5.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.6.0** | Made for forensic analysts and system administrators

@@ -34,8 +34,8 @@ quick-check:
 # Code formatting and organization (ruff all-in-one)
 format:
 	@echo "🎨 Formatting code (ruff)..."
-	@ruff format parse_avc.py context.py utils.py
-	@ruff check parse_avc.py context.py utils.py --fix --quiet || true
+	@ruff format parse_avc.py selinux/context.py utils.py
+	@ruff check parse_avc.py selinux/context.py utils.py --fix --quiet || true
 	@echo "✅ Code formatted and organized"
 
 # Fast syntax check only
@@ -49,7 +49,7 @@ syntax:
 lint:
 	@echo "🔍 Full quality analysis..."
 	@echo "→ Comprehensive ruff analysis:"
-	@ruff check parse_avc.py context.py utils.py | head -15 || true
+	@ruff check parse_avc.py selinux/context.py utils.py | head -15 || true
 	@echo "→ Dead code detection:"
 	@vulture parse_avc.py --min-confidence 90 | head -5 || true
 	@echo "→ Modern Python suggestions:"
@@ -128,11 +128,11 @@ all: format quick-check test security flow-diagram deps-graph
 # 	@echo "🔍 Running complexity analysis..."
 # 	@radon cc parse_avc.py --show-complexity --average
 # 	@echo "📊 Modularized files complexity:"
-# 	@radon cc context.py utils.py --average
+# 	@radon cc selinux/context.py utils.py --average
 #
 # Temporary workaround for radon complexity analysis:
 radon-check-local:
 	@echo "🔍 Running complexity analysis with local radon fix..."
 	@cd ../radon && python -m radon cc ../avc-parser/parse_avc.py --show-complexity --average
 	@echo "📊 Modularized files complexity:"
-	@cd ../radon && python -m radon cc ../avc-parser/context.py ../avc-parser/utils.py --average
+	@cd ../radon && python -m radon cc ../avc-parser/selinux/context.py ../avc-parser/utils.py --average
