@@ -1,0 +1,9 @@
+----
+type=FANOTIFY msg=audit(1753467866.760:171): avc: denied { open } for pid=1234 comm="suspicious-app" path="/etc/shadow" dev="sda1" ino=98765 scontext=unconfined_u:unconfined_r:unconfined_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1753467866.760:171): arch=x86_64 syscall=openat success=no exit=EACCES comm="suspicious-app" exe="/tmp/suspicious-app" subj=unconfined_u:unconfined_r:unconfined_t:s0
+type=PROCTITLE msg=audit(1753467866.760:171): proctitle="/tmp/suspicious-app"
+----
+type=SELINUX_ERR msg=audit(1753467967.123:172): op=security_compute_av reason=bounds scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:user_home_t:s0 tclass=file perms=read,write
+----
+type=USER_SELINUX_ERR msg=audit(1753468068.456:173): pid=5678 uid=0 auid=1000 ses=2 subj=unconfined_u:unconfined_r:unconfined_t:s0 msg='op=security_bounded_transition seresult=denied oldcontext=system_u:system_r:init_t:s0 newcontext=system_u:system_r:unconfined_t:s0'
+----

@@ -1,0 +1,3 @@
+type=MAC_POLICY_LOAD msg=audit(1163776448.949:12869): policy loaded auid=500
+type=MAC_POLICY_LOAD msg=audit(1163794206.019:14348): policy loaded auid=500
+type=MAC_POLICY_LOAD msg=audit(1470675789.411:2): policy loaded auid=4294967295 ses=4294967295

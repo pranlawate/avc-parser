@@ -164,7 +164,7 @@ def validate_log_entry(
     # Look for audit/AVC content specifically
     has_audit_content = any(
         re.search(
-            r"(type=AVC|type=USER_AVC|type=AVC_PATH|type=1400|type=1107|avc:.*denied|avc:.*granted)",
+            r"(type=AVC|type=USER_AVC|type=AVC_PATH|type=FANOTIFY|type=SELINUX_ERR|type=USER_SELINUX_ERR|type=MAC_POLICY_LOAD|type=1400|type=1107|type=1403|avc:.*denied|avc:.*granted|security_compute_sid)",
             line,
             re.IGNORECASE,
         )
@@ -173,7 +173,7 @@ def validate_log_entry(
 
     if not has_audit_content:
         warnings.append(
-            "No AVC denial/grant records found - may not contain SELinux events"
+            "No AVC/SELinux denial/error records found - may not contain SELinux events"
         )
 
     # Check for timestamp consistency
@@ -248,16 +248,15 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:
     shared_context.update(context_data)
     unparsed_types.update(context_unparsed)
 
-    # Process each AVC and USER_AVC line separately
+    # Process each AVC, USER_AVC, FANOTIFY, and SELINUX_ERR line separately
     for line in log_block.strip().split("\n"):
         line = line.strip()
-        if re.search(r"type=(AVC|USER_AVC|AVC_PATH|1400|1107)", line):
-            # Parse this specific AVC or USER_AVC line with error handling
+        if re.search(r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line):
+            # Parse this specific AVC/SELINUX_ERR line with error handling
             try:
                 avc_data = process_individual_avc_record(line, shared_context)
-                if (
-                    avc_data and "permission" in avc_data
-                ):  # Only add if it's a valid AVC
+                # For SELINUX_ERR, we don't have "permission", so check for error indicators or basic context
+                if avc_data and ("permission" in avc_data or "selinux_error_reason" in avc_data or "selinux_operation" in avc_data or "invalid_context" in avc_data or avc_data.get("denial_type") in ["SELINUX_ERR", "USER_SELINUX_ERR"]):
                     avc_denials.append(avc_data)
             except Exception as parse_error:  # pylint: disable=broad-exception-caught
                 # Individual AVC parsing failed - skip this record but continue with others
@@ -415,8 +414,8 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                             shared_context["path"] = value.strip()
                     else:
                         shared_context[key] = value.strip()
-        elif log_type not in ("AVC", "USER_AVC", "AVC_PATH", "1400", "1107"):
-            # Track unparsed types (excluding all supported AVC-related types)
+        elif log_type not in ("AVC", "USER_AVC", "AVC_PATH", "FANOTIFY", "SELINUX_ERR", "USER_SELINUX_ERR", "MAC_POLICY_LOAD", "1400", "1107", "1403"):
+            # Track unparsed types (excluding all supported AVC/SELinux-related types)
             unparsed_types.add(log_type)
 
     return shared_context, unparsed_types
@@ -437,14 +436,104 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
         avc_data = shared_context.copy()  # Start with shared context
 
         # Determine record type and extract content accordingly
-        record_type_match = re.search(r"type=(AVC|USER_AVC|AVC_PATH|1400|1107)", line)
+        record_type_match = re.search(r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line)
         if not record_type_match:
             return {}
 
         record_type = record_type_match.group(1)
 
+        # Handle SELINUX_ERR - different format, SELinux internal errors
+        if record_type == "SELINUX_ERR":
+            # SELINUX_ERR format: security_compute_sid: invalid context ... for scontext=... tcontext=... tclass=...
+            selinux_err_match = re.search(
+                r"(?:security_compute_sid|security_bounded_transition|op=\w+).*?scontext=(\S+).*?tcontext=(\S+).*?tclass=(\S+)",
+                line
+            )
+            if selinux_err_match:
+                # Parse scontext into AvcContext object (same as AVC handling)
+                scontext_string = selinux_err_match.group(1)
+                scontext_obj = AvcContext(scontext_string)
+                if scontext_obj.is_valid():
+                    avc_data["scontext"] = scontext_obj
+                    avc_data["scontext_raw"] = scontext_string
+                else:
+                    avc_data["scontext"] = scontext_string
+
+                # Parse tcontext into AvcContext object (same as AVC handling)
+                tcontext_string = selinux_err_match.group(2)
+                tcontext_obj = AvcContext(tcontext_string)
+                if tcontext_obj.is_valid():
+                    avc_data["tcontext"] = tcontext_obj
+                    avc_data["tcontext_raw"] = tcontext_string
+                else:
+                    avc_data["tcontext"] = tcontext_string
+
+                avc_data["tclass"] = selinux_err_match.group(3)
+                avc_data["denial_type"] = "SELINUX_ERR"
+                # Extract operation/reason if available
+                reason_match = re.search(r"reason=(\w+)", line)
+                if reason_match:
+                    avc_data["selinux_error_reason"] = reason_match.group(1)
+                # Extract invalid context if present
+                invalid_ctx_match = re.search(r"invalid context ([^\s]+)", line)
+                if invalid_ctx_match:
+                    avc_data["invalid_context"] = invalid_ctx_match.group(1)
+                return avc_data
+            else:
+                return {}
+
+        # Handle USER_SELINUX_ERR - similar to USER_AVC but for SELinux errors
+        elif record_type == "USER_SELINUX_ERR":
+            # Extract msg content from USER_SELINUX_ERR
+            msg_match = re.search(r"msg='([^']+)'", line)
+            if msg_match:
+                err_content = msg_match.group(1)
+                # Extract basic fields from outer message
+                user_fields = {
+                    "pid": r"pid=(\S+)",
+                    "uid": r"uid=(\S+)",
+                }
+                for key, pattern in user_fields.items():
+                    field_match = re.search(pattern, line)
+                    if field_match:
+                        avc_data[key] = field_match.group(1).strip()
+
+                # Parse the error message content
+                selinux_err_match = re.search(
+                    r"(?:op=(\w+)).*?(?:oldcontext|scontext)=(\S+).*?(?:newcontext|tcontext)=(\S+)",
+                    err_content
+                )
+                if selinux_err_match:
+                    avc_data["selinux_operation"] = selinux_err_match.group(1)
+
+                    # Parse scontext into AvcContext object (same as AVC handling)
+                    scontext_string = selinux_err_match.group(2)
+                    scontext_obj = AvcContext(scontext_string)
+                    if scontext_obj.is_valid():
+                        avc_data["scontext"] = scontext_obj
+                        avc_data["scontext_raw"] = scontext_string
+                    else:
+                        avc_data["scontext"] = scontext_string
+
+                    # Parse tcontext into AvcContext object (same as AVC handling)
+                    tcontext_string = selinux_err_match.group(3)
+                    tcontext_obj = AvcContext(tcontext_string)
+                    if tcontext_obj.is_valid():
+                        avc_data["tcontext"] = tcontext_obj
+                        avc_data["tcontext_raw"] = tcontext_string
+                    else:
+                        avc_data["tcontext"] = tcontext_string
+
+                    avc_data["denial_type"] = "USER_SELINUX_ERR"
+                    # Extract result if available
+                    result_match = re.search(r"seresult=(\w+)", err_content)
+                    if result_match:
+                        avc_data["selinux_error_result"] = result_match.group(1)
+                    return avc_data
+            return {}
+
         # Handle USER_AVC and numeric equivalent (1107)
-        if record_type in ("USER_AVC", "1107"):
+        elif record_type in ("USER_AVC", "1107"):
             # Extract the msg content from USER_AVC
             msg_match = re.search(r"msg='([^']+)'", line)
             if msg_match:
@@ -462,11 +551,13 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 # Skip if no msg content (like policyload notices)
                 return {}
         else:
-            # Handle AVC, AVC_PATH, and numeric equivalent (1400)
+            # Handle AVC, AVC_PATH, FANOTIFY, and numeric equivalent (1400)
             avc_content = line
 
         # Set the denial type based on the record type
-        if record_type in ("USER_AVC", "1107"):
+        if record_type == "FANOTIFY":
+            avc_data["denial_type"] = "FANOTIFY"
+        elif record_type in ("USER_AVC", "1107"):
             avc_data["denial_type"] = "USER_AVC"
         elif record_type == "AVC_PATH":
             avc_data["denial_type"] = "AVC_PATH"
@@ -679,6 +770,113 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
     except Exception:
         # Individual AVC parsing failed - return empty dict
         return {}
+
+
+def parse_mac_policy_load_events(log_block: str) -> list:
+    """
+    Parse MAC_POLICY_LOAD events from audit log.
+
+    MAC_POLICY_LOAD events indicate when SELinux policy is loaded or reloaded.
+    These are informational events, not denials.
+
+    Args:
+        log_block (str): Multi-line audit log block
+
+    Returns:
+        list: List of policy load event dictionaries with timestamp, auid, ses
+    """
+    policy_events = []
+
+    for line in log_block.strip().split('\n'):
+        # Match MAC_POLICY_LOAD or numeric type 1403
+        if not re.search(r"type=(MAC_POLICY_LOAD|1403)", line):
+            continue
+
+        event = {}
+
+        # Extract timestamp - handle both raw and ausearch -i formats
+        # Raw: audit(1163776448.949:12869)
+        # ausearch -i: audit(17/11/06 20:44:08.949:12869)
+        ts_match_raw = re.search(r"audit\((\d+\.\d+):(\d+)\)", line)
+        ts_match_interpreted = re.search(r"audit\((\d{2}/\d{2}/\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d+):(\d+)\)", line)
+
+        if ts_match_raw:
+            # Raw format
+            timestamp = float(ts_match_raw.group(1))
+            event_id = ts_match_raw.group(2)
+            event["timestamp"] = timestamp
+            event["event_id"] = f"{timestamp}:{event_id}"
+
+            try:
+                dt_obj = datetime.fromtimestamp(timestamp)
+                event["datetime_obj"] = dt_obj
+                event["datetime_str"] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, OSError):
+                event["datetime_str"] = "unknown"
+                event["datetime_obj"] = None
+        elif ts_match_interpreted:
+            # ausearch -i format: "17/11/06 20:44:08.949:12869"
+            date_str = ts_match_interpreted.group(1)  # "17/11/06"
+            time_str = ts_match_interpreted.group(2)  # "20:44:08.949"
+            event_id = ts_match_interpreted.group(3)
+
+            # Parse the date and time
+            try:
+                # Parse "DD/MM/YY HH:MM:SS.mmm" format
+                dt_str = f"{date_str} {time_str}"
+                dt_obj = datetime.strptime(dt_str, "%d/%m/%y %H:%M:%S.%f")
+                event["datetime_obj"] = dt_obj
+                event["datetime_str"] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                event["timestamp"] = dt_obj.timestamp()
+                event["event_id"] = f"{event['timestamp']}:{event_id}"
+            except ValueError:
+                event["datetime_str"] = "unknown"
+                event["datetime_obj"] = None
+
+        # Extract auid (audit user ID) - handle both raw and interpreted formats
+        # Raw: auid=500 or auid=4294967295
+        # Interpreted: auid=unknown(500) or auid=unset
+        auid_match_interpreted = re.search(r"auid=(\w+)\((\d+)\)", line)  # auid=unknown(500)
+        auid_match_raw = re.search(r"auid=(\d+)", line)  # auid=500
+        auid_match_unset = re.search(r"auid=(unset)", line)  # auid=unset
+
+        if auid_match_interpreted:
+            # ausearch -i format: auid=unknown(500)
+            auid = auid_match_interpreted.group(2)
+            event["auid"] = auid
+            event["auid_display"] = auid
+        elif auid_match_unset:
+            # ausearch -i format: auid=unset
+            event["auid"] = "4294967295"
+            event["auid_display"] = "unset"
+        elif auid_match_raw:
+            # Raw format: auid=500
+            auid = auid_match_raw.group(1)
+            event["auid"] = auid
+            if auid == "4294967295":
+                event["auid_display"] = "unset"
+            else:
+                event["auid_display"] = auid
+
+        # Extract ses (session ID) - handle both formats
+        ses_match_unset = re.search(r"ses=(unset)", line)
+        ses_match = re.search(r"ses=(\d+)", line)
+
+        if ses_match_unset:
+            event["ses"] = "4294967295"
+            event["ses_display"] = "unset"
+        elif ses_match:
+            ses = ses_match.group(1)
+            event["ses"] = ses
+            if ses == "4294967295":
+                event["ses_display"] = "unset"
+            else:
+                event["ses_display"] = ses
+
+        if event:  # Only append if we extracted some data
+            policy_events.append(event)
+
+    return policy_events
 
 
 def build_correlation_event(parsed_log: dict, permission: str) -> dict:
@@ -2468,26 +2666,45 @@ def print_rich_summary(
             pid_count = len(pids)
             pid_label = "PID" if pid_count == 1 else "PIDs"
 
+            # Check if this is a SELINUX_ERR (no PID info)
+            denial_type = parsed_log.get("denial_type", "")
+            is_selinux_error = denial_type in ["SELINUX_ERR", "USER_SELINUX_ERR"]
+
             if pid_count == 1:
                 # Simple format for single PID - no tree structure needed
                 single_pid = list(pids)[0]
-                # Count events for this specific PID in this group
-                pid_events_count = len(
-                    [
-                        event
-                        for event in group["all_events"]
-                        if event.get("pid") == single_pid
-                    ]
-                )
-                pid_count_display = (
-                    f" ({pid_events_count}x)" if pid_events_count > 1 else ""
-                )
-                console.print(
-                    f"• {pid_label} {single_pid}{pid_count_display} ({process_display})"
-                )
-                console.print(
-                    f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} {enforcement_status}"
-                )
+
+                # Different display for SELINUX_ERR (no PID/process info)
+                if is_selinux_error:
+                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security computation error"
+                    invalid_ctx = parsed_log.get("invalid_context", "")
+                    event_count_display = f" ({count}x)" if count > 1 else ""
+                    console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}{event_count_display}")
+                    if invalid_ctx:
+                        console.print(f"  Invalid context: [red]{invalid_ctx}[/red]")
+                    console.print(
+                        f"  Transition: {parsed_log.get('scontext', 'unknown')} → {parsed_log.get('tcontext', 'unknown')}"
+                    )
+                    console.print(f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] {enforcement_status}")
+                else:
+                    # Regular AVC: process-level denial
+                    # Count events for this specific PID in this group
+                    pid_events_count = len(
+                        [
+                            event
+                            for event in group["all_events"]
+                            if event.get("pid") == single_pid
+                        ]
+                    )
+                    pid_count_display = (
+                        f" ({pid_events_count}x)" if pid_events_count > 1 else ""
+                    )
+                    console.print(
+                        f"• {pid_label} {single_pid}{pid_count_display} ({process_display})"
+                    )
+                    console.print(
+                        f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} {enforcement_status}"
+                    )
             else:
                 # Tree structure for multiple PIDs
                 # Calculate total events for this permission group
@@ -2507,34 +2724,35 @@ def print_rich_summary(
                     f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} {enforcement_status}"
                 )
 
-            # Show Process Context for grouped events (in both default and detailed view)
-            exe_path = parsed_log.get("exe", "")
-            proctitle = parsed_log.get("proctitle", "")
+            # Show Process Context for grouped events (only for regular AVC, not SELINUX_ERR)
+            if not is_selinux_error:
+                exe_path = parsed_log.get("exe", "")
+                proctitle = parsed_log.get("proctitle", "")
 
-            # Generate contextual analysis for the group's permission
-            group_permission = permissions[0] if len(permissions) == 1 else None
-            tclass = parsed_log.get("tclass", "")
-            scontext = parsed_log.get("scontext")
-            tcontext = parsed_log.get("tcontext")
+                # Generate contextual analysis for the group's permission
+                group_permission = permissions[0] if len(permissions) == 1 else None
+                tclass = parsed_log.get("tclass", "")
+                scontext = parsed_log.get("scontext")
+                tcontext = parsed_log.get("tcontext")
 
-            contextual_analysis = ""
-            if group_permission and tclass:
-                # Generate fresh analysis specific to this group's permission
-                process_name = parsed_log.get("comm")
-                contextual_analysis = (
-                    PermissionSemanticAnalyzer.get_contextual_analysis(
-                        group_permission, tclass, scontext, tcontext, process_name
+                contextual_analysis = ""
+                if group_permission and tclass:
+                    # Generate fresh analysis specific to this group's permission
+                    process_name = parsed_log.get("comm")
+                    contextual_analysis = (
+                        PermissionSemanticAnalyzer.get_contextual_analysis(
+                            group_permission, tclass, scontext, tcontext, process_name
+                        )
                     )
-                )
 
-            if contextual_analysis or proctitle:
-                console.print("  └─ Process Context:")
-                if contextual_analysis:
-                    console.print(
-                        f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]"
-                    )
-                if proctitle and proctitle != parsed_log.get("comm", ""):
-                    console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
+                if contextual_analysis or proctitle:
+                    console.print("  └─ Process Context:")
+                    if contextual_analysis:
+                        console.print(
+                            f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]"
+                        )
+                    if proctitle and proctitle != parsed_log.get("comm", ""):
+                        console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
 
             if detailed:
                 # Group events by PID for multi-level tree display
@@ -2723,6 +2941,9 @@ def print_rich_summary(
                 mode = "[cyan]Enforcing[/cyan]"
 
             # Display correlation event
+            denial_type = parsed_log.get("denial_type", "")
+            is_selinux_error = denial_type in ["SELINUX_ERR", "USER_SELINUX_ERR"]
+
             if detailed:
                 # Enhanced detailed view with additional information
                 exe_path = parsed_log.get("exe", "")
@@ -2732,85 +2953,112 @@ def print_rich_summary(
                     exe_display = f" \\[{escaped_exe}\\]"
                 else:
                     exe_display = ""
-                denied_bionic = format_bionic_text("denied", "white")
-                to_bionic = format_bionic_text("to", "white")
-                # Split into two lines: PID+process line and denial action line
-                console.print(f"• PID {pid} ([green]{comm}[/green]){exe_display}")
-                console.print(
-                    f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}"
-                )
 
-                # Add detailed sub-information with tree-like structure
-                syscall = parsed_log.get("syscall", "")
-                cwd = parsed_log.get("cwd", "")
-                proctitle = parsed_log.get("proctitle", "")
-
-                if syscall:
-                    # Get actual exit code from the correlation event
-                    exit_code = correlation.get("exit", "unknown")
+                # Different display for SELINUX_ERR (no PID/process info)
+                if is_selinux_error:
+                    # SELINUX_ERR: kernel-level security computation error
+                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security computation error"
+                    invalid_ctx = parsed_log.get("invalid_context", "")
+                    console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}")
+                    if invalid_ctx:
+                        console.print(f"  Invalid context: [red]{invalid_ctx}[/red]")
                     console.print(
-                        f"  ├─ [bright_cyan]{permission}[/bright_cyan] | Time: {timestamp} | Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: {exit_code}"
+                        f"  Transition: {parsed_log.get('scontext', 'unknown')} → {parsed_log.get('tcontext', 'unknown')}"
+                    )
+                    console.print(f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] [{mode}] {enforcement}")
+                else:
+                    # Regular AVC: process-level denial
+                    denied_bionic = format_bionic_text("denied", "white")
+                    to_bionic = format_bionic_text("to", "white")
+                    # Split into two lines: PID+process line and denial action line
+                    console.print(f"• PID {pid} ([green]{comm}[/green]){exe_display}")
+                    console.print(
+                        f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}"
                     )
 
-                # Add process context information
-                if cwd:
-                    console.print(f"  ├─ Working Directory: [dim]{cwd}[/dim]")
+                # Add detailed sub-information with tree-like structure (only for regular AVC, not SELINUX_ERR)
+                if not is_selinux_error:
+                    syscall = parsed_log.get("syscall", "")
+                    cwd = parsed_log.get("cwd", "")
+                    proctitle = parsed_log.get("proctitle", "")
 
-                if proctitle and proctitle != comm:
-                    # Determine if this should be the last item for proper tree branching
-                    has_analysis = (
-                        permission
-                        and hasattr(
-                            PermissionSemanticAnalyzer, "get_contextual_analysis"
+                    if syscall:
+                        # Get actual exit code from the correlation event
+                        exit_code = correlation.get("exit", "unknown")
+                        console.print(
+                            f"  ├─ [bright_cyan]{permission}[/bright_cyan] | Time: {timestamp} | Syscall: [bright_yellow]{syscall}[/bright_yellow] | Exit: {exit_code}"
                         )
-                        and parsed_log.get("contextual_analysis", "")
-                    )
-                    branch = "├─" if has_analysis else "└─"
-                    console.print(f"  {branch} Process Title: [dim]{proctitle}[/dim]")
 
-                # Add semantic analysis last as it provides interpretive context
-                if permission and hasattr(
-                    PermissionSemanticAnalyzer, "get_contextual_analysis"
-                ):
-                    # Generate contextual analysis specific to this event's permission and object class
-                    tclass = parsed_log.get("tclass", "")
-                    scontext = parsed_log.get("scontext")
-                    tcontext = parsed_log.get("tcontext")
+                    # Add process context information
+                    if cwd:
+                        console.print(f"  ├─ Working Directory: [dim]{cwd}[/dim]")
 
-                    if tclass:
-                        contextual_analysis = (
-                            PermissionSemanticAnalyzer.get_contextual_analysis(
-                                permission, tclass, scontext, tcontext, comm
+                    if proctitle and proctitle != comm:
+                        # Determine if this should be the last item for proper tree branching
+                        has_analysis = (
+                            permission
+                            and hasattr(
+                                PermissionSemanticAnalyzer, "get_contextual_analysis"
                             )
+                            and parsed_log.get("contextual_analysis", "")
                         )
-                        if contextual_analysis:
-                            console.print(
-                                f"  └─ Analysis: [dim]{contextual_analysis}[/dim]"
-                            )
+                        branch = "├─" if has_analysis else "└─"
+                        console.print(f"  {branch} Process Title: [dim]{proctitle}[/dim]")
 
-                # Fallback closing branch if no other context is available
-                if not (
-                    cwd
-                    or (proctitle and proctitle != comm)
-                    or (
-                        permission
-                        and hasattr(
-                            PermissionSemanticAnalyzer, "get_contextual_analysis"
+                    # Add semantic analysis last as it provides interpretive context
+                    if permission and hasattr(
+                        PermissionSemanticAnalyzer, "get_contextual_analysis"
+                    ):
+                        # Generate contextual analysis specific to this event's permission and object class
+                        tclass = parsed_log.get("tclass", "")
+                        scontext = parsed_log.get("scontext")
+                        tcontext = parsed_log.get("tcontext")
+
+                        if tclass:
+                            contextual_analysis = (
+                                PermissionSemanticAnalyzer.get_contextual_analysis(
+                                    permission, tclass, scontext, tcontext, comm
+                                )
+                            )
+                            if contextual_analysis:
+                                console.print(
+                                    f"  └─ Analysis: [dim]{contextual_analysis}[/dim]"
+                                )
+
+                    # Fallback closing branch if no other context is available
+                    if not (
+                        cwd
+                        or (proctitle and proctitle != comm)
+                        or (
+                            permission
+                            and hasattr(
+                                PermissionSemanticAnalyzer, "get_contextual_analysis"
+                            )
+                            and parsed_log.get("contextual_analysis", "")
                         )
-                        and parsed_log.get("contextual_analysis", "")
-                    )
-                ):
-                    console.print(f"  └─ Process: [dim]{comm}[/dim]")
+                    ):
+                        console.print(f"  └─ Process: [dim]{comm}[/dim]")
 
             else:
                 # Standard compact view
-                denied_bionic = format_bionic_text("denied", "white")
-                to_bionic = format_bionic_text("to", "white")
-                # Split into two lines: PID+process line and denial action line
-                console.print(f"• PID {pid} ([green]{comm}[/green])")
-                console.print(
-                    f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}"
-                )
+                if is_selinux_error:
+                    # SELINUX_ERR compact view
+                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security error"
+                    invalid_ctx = parsed_log.get("invalid_context", "")
+                    console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}")
+                    if invalid_ctx:
+                        console.print(f"  Invalid context: [red]{invalid_ctx}[/red] [{mode}] {enforcement}")
+                    else:
+                        console.print(f"  [{mode}] {enforcement}")
+                else:
+                    # Regular AVC compact view
+                    denied_bionic = format_bionic_text("denied", "white")
+                    to_bionic = format_bionic_text("to", "white")
+                    # Split into two lines: PID+process line and denial action line
+                    console.print(f"• PID {pid} ([green]{comm}[/green])")
+                    console.print(
+                        f"  {denied_bionic} '[bright_cyan]{permission}[/bright_cyan]' {to_bionic} {target_desc} [{mode}] {enforcement}"
+                    )
 
     # Generate and display sesearch command for policy investigation
     # Use aggregated permissions if available for more complete sesearch command
@@ -3013,7 +3261,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             ausearch_cmd = [
                 "ausearch",
                 "-m",
-                "AVC,USER_AVC,AVC_PATH,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR",
+                "AVC,USER_AVC,AVC_PATH,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD",
                 "-i",
                 "-if",
                 file_path,
@@ -3099,6 +3347,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     validation_warnings = []
     valid_blocks = []
     all_avc_denials = []
+    all_policy_loads = []
 
     for i, block in enumerate(log_blocks):
         # Validate and sanitize the log block
@@ -3121,6 +3370,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         avc_denials, unparsed = parse_avc_log(sanitized_block)
         all_unparsed_types.update(unparsed)
         all_avc_denials.extend(avc_denials)
+
+        # Parse MAC_POLICY_LOAD events (informational)
+        policy_loads = parse_mac_policy_load_events(sanitized_block)
+        all_policy_loads.extend(policy_loads)
 
     # Check if we have any valid blocks after validation
     if not valid_blocks:
@@ -3171,8 +3424,14 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     # Process all AVC denials with smart signature generation
     for parsed_log in all_avc_denials:
-        if "permission" in parsed_log:
-            permission = parsed_log.get("permission")
+        # Handle both regular AVC denials (with permission) and SELINUX_ERR records (without permission)
+        if "permission" in parsed_log or parsed_log.get("denial_type") in ["SELINUX_ERR", "USER_SELINUX_ERR"]:
+            # For regular AVC, use permission; for SELINUX_ERR, use error type as identifier
+            if "permission" in parsed_log:
+                permission = parsed_log.get("permission")
+            else:
+                # SELINUX_ERR doesn't have permission, use error type + operation/reason as identifier
+                permission = parsed_log.get("selinux_error_reason") or parsed_log.get("selinux_operation") or "selinux_error"
 
             # Generate smart signature using new logic (or legacy for regression testing)
             signature = generate_smart_signature(
@@ -3662,22 +3921,33 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             detailed=args.detailed,
                         )
 
-                # Show filtering info in final summary if applicable
-                if args.process or args.path:
-                    console.print(
-                        f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials. Displayed {len(filtered_denials)} after filtering."
-                    )
-                else:
-                    console.print(
-                        f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials."
-                    )
+            # Display MAC_POLICY_LOAD events summary if any (outside if filtered_denials block)
+            if all_policy_loads:
+                console.print("\n" + "─" * console.width)
+                console.print("[bold cyan]📋 SELinux Policy Load Events[/bold cyan]")
+                console.print(f"\nDetected [bright_cyan]{len(all_policy_loads)}[/bright_cyan] policy reload(s):\n")
+                for event in all_policy_loads:
+                    timestamp_str = event.get('datetime_str', 'unknown')
+                    auid = event.get('auid_display', 'unknown')
+                    console.print(f"  • {timestamp_str} - User ID: {auid}")
+                console.print()
 
-                # --- Added: Print the list of unparsed types found ---
-                if all_unparsed_types:
-                    console.print(
-                        "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:"
-                    )
-                    console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
+            # Show filtering info in final summary if applicable
+            if args.process or args.path:
+                console.print(
+                    f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials. Displayed {len(filtered_denials)} after filtering."
+                )
+            else:
+                console.print(
+                    f"\n[bold green]Analysis Complete:[/bold green] Processed {len(log_blocks)} log blocks and found {len(unique_denials)} unique denials."
+                )
+
+            # --- Added: Print the list of unparsed types found ---
+            if all_unparsed_types:
+                console.print(
+                    "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:"
+                )
+                console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
         # Use interactive pager for large outputs if requested and running in a terminal
         if args.pager and sys.stdout.isatty() and not args.json:

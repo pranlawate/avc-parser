@@ -1,0 +1,23 @@
+type=AVC msg=audit(1725465540.190:101) : avc:  denied  { read } for  pid=1001 comm="logrotate" name="app.log" dev="dm-0" ino=12345 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.190:101) : arch=c000003e syscall=257 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=0 a3=0 items=0 ppid=1 pid=1001 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.190:101) : proctitle="/usr/sbin/logrotate"
+
+type=AVC msg=audit(1725465540.191:102) : avc:  denied  { read } for  pid=1001 comm="logrotate" name="error.log" dev="dm-0" ino=12346 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.191:102) : arch=c000003e syscall=257 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=0 a3=0 items=0 ppid=1 pid=1001 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.191:102) : proctitle="/usr/sbin/logrotate"
+
+type=AVC msg=audit(1725465540.192:103) : avc:  denied  { read } for  pid=1002 comm="logrotate" name="app.log" dev="dm-0" ino=12345 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.192:103) : arch=c000003e syscall=257 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=0 a3=0 items=0 ppid=1 pid=1002 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.192:103) : proctitle="/usr/sbin/logrotate"
+
+type=AVC msg=audit(1725465540.193:104) : avc:  denied  { read } for  pid=1002 comm="logrotate" name="error.log" dev="dm-0" ino=12346 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.193:104) : arch=c000003e syscall=257 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=0 a3=0 items=0 ppid=1 pid=1002 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.193:104) : proctitle="/usr/sbin/logrotate"
+
+type=AVC msg=audit(1725465540.194:105) : avc:  denied  { read } for  pid=1003 comm="logrotate" name="app.log" dev="dm-0" ino=12345 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.194:105) : arch=c000003e syscall=262 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=7ffc8a0b5e30 a3=0 items=0 ppid=1 pid=1003 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.194:105) : proctitle="/usr/sbin/logrotate"
+
+type=AVC msg=audit(1725465540.195:106) : avc:  denied  { read } for  pid=1003 comm="logrotate" name="error.log" dev="dm-0" ino=12346 scontext=system_u:system_r:logrotate_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=SYSCALL msg=audit(1725465540.195:106) : arch=c000003e syscall=262 success=no exit=-13 a0=ffffff9c a1=7f8b2c003d50 a2=7ffc8a0b5e30 a3=0 items=0 ppid=1 pid=1003 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="logrotate" exe="/usr/sbin/logrotate" subj=system_u:system_r:logrotate_t:s0 key=(null)
+type=PROCTITLE msg=audit(1725465540.195:106) : proctitle="/usr/sbin/logrotate"

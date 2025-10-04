@@ -1,0 +1,8 @@
+type=SELINUX_ERR msg=audit(1163774199.777:11573): security_compute_sid:  invalid context staff_u:staff_r:staff_userhelper_t:s0 for scontext=staff_u:staff_r:staff_t:s0 tcontext=system_u:object_r:userhelper_exec_t:s0 tclass=process
+type=SELINUX_ERR msg=audit(1163774199.949:11577): security_compute_sid:  invalid context staff_u:staff_r:staff_userhelper_t:s0 for scontext=staff_u:staff_r:staff_userhelper_t:s0 tcontext=system_u:object_r:xauth_exec_t:s0 tclass=process
+type=SELINUX_ERR msg=audit(1163774199.953:11585): security_compute_sid:  invalid context staff_u:staff_r:staff_userhelper_t:s0 for scontext=staff_u:staff_r:staff_userhelper_t:s0 tcontext=system_u:object_r:xauth_exec_t:s0 tclass=process
+type=SELINUX_ERR msg=audit(1163777716.449:13117): security_compute_sid:  invalid context staff_u:staff_r:staff_userhelper_t:s0 for scontext=staff_u:staff_r:staff_t:s0 tcontext=system_u:object_r:userhelper_exec_t:s0 tclass=process
+type=SELINUX_ERR msg=audit(1163777721.381:13123): security_compute_sid:  invalid context staff_u:staff_r:staff_userhelper_t:s0 for scontext=staff_u:staff_r:staff_userhelper_t:s0 tcontext=system_u:object_r:xauth_exec_t:s0 tclass=process
+type=MAC_POLICY_LOAD msg=audit(1163776448.949:12869): policy loaded auid=500
+type=MAC_POLICY_LOAD msg=audit(1163794206.019:14348): policy loaded auid=500
+type=MAC_POLICY_LOAD msg=audit(1470675789.411:2): policy loaded auid=4294967295 ses=4294967295
