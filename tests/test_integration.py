@@ -587,8 +587,9 @@ class TestReportFormat(unittest.TestCase):
         self.assertIn("WHERE:", output, "Brief report should contain WHERE section")
         self.assertIn("IMPACT:", output, "Brief report should contain IMPACT section")
         self.assertIn("STATUS:", output, "Brief report should contain STATUS section")
-        self.assertIn("REMEDIATION:", output, "Brief report should contain remediation commands")
-        self.assertIn("sesearch -A", output, "Brief report should contain sesearch commands")
+        # Note: REMEDIATION section was removed from brief format per user request
+        # self.assertIn("REMEDIATION:", output, "Brief report should contain remediation commands")
+        # self.assertIn("sesearch -A", output, "Brief report should contain sesearch commands")
 
         # Verify no Rich panel formatting
         self.assertNotIn("╭", output, "Brief report should not contain Rich panel borders")
@@ -835,8 +836,9 @@ type=AVC msg=audit(1694170523.456:123): avc:  denied  { noatsecure } for  pid=12
         self.assertEqual(result_brief.returncode, 0, "Brief format should succeed")
         self.assertEqual(result_sealert.returncode, 0, "Sealert format should succeed")
 
-        # Both should contain the same sesearch command
-        self.assertIn("sesearch -A -s httpd_t", result_brief.stdout, "Brief should contain sesearch command")
+        # Note: REMEDIATION/sesearch was removed from brief format per user request
+        # Only sealert format should contain sesearch command
+        # self.assertIn("sesearch -A -s httpd_t", result_brief.stdout, "Brief should contain sesearch command")
         self.assertIn("sesearch -A -s httpd_t", result_sealert.stdout, "Sealert should contain sesearch command")
 
         # Should have different format styles

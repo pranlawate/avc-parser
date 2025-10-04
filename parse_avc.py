@@ -504,8 +504,8 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             "permission": r"denied\s+\{ ([^}]+) \}",
             "pid": r"pid=(\S+)",
             "comm": r"comm=(?:\"([^\"]+)\"|([^\s]+))",
-            "exe": r"exe=\"([^\"]+)\"",  # Executable path in AVC records
-            "proctitle": r"proctitle=\"([^\"]+)\"",  # Process title in AVC records
+            "exe": r'exe=(?:"([^"]+)"|([^\s]+))',  # Executable path - quotes optional (ausearch -i strips them)
+            "proctitle": r'proctitle=(?:"([^"]+)"|([^\s]+))',  # Process title - quotes optional
             "path": r"path=\"([^\"]+)\"",
             "path_unquoted": r"path=([^\s]+)",  # For unquoted paths in AVC
             "name": r"name=([^\s]+)",  # name field in AVC (often just filename)
@@ -526,8 +526,9 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 if "type=USER_AVC" in line and key == "pid" and key in avc_data:
                     continue
 
-                if key == "comm" and len(field_match.groups()) > 1:
-                    # Handle comm field which can be quoted or unquoted
+                if key in ("comm", "exe") and len(field_match.groups()) > 1:
+                    # Handle comm and exe fields that can be quoted or unquoted
+                    # ausearch -i strips quotes, so we need to handle both formats
                     avc_data[key] = (
                         field_match.group(1) or field_match.group(2)
                     ).strip()
@@ -548,7 +549,8 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                         avc_data[key] = context_string
                 elif key == "proctitle":
                     # Handle hex-encoded proctitle in AVC records (same as shared context processing)
-                    raw_proctitle = field_match.group(1).strip()
+                    # Handle quoted or unquoted proctitle
+                    raw_proctitle = (field_match.group(1) or field_match.group(2)).strip() if len(field_match.groups()) > 1 else field_match.group(1).strip()
                     try:
                         # Check if it's hex-encoded (all hex characters and even length)
                         if all(c in "0123456789ABCDEFabcdef" for c in raw_proctitle) and len(raw_proctitle) % 2 == 0:
@@ -623,10 +625,17 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             source_context = avc_data.get("scontext")
             target_context = avc_data.get("tcontext")
 
-            # Add permission description
-            avc_data["permission_description"] = (
-                PermissionSemanticAnalyzer.get_permission_description(permission)
-            )
+            # Add context-aware permission description
+            # Map tclass to resource_type for context-aware descriptions
+            resource_type = "directory" if obj_class == "dir" else "file" if obj_class == "file" else None
+            if resource_type and resource_type in ["file", "directory"]:
+                avc_data["permission_description"] = (
+                    PermissionSemanticAnalyzer.get_permission_description_with_context(permission, resource_type)
+                )
+            else:
+                avc_data["permission_description"] = (
+                    PermissionSemanticAnalyzer.get_permission_description(permission)
+                )
 
             # Add contextual analysis
             process_name = avc_data.get("comm")
@@ -682,10 +691,13 @@ def build_correlation_event(parsed_log: dict, permission: str) -> dict:
     correlation_event = {
         "pid": parsed_log.get("pid"),
         "comm": parsed_log.get("comm"),
+        "exe": parsed_log.get("exe"),  # Executable path for fallback when comm is missing
+        "proctitle": parsed_log.get("proctitle"),  # Process title for fallback
         "path": parsed_log.get("path"),
         "permission": permission,
         "permissive": parsed_log.get("permissive"),
         "timestamp": parsed_log.get("datetime_str"),
+        "syscall": parsed_log.get("syscall"),  # System call that triggered the denial
         "dest_port": parsed_log.get("dest_port"),
         "saddr": parsed_log.get("saddr"),
         "tclass": parsed_log.get("tclass"),
@@ -711,6 +723,11 @@ def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str
     Returns:
         str: Enhanced permissions string with descriptions
     """
+    # Get tclass for context-aware permission descriptions
+    tclass = parsed_log.get("tclass", "")
+    # Map tclass to resource_type
+    resource_type = "directory" if tclass == "dir" else "file" if tclass == "file" else None
+
     if "permissions" in denial_info and len(denial_info["permissions"]) > 1:
         # Multiple permissions case
         enhanced_perms = []
@@ -720,7 +737,11 @@ def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str
             ):
                 perm_desc = parsed_log["permission_description"]
             else:
-                perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
+                # Use context-aware description if we have a resource type
+                if resource_type and resource_type in ["file", "directory"]:
+                    perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(perm, resource_type)
+                else:
+                    perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
 
             if perm_desc != perm:
                 enhanced_perms.append(f"{perm} ({perm_desc})")
@@ -1657,13 +1678,12 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     console.print("-" * 35)
 
 
-def group_events_by_resource(correlations: list, expand_groups: bool = False) -> dict:
+def group_events_by_resource(correlations: list) -> dict:
     """
     Group correlation events by exact resource (file path, port, etc.) for smart event grouping.
 
     Args:
         correlations (list): List of correlation event dictionaries
-        expand_groups (bool): If True, disable grouping and return individual events
 
     Returns:
         dict: Grouped events with structure:
@@ -1688,14 +1708,6 @@ def group_events_by_resource(correlations: list, expand_groups: bool = False) ->
                 ]
             }
     """
-    if expand_groups:
-        # Return all events as individual when grouping is disabled
-        return {
-            "grouped": [],
-            "individual": [
-                {"type": "individual_event", "event": event} for event in correlations
-            ],
-        }
 
     # Group events by exact resource (file path, port, socket address, etc.)
     resource_groups = {}
@@ -1785,12 +1797,345 @@ def group_events_by_resource(correlations: list, expand_groups: bool = False) ->
     return {"grouped": grouped_events, "individual": individual_events}
 
 
+def consolidate_resource_groups(grouped_events: dict) -> dict:
+    """
+    Consolidate groups that have identical PIDs accessing different resources.
+
+    When the same PIDs access multiple files/resources, merge them into a single
+    consolidated group to avoid repetition.
+
+    Args:
+        grouped_events (dict): Output from group_events_by_resource()
+
+    Returns:
+        dict: Consolidated groups with structure:
+            {
+                'grouped': [consolidated groups with multiple resources],
+                'individual': [unchanged individual events]
+            }
+    """
+    if not grouped_events["grouped"]:
+        return grouped_events
+
+    # Group by PID set signature
+    pid_signature_groups = {}
+
+    for group in grouped_events["grouped"]:
+        # Create signature: frozenset of PIDs + comm + resource_type (to avoid mixing files and dirs)
+        pids_tuple = tuple(sorted(group["pids"]))
+        comm = group["comms"][0] if group["comms"] else "unknown"
+        resource_type = group["resource_type"]
+
+        signature = (pids_tuple, comm, resource_type)
+
+        if signature not in pid_signature_groups:
+            pid_signature_groups[signature] = []
+        pid_signature_groups[signature].append(group)
+
+    # Build consolidated groups
+    consolidated_groups = []
+
+    for signature, groups in pid_signature_groups.items():
+        if len(groups) == 1:
+            # Only one resource for this PID set - keep as-is
+            consolidated_groups.append(groups[0])
+        else:
+            # Multiple resources for same PIDs - consolidate!
+            pids_tuple, comm, resource_type = signature
+
+            # Calculate total events
+            total_events = sum(g["count"] for g in groups)
+
+            # Collect all resources and their details
+            resources_by_permission = {}
+            all_events = []
+
+            for group in groups:
+                for perm in group["permissions"]:
+                    if perm not in resources_by_permission:
+                        resources_by_permission[perm] = []
+                    resources_by_permission[perm].append({
+                        "resource": group["resource"],
+                        "resource_type": group["resource_type"],
+                        "count": group["count"]
+                    })
+                all_events.extend(group["all_events"])
+
+            # Create consolidated group
+            consolidated = {
+                "type": "consolidated_resource_group",
+                "pids": list(pids_tuple),
+                "comms": [comm],
+                "count": total_events,
+                "resource_count": len(groups),
+                "resources_by_permission": resources_by_permission,
+                "all_events": all_events,
+                "permissions": sorted(resources_by_permission.keys())
+            }
+
+            consolidated_groups.append(consolidated)
+
+    return {
+        "grouped": consolidated_groups,
+        "individual": grouped_events["individual"]
+    }
+
+
+def display_consolidated_group(console: Console, group: dict, parsed_log: dict, detailed: bool = False):
+    """
+    Display a consolidated group where same PIDs access multiple resources.
+
+    Args:
+        console: Rich console for output
+        group: Consolidated group data
+        parsed_log: Main denial log data for context
+        detailed: Whether to show detailed view
+    """
+    from rich.tree import Tree
+
+    pids = group["pids"]
+    comms = group["comms"]
+    total_events = group["count"]
+    resource_count = group["resource_count"]
+    resources_by_permission = group["resources_by_permission"]
+
+    # Get process name and description
+    process_name = comms[0] if comms else "unknown"
+    process_desc = parsed_log.get("source_type_description", "")
+    if process_desc:
+        process_display = f"[green]{process_name}[/green] [dim]({process_desc})[/dim]"
+    else:
+        process_display = f"[green]{process_name}[/green]"
+
+    # Analyze PID-resource correlation
+    pid_resource_map = {}
+    for event in group["all_events"]:
+        pid = event.get("pid")
+        perm = event.get("permission")
+        # Build resource key similar to grouping logic
+        path = event.get("path", "")
+        if path:
+            resource = path
+        elif event.get("dest_port"):
+            resource = f"port:{event.get('dest_port')}"
+        elif event.get("saddr"):
+            resource = f"socket:{event.get('saddr')}"
+        elif event.get("tclass"):
+            tclass = event.get("tclass")
+            resource = f"{tclass}:{perm}"
+        else:
+            resource = "unknown"
+
+        if pid not in pid_resource_map:
+            pid_resource_map[pid] = set()
+        pid_resource_map[pid].add(resource)
+
+    # Check if all PIDs access all resources (perfect correlation)
+    all_resources_set = set(r for resources in pid_resource_map.values() for r in resources)
+    perfect_correlation = all(
+        pid_resource_map[pid] == all_resources_set for pid in pid_resource_map
+    )
+
+    # Display header with correlation info
+    pid_count = len(pids)
+    if perfect_correlation:
+        correlation_note = f" [dim](all PIDs access all resources)[/dim]"
+    else:
+        correlation_note = ""
+
+    console.print(f"• {pid_count} PIDs ({process_display}), {total_events} events across {resource_count} resources{correlation_note}")
+
+    # Show PID list
+    pid_chunks = [pids[i : i + 8] for i in range(0, len(pids), 8)]
+    for i, chunk in enumerate(pid_chunks):
+        is_last_chunk = i == len(pid_chunks) - 1
+        tree_symbol = "└─" if is_last_chunk else "├─"
+        console.print(f"  {tree_symbol} {', '.join(chunk)}")
+
+    # Check if any events are permissive
+    group_is_permissive = any(
+        event.get("permissive") == "1" for event in group["all_events"]
+    )
+    if group_is_permissive:
+        enforcement_status = "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+    else:
+        enforcement_status = "[Enforcing] [red]✗ BLOCKED[/red]"
+
+    # Display resources grouped by permission
+    console.print("")
+    console.print("  Resources affected:")
+    for perm in sorted(resources_by_permission.keys()):
+        resources = resources_by_permission[perm]
+        perm_event_count = sum(r["count"] for r in resources)
+
+        # Get permission description with context awareness
+        # Check what resource types we have for this permission
+        resource_types = set(r["resource_type"] for r in resources)
+        # Use the most common resource type for description context
+        primary_resource_type = list(resource_types)[0] if len(resource_types) == 1 else None
+
+        from selinux.context import PermissionSemanticAnalyzer
+        # Get context-aware description if we have a single resource type
+        if primary_resource_type and primary_resource_type in ["file", "directory"]:
+            perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(perm, primary_resource_type)
+        else:
+            perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
+
+        console.print(f"  ├─ Permission: {perm} ({perm_desc}) - {perm_event_count} events")
+
+        # List resources
+        for i, res_info in enumerate(resources):
+            is_last = i == len(resources) - 1
+            res_symbol = "   └─" if is_last else "   ├─"
+
+            # Format resource display
+            resource = res_info["resource"]
+            res_type = res_info["resource_type"]
+            res_count = res_info["count"]
+
+            # Simplify resource display
+            if res_type == "file" or res_type == "directory":
+                # Show basename for files, or truncate long paths
+                if "/" in resource and len(resource) > 50:
+                    parts = resource.split("/")
+                    if len(parts) > 3:
+                        resource_display = f".../{'/'.join(parts[-2:])}"
+                    else:
+                        resource_display = resource
+                else:
+                    resource_display = resource
+            else:
+                resource_display = resource
+
+            console.print(f"  {res_symbol} {resource_display} ({res_count} events) {enforcement_status}")
+
+    # Show Process Context once for the entire consolidated group
+    console.print("")
+    proctitle = parsed_log.get("proctitle", "")
+    exe_path = parsed_log.get("exe", "")
+
+    # Generate contextual analysis - use first permission for context
+    first_perm = sorted(resources_by_permission.keys())[0]
+
+    # Get tclass from this consolidated group's actual resources, not from parsed_log
+    # which might be from a different tclass in the same denial signature
+    first_resources = resources_by_permission[first_perm]
+    actual_resource_type = first_resources[0]["resource_type"]
+    # Map resource_type back to tclass
+    if actual_resource_type == "directory":
+        tclass = "dir"
+    elif actual_resource_type == "file":
+        tclass = "file"
+    elif actual_resource_type in ["chr_file", "blk_file", "lnk_file", "sock_file", "fifo_file"]:
+        tclass = actual_resource_type
+    else:
+        # Fall back to parsed_log tclass for non-filesystem resources
+        tclass = parsed_log.get("tclass", "")
+
+    scontext = parsed_log.get("scontext")
+    tcontext = parsed_log.get("tcontext")
+
+    contextual_analysis = ""
+    if tclass:
+        from selinux.context import PermissionSemanticAnalyzer
+        contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
+            first_perm, tclass, scontext, tcontext, process_name
+        )
+
+    if contextual_analysis or proctitle:
+        console.print("  └─ Process Context:")
+        if contextual_analysis:
+            console.print(f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]")
+        if proctitle and proctitle != process_name:
+            console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
+
+    # Show detailed per-PID, per-resource breakdown if detailed flag is set
+    if detailed:
+        console.print("")
+        console.print("  [bold]Detailed Breakdown:[/bold]")
+
+        # Group events by PID
+        events_by_pid = {}
+        for event in group["all_events"]:
+            pid = event.get("pid", "unknown")
+            if pid not in events_by_pid:
+                events_by_pid[pid] = []
+            events_by_pid[pid].append(event)
+
+        # Display per-PID breakdown
+        for pid_idx, (pid, pid_events) in enumerate(sorted(events_by_pid.items())):
+            is_last_pid = pid_idx == len(events_by_pid) - 1
+            pid_branch = "  └─" if is_last_pid else "  ├─"
+
+            console.print(f"{pid_branch} PID {pid} ({len(pid_events)} event{'s' if len(pid_events) != 1 else ''}):")
+
+            # Group this PID's events by resource
+            events_by_resource = {}
+            for event in pid_events:
+                # Build resource key
+                path = event.get("path", "")
+                if path:
+                    resource = path
+                elif event.get("dest_port"):
+                    resource = f"port:{event.get('dest_port')}"
+                elif event.get("saddr"):
+                    resource = f"socket:{event.get('saddr')}"
+                else:
+                    resource = "unknown"
+
+                if resource not in events_by_resource:
+                    events_by_resource[resource] = []
+                events_by_resource[resource].append(event)
+
+            # Display per-resource events
+            for res_idx, (resource, res_events) in enumerate(sorted(events_by_resource.items())):
+                is_last_resource = res_idx == len(events_by_resource) - 1
+                indent = "     " if is_last_pid else "  │  "
+                res_branch = "└─" if is_last_resource else "├─"
+
+                # Format resource display
+                if "/" in resource and len(resource) > 60:
+                    parts = resource.split("/")
+                    if len(parts) > 3:
+                        resource_display = f".../{'/'.join(parts[-2:])}"
+                    else:
+                        resource_display = resource
+                else:
+                    resource_display = resource
+
+                permission = res_events[0].get("permission", "unknown")
+                event_count = len(res_events)
+
+                console.print(f"{indent}{res_branch} {resource_display}")
+                console.print(f"{indent}   Permission: [bright_cyan]{permission}[/bright_cyan], {event_count} event{'s' if event_count != 1 else ''}")
+
+                # Show timestamps and syscalls for these events
+                for evt_idx, event in enumerate(res_events[:3]):  # Show first 3 events
+                    timestamp = event.get("timestamp", "N/A")
+                    syscall = event.get("syscall", "N/A")
+                    exit_code = event.get("exit", "N/A")
+                    success = event.get("success", "")
+
+                    # Format success/failure
+                    if success == "yes":
+                        result = "[green]success[/green]"
+                    elif success == "no":
+                        result = "[red]failed[/red]"
+                    else:
+                        result = ""
+
+                    evt_branch = "   " if evt_idx < 2 else "   "
+                    console.print(f"{indent}   {evt_branch}• {timestamp} via [dim]{syscall}[/dim] (exit={exit_code}{', ' + result if result else ''})")
+
+                if event_count > 3:
+                    console.print(f"{indent}      [dim]... and {event_count - 3} more event{'s' if event_count - 3 != 1 else ''}[/dim]")
+
+
 def print_rich_summary(
     console: Console,
     denial_info: dict,
     denial_num: int,
     detailed: bool = False,
-    expand_groups: bool = False,
 ):
     """
     Print a Rich-formatted summary with correlation events display.
@@ -1806,6 +2151,7 @@ def print_rich_summary(
         denial_num (int): Sequential denial number for display
     """
     from rich.panel import Panel
+    from selinux.context import PermissionSemanticAnalyzer
 
     parsed_log = denial_info["log"]
     count = denial_info["count"]
@@ -1900,7 +2246,21 @@ def print_rich_summary(
 
     # 2. WHAT - Action summary with syscall context
     permissions_display = get_enhanced_permissions_display(denial_info, parsed_log)
-    obj_class = parsed_log.get("class_description", parsed_log.get("tclass", ""))
+
+    # Handle multiple tclasses (e.g., file and dir in same denial group)
+    if (
+        "tclasss" in denial_info
+        and denial_info["tclasss"]
+        and len(denial_info["tclasss"]) > 1
+    ):
+        # Multiple tclasses - show all of them
+        tclass_list = sorted(list(denial_info["tclasss"]))
+        # Map to descriptions if available
+        class_descs = [PermissionSemanticAnalyzer.get_class_description(tc) for tc in tclass_list]
+        obj_class = " and ".join(class_descs)
+    else:
+        # Single tclass
+        obj_class = parsed_log.get("class_description", parsed_log.get("tclass", ""))
 
     # Apply BIONIC reading to natural language parts only
     denied_bionic = format_bionic_text("Denied", "white")
@@ -1948,11 +2308,21 @@ def print_rich_summary(
 
         # Apply smart event grouping by exact resource
         grouped_events = group_events_by_resource(
-            denial_info["correlations"], expand_groups
+            denial_info["correlations"]
         )
+
+        # Consolidate groups with same PIDs accessing different resources
+        grouped_events = consolidate_resource_groups(grouped_events)
 
         # Display grouped events first (multiple PIDs accessing same exact resource)
         for group in grouped_events["grouped"]:
+            # Check if this is a consolidated group (multiple resources, same PIDs)
+            if group.get("type") == "consolidated_resource_group":
+                # Display consolidated group
+                display_consolidated_group(console, group, parsed_log, detailed)
+                continue
+
+            # Regular group (single resource)
             resource = group["resource"]
             resource_type = group["resource_type"]
             count = group["count"]
@@ -2079,6 +2449,17 @@ def print_rich_summary(
             denied_bionic = format_bionic_text("denied", "white")
             to_bionic = format_bionic_text("to", "white")
 
+            # Check if any events in this group are permissive
+            group_is_permissive = any(
+                event.get("permissive") == "1" for event in group["all_events"]
+            )
+
+            # Determine enforcement status display
+            if group_is_permissive:
+                enforcement_status = "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+            else:
+                enforcement_status = "[Enforcing] [red]✗ BLOCKED[/red]"
+
             # Use tree structure only for multiple PIDs, simple format for single PID
             pid_count = len(pids)
             pid_label = "PID" if pid_count == 1 else "PIDs"
@@ -2101,11 +2482,14 @@ def print_rich_summary(
                     f"• {pid_label} {single_pid}{pid_count_display} ({process_display})"
                 )
                 console.print(
-                    f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} [Enforcing] [red]✗ BLOCKED[/red]"
+                    f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} {enforcement_status}"
                 )
             else:
                 # Tree structure for multiple PIDs
-                console.print(f"• {pid_count} {pid_label} ({process_display})")
+                # Calculate total events for this permission group
+                total_events = len(group["all_events"])
+                events_info = f", {total_events} event{'s' if total_events != 1 else ''}" if total_events != pid_count else ""
+                console.print(f"• {pid_count} {pid_label} ({process_display}){events_info}")
 
                 # Tree structure for PID list (8 PIDs per line)
                 pid_chunks = [pids[i : i + 8] for i in range(0, len(pids), 8)]
@@ -2116,8 +2500,37 @@ def print_rich_summary(
 
                 # Denial action line
                 console.print(
-                    f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} [Enforcing] [red]✗ BLOCKED[/red]"
+                    f"  {denied_bionic} '[bright_cyan]{perm_display}[/bright_cyan]' {to_bionic} {resource_display} {enforcement_status}"
                 )
+
+            # Show Process Context for grouped events (in both default and detailed view)
+            exe_path = parsed_log.get("exe", "")
+            proctitle = parsed_log.get("proctitle", "")
+
+            # Generate contextual analysis for the group's permission
+            group_permission = permissions[0] if len(permissions) == 1 else None
+            tclass = parsed_log.get("tclass", "")
+            scontext = parsed_log.get("scontext")
+            tcontext = parsed_log.get("tcontext")
+
+            contextual_analysis = ""
+            if group_permission and tclass:
+                # Generate fresh analysis specific to this group's permission
+                process_name = parsed_log.get("comm")
+                contextual_analysis = (
+                    PermissionSemanticAnalyzer.get_contextual_analysis(
+                        group_permission, tclass, scontext, tcontext, process_name
+                    )
+                )
+
+            if contextual_analysis or proctitle:
+                console.print("  └─ Process Context:")
+                if contextual_analysis:
+                    console.print(
+                        f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]"
+                    )
+                if proctitle and proctitle != parsed_log.get("comm", ""):
+                    console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
 
             if detailed:
                 # Group events by PID for multi-level tree display
@@ -2204,51 +2617,20 @@ def print_rich_summary(
                             f"  {pid_prefix} └─ ... and {remaining_count} more event type{'s' if remaining_count != 1 else ''}"
                         )
 
-                # Add process context at the bottom
-                exe_path = parsed_log.get("exe", "")
-                proctitle = parsed_log.get("proctitle", "")
-
-                # Generate contextual analysis for the group's permission (dynamic per-group analysis)
-                group_permission = permissions[0] if len(permissions) == 1 else None
-                tclass = parsed_log.get("tclass", "")
-                scontext = parsed_log.get("scontext")
-                tcontext = parsed_log.get("tcontext")
-
-                contextual_analysis = ""
-                if group_permission and tclass:
-                    # Generate fresh analysis specific to this group's permission
-                    process_name = parsed_log.get("comm")
-                    contextual_analysis = (
-                        PermissionSemanticAnalyzer.get_contextual_analysis(
-                            group_permission, tclass, scontext, tcontext, process_name
-                        )
-                    )
-
-                if exe_path or proctitle or contextual_analysis:
-                    console.print("  └─ Process Context:")
-                    if exe_path:
-                        console.print(f"     ├─ Executable: [dim]{exe_path}[/dim]")
-                    if contextual_analysis:
-                        console.print(
-                            f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]"
-                        )
-                    if proctitle and proctitle != parsed_log.get("comm", ""):
-                        console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
-
         # Display individual events (single PID per resource)
         for item in grouped_events["individual"]:
             correlation = item["event"]
             pid = correlation.get("pid", "unknown")
-            # Get comm from correlation event, fallback to main parsed_log, then exe, then proctitle
+            # Get comm from correlation event, fallback to main parsed_log, then exe, then proctitle, then scontext
             comm = correlation.get("comm") or parsed_log.get("comm")
-            if not comm:
-                # Fallback to exe (executable path) - extract just the executable name
+            if not comm or comm == "unknown":
+                # Fallback 1: exe (executable path) - extract just the executable name
                 exe = correlation.get("exe") or parsed_log.get("exe")
                 if exe:
                     # Extract just the executable name from the path
                     comm = exe.split("/")[-1] if "/" in exe else exe
                 else:
-                    # Fallback to proctitle (process title)
+                    # Fallback 2: proctitle (process title)
                     proctitle = correlation.get("proctitle") or parsed_log.get(
                         "proctitle"
                     )
@@ -2264,7 +2646,22 @@ def print_rich_summary(
                             else "unknown"
                         )
                     else:
-                        comm = "unknown"
+                        # Fallback 3: Extract from scontext (e.g., system_dbusd_t → dbusd)
+                        scontext = parsed_log.get("scontext")
+                        if scontext:
+                            # Get the type from scontext (3rd component)
+                            try:
+                                scontext_str = str(scontext)
+                                stype = scontext_str.split(":")[2] if ":" in scontext_str else None
+                                if stype and stype.endswith("_t"):
+                                    # Remove _t suffix and clean up
+                                    comm = stype[:-2].replace("system_", "").replace("_", "-")
+                                else:
+                                    comm = "unknown"
+                            except (IndexError, AttributeError):
+                                comm = "unknown"
+                        else:
+                            comm = "unknown"
             permission = correlation.get("permission", "")
             path = correlation.get("path", "")
             dest_port = correlation.get("dest_port", "")
@@ -2421,9 +2818,24 @@ def print_rich_summary(
     ):
         # Use aggregated permissions for more complete sesearch command
         permissions_list = sorted(list(denial_info["permissions"]))
-        sesearch_log["permission"] = "{ " + " ".join(permissions_list) + " }"
+        sesearch_log["permission"] = ",".join(permissions_list)
 
     sesearch_cmd = generate_sesearch_command(sesearch_log)
+
+    # If we have multiple tclasses, show additional sesearch commands
+    if (
+        "tclasss" in denial_info
+        and denial_info["tclasss"]
+        and len(denial_info["tclasss"]) > 1
+    ):
+        # Generate additional sesearch commands for other tclasses
+        other_tclasses = sorted([tc for tc in denial_info["tclasss"] if tc != parsed_log.get("tclass")])
+        for tclass in other_tclasses:
+            other_log = sesearch_log.copy()
+            other_log["tclass"] = tclass
+            other_cmd = generate_sesearch_command(other_log)
+            if other_cmd:
+                sesearch_cmd += f"\n{other_cmd}"
     if sesearch_cmd:
         # Create sesearch command panel
         sesearch_text = f"[bold green]{sesearch_cmd}[/bold green]"
@@ -2457,97 +2869,108 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         SystemExit: On argument validation errors or file processing failures
     """
     parser = argparse.ArgumentParser(
-        description="A tool to parse an SELinux AVC denial log from a file or user prompt."
+        description="A tool to parse an SELinux AVC denial log from a file or user prompt.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+
+    # Input Options
+    input_group = parser.add_argument_group('Input Options')
+    input_group.add_argument(
         "-f",
         "--file",
         type=str,
         help="Path to audit file (auto-detects raw audit.log vs pre-processed format). Note: processes one file at a time.",
     )
-    parser.add_argument(
+    input_group.add_argument(
         "-rf",
         "--raw-file",
         type=str,
         help="Path to a raw audit.log file containing the AVC log string.",
     )
-    parser.add_argument(
+    input_group.add_argument(
         "-af",
         "--avc-file",
         type=str,
         help="Path to a pre-processed file containing ausearch output.",
     )
-    parser.add_argument(
+
+    # Display Options
+    display_group = parser.add_argument_group('Display Options')
+    display_group.add_argument(
         "--json", action="store_true", help="Output the parsed data in JSON format."
     )
-    parser.add_argument(
+    display_group.add_argument(
         "--fields",
         action="store_true",
         help="Field-by-field technical breakdown for deep-dive analysis.",
     )
-    parser.add_argument(
+    display_group.add_argument(
         "--detailed",
         action="store_true",
-        help="Show enhanced detailed view with expanded correlation events and context information.",
+        help="Show detailed view with per-PID timestamps, syscalls, and exit codes.",
     )
-    parser.add_argument(
+    display_group.add_argument(
         "--report",
         nargs="?",
         const="brief",
         choices=["brief", "sealert"],
         help="Professional report format: 'brief' (default) for executive summaries, 'sealert' for technical analysis.",
     )
-    parser.add_argument(
+    display_group.add_argument(
+        "--pager",
+        action="store_true",
+        help="Use interactive pager for large outputs (like 'less' command).",
+    )
+
+    # Filtering Options
+    filter_group = parser.add_argument_group('Filtering Options')
+    filter_group.add_argument(
         "--process",
         type=str,
         help="Filter denials by process name (e.g., --process httpd).",
     )
-    parser.add_argument(
+    filter_group.add_argument(
         "--path",
         type=str,
         help="Filter denials by file path (supports wildcards, e.g., --path '/var/www/*').",
     )
-    parser.add_argument(
+    filter_group.add_argument(
+        "--source",
+        type=str,
+        help="Filter by source context pattern (e.g., 'httpd_t', '*unconfined*', 'system_r').",
+    )
+    filter_group.add_argument(
+        "--target",
+        type=str,
+        help="Filter by target context pattern (e.g., 'default_t', '*var_lib*').",
+    )
+    filter_group.add_argument(
+        "--since",
+        type=str,
+        help="Only include denials since this time (e.g., 'yesterday', 'today', '2025-01-15', '2 hours ago').",
+    )
+    filter_group.add_argument(
+        "--until",
+        type=str,
+        help="Only include denials until this time (e.g., 'today', '2025-01-15 14:30').",
+    )
+
+    # Sorting Options
+    sort_group = parser.add_argument_group('Sorting Options')
+    sort_group.add_argument(
         "--sort",
         type=str,
         choices=["recent", "count", "chrono"],
         default="recent",
         help="Sort order: 'recent' (newest first, default), 'count' (highest count first), 'chrono' (oldest first).",
     )
-    parser.add_argument(
-        "--since",
-        type=str,
-        help="Only include denials since this time (e.g., 'yesterday', 'today', '2025-01-15', '2 hours ago').",
-    )
-    parser.add_argument(
-        "--until",
-        type=str,
-        help="Only include denials until this time (e.g., 'today', '2025-01-15 14:30').",
-    )
-    parser.add_argument(
-        "--source",
-        type=str,
-        help="Filter by source context pattern (e.g., 'httpd_t', '*unconfined*', 'system_r').",
-    )
-    parser.add_argument(
-        "--target",
-        type=str,
-        help="Filter by target context pattern (e.g., 'default_t', '*var_lib*').",
-    )
-    parser.add_argument(
+
+    # Advanced Options
+    advanced_group = parser.add_argument_group('Advanced Options')
+    advanced_group.add_argument(
         "--legacy-signatures",
         action="store_true",
         help="Use legacy signature logic for regression testing (disables smart deduplication).",
-    )
-    parser.add_argument(
-        "--expand-groups",
-        action="store_true",
-        help="Show individual events instead of resource-based groupings (disables smart event grouping).",
-    )
-    parser.add_argument(
-        "--pager",
-        action="store_true",
-        help="Use interactive pager for large outputs (like 'less' command).",
     )
     args = parser.parse_args()
 
@@ -2775,6 +3198,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     "dest_port",
                     "permissive",
                     "proctitle",
+                    "tclass",  # Collect tclass to handle file/dir mixing in same signature
                 ]
                 for field in varying_fields:
                     if field in parsed_log and parsed_log[field] not in [
@@ -2822,6 +3246,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     "dest_port",
                     "permissive",
                     "proctitle",
+                    "tclass",  # Collect tclass to handle file/dir mixing in same signature
                 ]
                 for field in varying_fields:
                     if field in parsed_log and parsed_log[field] not in [
@@ -3218,14 +3643,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 console,
                                 denial_info,
                                 i + 1,
-                                expand_groups=args.expand_groups,
                             )
                         else:  # brief format (default)
                             display_report_brief_format(
                                 console,
                                 denial_info,
                                 i + 1,
-                                expand_groups=args.expand_groups,
                             )
                     else:
                         print_rich_summary(
@@ -3233,7 +3656,6 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             denial_info,
                             i + 1,
                             detailed=args.detailed,
-                            expand_groups=args.expand_groups,
                         )
 
                 # Show filtering info in final summary if applicable
@@ -3611,14 +4033,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                         pager_console,
                                         denial_info,
                                         i + 1,
-                                        expand_groups=args.expand_groups,
                                     )
                                 else:  # brief format (default)
                                     display_report_brief_format(
                                         pager_console,
                                         denial_info,
                                         i + 1,
-                                        expand_groups=args.expand_groups,
                                     )
                             else:
                                 print_rich_summary(
@@ -3626,7 +4046,6 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     denial_info,
                                     i + 1,
                                     detailed=args.detailed,
-                                    expand_groups=args.expand_groups,
                                 )
 
                         # Final summary

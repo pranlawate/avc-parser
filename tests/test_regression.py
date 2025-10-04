@@ -405,5 +405,173 @@ type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pi
             self.assertIsInstance(denial["ino"], str)  # Inode numbers stored as strings
 
 
+class TestFieldExtractionRegression(unittest.TestCase):
+    """
+    Regression tests for field extraction from AVC and USER_AVC records.
+
+    These tests ensure that all fields are properly extracted from audit logs,
+    especially when processed with ausearch -i (which strips quotes from some fields).
+
+    This test class was added after discovering that exe fields were not being
+    extracted from USER_AVC messages because ausearch -i strips quotes.
+    """
+
+    def test_exe_extraction_from_user_avc_unquoted(self):
+        """Test exe extraction from USER_AVC with unquoted exe (ausearch -i format)."""
+        # This is the format after ausearch -i processing (no quotes around exe)
+        line = """type=USER_AVC msg=audit(06/18/2025 09:12:51.190:456): pid=446 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  denied  { send_msg } for msgtype=method_return dest=:1.485 spid=450 tpid=5571 scontext=system_u:system_r:avahi_t:s0 tcontext=system_u:system_r:system_cronjob_t:s0-s0:c0.c1023 tclass=dbus permissive=0 exe=/usr/bin/dbus-daemon sauid=81 hostname=? addr=? terminal=?'"""
+
+        denials, _ = parse_avc_log(line)
+
+        self.assertEqual(len(denials), 1)
+        denial = denials[0]
+
+        # Critical: exe field must be extracted even without quotes
+        self.assertIn("exe", denial)
+        self.assertEqual(denial["exe"], "/usr/bin/dbus-daemon")
+
+    def test_exe_extraction_from_user_avc_quoted(self):
+        """Test exe extraction from USER_AVC with quoted exe (raw audit.log format)."""
+        # This is the raw format before ausearch -i processing (with quotes)
+        line = """type=USER_AVC msg=audit(1756368016.062:1195): pid=446 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  denied  { send_msg } for msgtype=method_return dest=:1.485 spid=450 tpid=5571 scontext=system_u:system_r:avahi_t:s0 tcontext=system_u:system_r:system_cronjob_t:s0-s0:c0.c1023 tclass=dbus permissive=0  exe="/usr/bin/dbus-daemon" sauid=81 hostname=? addr=? terminal=?'"""
+
+        denials, _ = parse_avc_log(line)
+
+        self.assertEqual(len(denials), 1)
+        denial = denials[0]
+
+        # Must extract exe from quoted format too
+        self.assertIn("exe", denial)
+        self.assertEqual(denial["exe"], "/usr/bin/dbus-daemon")
+
+    def test_comm_extraction_quoted_and_unquoted(self):
+        """Test comm extraction from both quoted and unquoted formats."""
+        # Quoted format
+        line_quoted = """type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pid=1234 comm="httpd" path="/var/www/html/index.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0"""
+
+        denials, _ = parse_avc_log(line_quoted)
+        self.assertEqual(len(denials), 1)
+        self.assertEqual(denials[0]["comm"], "httpd")
+
+        # Unquoted format (some logs have this)
+        line_unquoted = """type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pid=1234 comm=httpd path="/var/www/html/index.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0"""
+
+        denials, _ = parse_avc_log(line_unquoted)
+        self.assertEqual(len(denials), 1)
+        self.assertEqual(denials[0]["comm"], "httpd")
+
+    def test_proctitle_extraction_quoted_and_unquoted(self):
+        """Test proctitle extraction from both quoted and unquoted formats."""
+        # Quoted format
+        line_quoted = """type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pid=1234 comm="httpd" proctitle="/usr/sbin/httpd" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0"""
+
+        denials, _ = parse_avc_log(line_quoted)
+        self.assertEqual(len(denials), 1)
+        self.assertIn("proctitle", denials[0])
+        self.assertEqual(denials[0]["proctitle"], "/usr/sbin/httpd")
+
+        # Unquoted format (ausearch -i might strip quotes)
+        line_unquoted = """type=AVC msg=audit(06/18/2025 09:12:51.190:4997970): avc: denied { read } for pid=1234 comm="httpd" proctitle=/usr/sbin/httpd scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0"""
+
+        denials, _ = parse_avc_log(line_unquoted)
+        self.assertEqual(len(denials), 1)
+        self.assertIn("proctitle", denials[0])
+        self.assertEqual(denials[0]["proctitle"], "/usr/sbin/httpd")
+
+    def test_correlation_event_includes_exe_and_proctitle(self):
+        """Test that correlation events include exe and proctitle for fallback logic."""
+        from parse_avc import build_correlation_event
+
+        parsed_log = {
+            "pid": "1234",
+            "comm": "httpd",
+            "exe": "/usr/sbin/httpd",
+            "proctitle": "/usr/sbin/httpd -D FOREGROUND",
+            "path": "/var/www/html/index.html",
+            "permission": "read",
+            "permissive": "0",
+            "datetime_str": "2025-06-18 09:12:51",
+            "tclass": "file",
+        }
+
+        correlation = build_correlation_event(parsed_log, "read")
+
+        # Verify exe and proctitle are included in correlation event
+        self.assertIn("exe", correlation)
+        self.assertEqual(correlation["exe"], "/usr/sbin/httpd")
+        self.assertIn("proctitle", correlation)
+        self.assertEqual(correlation["proctitle"], "/usr/sbin/httpd -D FOREGROUND")
+
+        # Also verify other expected fields
+        self.assertIn("pid", correlation)
+        self.assertIn("comm", correlation)
+        self.assertIn("path", correlation)
+        self.assertIn("permission", correlation)
+
+    def test_all_fields_extracted_from_user_avc(self):
+        """Test comprehensive field extraction from USER_AVC message."""
+        line = """type=USER_AVC msg=audit(06/18/2025 09:12:51.190:456): pid=446 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  denied  { send_msg } for msgtype=method_return dest=:1.485 spid=450 tpid=5571 scontext=system_u:system_r:avahi_t:s0 tcontext=system_u:system_r:system_cronjob_t:s0-s0:c0.c1023 tclass=dbus permissive=0 exe=/usr/bin/dbus-daemon sauid=81 hostname=? addr=? terminal=?'"""
+
+        denials, _ = parse_avc_log(line)
+        self.assertEqual(len(denials), 1)
+        denial = denials[0]
+
+        # Verify all critical fields are extracted
+        expected_fields = {
+            "pid": "446",  # Outer PID takes precedence
+            "uid": "81",
+            "denial_type": "USER_AVC",
+            "permission": "send_msg",
+            "tclass": "dbus",
+            "permissive": "0",
+            "exe": "/usr/bin/dbus-daemon",
+            "dest_port": ":1.485",  # D-Bus destination
+        }
+
+        for field, expected_value in expected_fields.items():
+            self.assertIn(field, denial, f"Field '{field}' missing from USER_AVC denial")
+            self.assertEqual(denial[field], expected_value, f"Field '{field}' has wrong value")
+
+        # Verify contexts
+        self.assertIn("scontext", denial)
+        self.assertIn("tcontext", denial)
+
+    def test_varying_fields_collection(self):
+        """Test that varying fields (tclass, exe, proctitle) are collected in unique denials."""
+        # This test would require access to the main() function's denial aggregation logic
+        # For now, we test that individual parsing collects these fields
+
+        line1 = """type=AVC msg=audit(06/18/2025 09:12:51.190:1): avc: denied { read } for pid=1234 comm="test" exe="/usr/bin/test" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0"""
+        line2 = """type=AVC msg=audit(06/18/2025 09:12:52.190:2): avc: denied { read } for pid=5678 comm="test" exe="/usr/bin/test2" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=dir permissive=0"""
+
+        denials, _ = parse_avc_log(f"{line1}\n{line2}")
+
+        self.assertEqual(len(denials), 2)
+
+        # Verify first denial has file tclass
+        self.assertEqual(denials[0]["tclass"], "file")
+        self.assertEqual(denials[0]["exe"], "/usr/bin/test")
+
+        # Verify second denial has dir tclass and different exe
+        self.assertEqual(denials[1]["tclass"], "dir")
+        self.assertEqual(denials[1]["exe"], "/usr/bin/test2")
+
+    def test_exe_fallback_when_comm_missing(self):
+        """Test that exe is used as fallback when comm is missing."""
+        # USER_AVC without comm field (common in D-Bus denials)
+        line = """type=USER_AVC msg=audit(06/18/2025 09:12:51.190:456): pid=446 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  denied  { send_msg } for msgtype=method_return dest=:1.485 scontext=system_u:system_r:avahi_t:s0 tcontext=system_u:system_r:system_cronjob_t:s0-s0:c0.c1023 tclass=dbus permissive=0 exe=/usr/bin/dbus-daemon sauid=81'"""
+
+        denials, _ = parse_avc_log(line)
+        self.assertEqual(len(denials), 1)
+        denial = denials[0]
+
+        # comm should not be in the denial (not in the log)
+        self.assertNotIn("comm", denial)
+
+        # But exe should be extracted
+        self.assertIn("exe", denial)
+        self.assertEqual(denial["exe"], "/usr/bin/dbus-daemon")
+
+
 if __name__ == "__main__":
     unittest.main()

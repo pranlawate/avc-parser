@@ -119,6 +119,11 @@ class PermissionSemanticAnalyzer:
         "lock": "Lock file for exclusive access",
         "ioctl": "Perform device control operations",
         "map": "Memory map file",
+        # Key/Security permissions
+        "view": "View security key information",
+        "link": "Link security key",
+        "setattr_key": "Set key attributes",
+        "search_key": "Search for key",
         # Network permissions
         "name_connect": "Connect to network service",
         "name_bind": "Bind to network port",
@@ -193,6 +198,45 @@ class PermissionSemanticAnalyzer:
         return cls.PERMISSION_DESCRIPTIONS.get(permission, permission)
 
     @classmethod
+    def get_permission_description_with_context(cls, permission: str, resource_type: str) -> str:
+        """
+        Get context-aware human-readable description for a permission.
+
+        Args:
+            permission: The permission name (e.g., 'read', 'write', 'getattr')
+            resource_type: The resource type (e.g., 'file', 'directory')
+
+        Returns:
+            Context-aware description string
+        """
+        # Context-aware permission descriptions for file vs directory
+        context_descriptions = {
+            ("read", "directory"): "Read directory content",
+            ("read", "file"): "Read file content",
+            ("write", "directory"): "Modify directory entries (add/remove files)",
+            ("write", "file"): "Modify file content",
+            ("getattr", "directory"): "Read directory attributes",
+            ("getattr", "file"): "Read file attributes",
+            ("setattr", "directory"): "Set directory attributes",
+            ("setattr", "file"): "Set file attributes",
+            ("search", "directory"): "Search directory",
+            ("open", "directory"): "Open directory",
+            ("open", "file"): "Open file",
+            ("add_name", "directory"): "Add entry to directory",
+            ("remove_name", "directory"): "Remove entry from directory",
+            ("rename", "directory"): "Rename directory entry",
+            ("rmdir", "directory"): "Remove directory",
+        }
+
+        # Try context-specific description first
+        context_key = (permission, resource_type)
+        if context_key in context_descriptions:
+            return context_descriptions[context_key]
+
+        # Fall back to generic description
+        return cls.PERMISSION_DESCRIPTIONS.get(permission, permission)
+
+    @classmethod
     def get_class_description(cls, obj_class: str) -> str:
         """Get human-readable description for an object class."""
         return cls.CLASS_DESCRIPTIONS.get(obj_class, obj_class)
@@ -235,6 +279,8 @@ class PermissionSemanticAnalyzer:
         context_patterns = {
             ("read", "file"): f"{source_desc} attempting to read file content",
             ("write", "file"): f"{source_desc} attempting to modify file content",
+            ("write", "dir"): f"{source_desc} attempting to modify directory entries",
+            ("read", "dir"): f"{source_desc} attempting to read directory content",
             ("execute", "file"): f"{source_desc} attempting to run executable",
             ("open", "file"): f"{source_desc} attempting to open file",
             ("create", "file"): f"{source_desc} attempting to create new file",
@@ -271,6 +317,9 @@ class PermissionSemanticAnalyzer:
                 "transition",
                 "process",
             ): f"{source_desc} attempting to change security context",
+            ("view", "key"): f"{source_desc} attempting to view security key",
+            ("link", "key"): f"{source_desc} attempting to link security key",
+            ("search", "key"): f"{source_desc} attempting to search for security key",
         }
 
         # Look for specific pattern match

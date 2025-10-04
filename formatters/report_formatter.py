@@ -14,7 +14,6 @@ def display_report_sealert_format(
     console: Console,
     denial_info: dict,
     denial_num: int,
-    expand_groups: bool = False,
 ):
     """
     Display denial information in sealert-inspired technical report format.
@@ -26,7 +25,6 @@ def display_report_sealert_format(
         console (Console): Rich console object for formatted output
         denial_info (dict): Aggregated denial information with correlation data
         denial_num (int): Sequential denial number for display
-        expand_groups (bool): Whether to show individual events instead of grouped view
     """
     parsed_log = denial_info["log"]
     count = denial_info["count"]
@@ -208,7 +206,6 @@ def display_report_brief_format(
     console: Console,
     denial_info: dict,
     denial_num: int,
-    expand_groups: bool = False,
 ):
     """
     Display denial information in executive brief format for management reporting.
@@ -220,7 +217,6 @@ def display_report_brief_format(
         console (Console): Rich console object for formatted output
         denial_info (dict): Aggregated denial information with correlation data
         denial_num (int): Sequential denial number for display
-        expand_groups (bool): Whether to show individual events instead of grouped view
     """
     parsed_log = denial_info["log"]
     count = denial_info["count"]
@@ -371,25 +367,6 @@ def display_report_brief_format(
 
     console.print(f"STATUS: {status}")
     console.print("=" * 80)
-    console.print()
-
-    # REMEDIATION: Technical guidance
-    console.print("REMEDIATION:")
-
-    # Generate sesearch command with aggregated permissions
-    sesearch_log = parsed_log.copy()
-    if (
-        "permissions" in denial_info
-        and denial_info["permissions"]
-        and len(denial_info["permissions"]) > 1
-    ):
-        # Use aggregated permissions for more complete sesearch command
-        permissions_list = sorted(list(denial_info["permissions"]))
-        sesearch_log["permission"] = " ".join(permissions_list)
-
-    sesearch_command = generate_sesearch_command(sesearch_log)
-    console.print(f"$ {sesearch_command}")
-    console.print("$ # If no rules exist, create custom policy or fix file contexts")
 
     # Security notice for permissive mode
     if is_permissive:
