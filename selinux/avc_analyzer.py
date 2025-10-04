@@ -5,19 +5,12 @@ Provides object-oriented interface while leveraging existing functional implemen
 
 import os
 import json
+import subprocess
+import tempfile
 from typing import Dict, List, Optional
 from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
-
-# Import our existing functional modules
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from validators.file_validator import validate_file_path
-from utils.file_utils import read_audit_log, detect_format
-from detectors.anomaly_detector import detect_anomalies
-from formatters.report_formatter import format_brief_report, format_sealert_report
 
 
 class AVCAnalyzer:
@@ -44,6 +37,10 @@ class AVCAnalyzer:
         self.console = Console()
         self.denials = []
         self.summary = {}
+        self.parser_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "parse_avc.py"
+        )
 
     def analyze_avc_denials(self) -> bool:
         """
@@ -57,25 +54,38 @@ class AVCAnalyzer:
             return False
 
         try:
-            # Use our existing functional code
-            from parse_avc import parse_audit_log, process_denials
+            # Run parse_avc.py with JSON output to get structured data
+            result = subprocess.run(
+                ["python3", self.parser_path, "--file", self.audit_log, "--json"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
 
-            # Parse audit log
-            raw_denials = parse_audit_log(self.audit_log)
+            if result.returncode != 0:
+                if "No AVC events found" in result.stdout or "No AVC events found" in result.stderr:
+                    rprint("[green]No SELinux AVC denials found - system is compliant[/green]")
+                    return True
+                else:
+                    self.console.print(f"[red]Error running AVC parser: {result.stderr}[/red]")
+                    return False
 
-            if not raw_denials:
+            # Parse JSON output
+            data = json.loads(result.stdout)
+            self.denials = data.get("unique_denials", [])
+
+            if not self.denials:
                 rprint("[green]No SELinux AVC denials found - system is compliant[/green]")
                 return True
 
-            # Process and store results
-            self.denials = process_denials(raw_denials)
             self._generate_summary()
-
-            # Display results
             self._display_summary_table()
 
             return True
 
+        except json.JSONDecodeError as e:
+            self.console.print(f"[red]Error parsing AVC data: {e}[/red]")
+            return False
         except Exception as e:
             self.console.print(f"[red]Error analyzing AVC denials: {e}[/red]")
             return False
@@ -97,15 +107,14 @@ class AVCAnalyzer:
         Get high-priority denials requiring immediate attention
 
         Returns:
-            list: Critical denial events
+            list: Critical denial events (denials with high occurrence counts)
         """
-        # Use our existing anomaly detector
-        anomalies = detect_anomalies(self.denials)
-        return [d for d in self.denials if d.get('is_anomaly', False)]
+        # Consider denials with count > 10 as critical
+        return [d for d in self.denials if d.get('count', 0) > 10]
 
     def generate_brief_report(self) -> str:
         """
-        Generate executive summary report
+        Generate executive summary report using parse_avc.py --report brief
 
         Returns:
             str: Brief report text
@@ -113,11 +122,20 @@ class AVCAnalyzer:
         if not self.denials:
             return "No SELinux denials detected"
 
-        return format_brief_report(self.denials, self.summary)
+        try:
+            result = subprocess.run(
+                ["python3", self.parser_path, "--file", self.audit_log, "--report", "brief"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            return result.stdout if result.returncode == 0 else "Error generating brief report"
+        except Exception:
+            return "Error generating brief report"
 
     def generate_technical_report(self) -> str:
         """
-        Generate detailed technical report with remediation steps
+        Generate detailed technical report with remediation steps using parse_avc.py --report sealert
 
         Returns:
             str: Technical sealert-style report
@@ -125,14 +143,33 @@ class AVCAnalyzer:
         if not self.denials:
             return "No SELinux denials detected"
 
-        return format_sealert_report(self.denials, self.summary)
+        try:
+            result = subprocess.run(
+                ["python3", self.parser_path, "--file", self.audit_log, "--report", "sealert"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            return result.stdout if result.returncode == 0 else "Error generating technical report"
+        except Exception:
+            return "Error generating technical report"
 
     def _generate_summary(self):
         """Generate summary statistics from denials"""
+        # Extract process names from log data
+        processes = set()
+        target_types = set()
+        for denial in self.denials:
+            log = denial.get('log', {})
+            if 'comm' in log:
+                processes.add(log['comm'])
+            if 'tcontext_type' in log:
+                target_types.add(log['tcontext_type'])
+
         self.summary = {
             "total_denials": len(self.denials),
-            "unique_types": len(set(d.get('tcontext_type', '') for d in self.denials)),
-            "processes": len(set(d.get('comm', '') for d in self.denials)),
+            "unique_types": len(target_types),
+            "processes": len(processes),
             "critical_count": len(self.get_critical_denials())
         }
 
