@@ -215,7 +215,7 @@ Showing 2 of 45 unique denials after filtering.
 
 ## 🔧 **Process Name Resolution Examples**
 
-### Improved Contextual Analysis (Version 1.5.0+)
+### Improved Contextual Analysis
 The tool now uses actual process names instead of SELinux type descriptions in contextual analysis:
 
 ```bash
@@ -453,7 +453,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --sort chrono --detailed
 python3 parse_avc.py --file /var/log/audit/audit.log --sort recent
 
 # Detailed individual event analysis (disable grouping)
-python3 parse_avc.py --file /var/log/audit/audit.log --expand-groups --detailed
+python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 ```
 
 ## 💡 **Advanced Usage Tips**
@@ -499,4 +499,4 @@ python3 parse_avc.py --file audit.log | grep "PID"
 - [ROADMAP.md](ROADMAP.md) - Development roadmap and features
 - [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) - Feature scope and decisions
 
-**SELinux AVC Denial Analyzer v1.6.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators

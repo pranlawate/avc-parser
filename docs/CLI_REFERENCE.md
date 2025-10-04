@@ -20,7 +20,7 @@ This document provides comprehensive reference information for using the SELinux
 ### Display Mode Options (Mutually Exclusive)
 | Mode | Description | Compatible Modifiers |
 |------|-------------|----------------------|
-| **Default Rich** | Professional terminal display with panels and colors | `--detailed`, `--expand-groups`, `--pager` |
+| **Default Rich** | Professional terminal display with panels and colors | `--detailed`, `--pager` |
 | `--report [brief\|sealert]` | Professional text formats: `brief` (executive summaries), `sealert` (technical analysis) | `--pager` |
 | `--fields` | Field-by-field technical breakdown for deep-dive analysis | `--pager` |
 | `--json` | Machine-readable structured output | Works with all filtering options |
@@ -31,7 +31,6 @@ This document provides comprehensive reference information for using the SELinux
 | Modifier | Description | Compatible With |
 |----------|-------------|-----------------|
 | `--detailed` | Enhanced view with expanded correlation events and context | Default Rich mode only |
-| `--expand-groups` | Show individual events instead of resource-based groupings | Default Rich mode only |
 | `--pager` | Interactive pager for large outputs (like 'less' command) | All display modes |
 
 ### Filtering & Sorting Options
@@ -49,7 +48,6 @@ This document provides comprehensive reference information for using the SELinux
 | Option | Description |
 |--------|-------------|
 | `--legacy-signatures` | Use legacy signature logic for regression testing (disables smart deduplication) |
-| `--expand-groups` | Show individual events instead of resource-based groupings (disables smart event grouping) |
 | `--pager` | Use interactive pager for large outputs (like 'less' command) - only works in terminal environments |
 | `-h, --help` | Show help message |
 
@@ -87,10 +85,8 @@ python3 parse_avc.py --file audit.log --json
 
 ### Display Modifier Examples
 ```bash
-# Rich mode modifiers (--detailed and --expand-groups work together)
+# Rich mode with detailed view
 python3 parse_avc.py --file audit.log --detailed
-python3 parse_avc.py --file audit.log --expand-groups
-python3 parse_avc.py --file audit.log --detailed --expand-groups
 
 # Interactive pager (works with all modes)
 python3 parse_avc.py --file audit.log --pager
@@ -102,7 +98,7 @@ python3 parse_avc.py --file audit.log --fields --pager
 ### Argument Combination Rules
 ```bash
 # Valid Rich mode combinations
-python3 parse_avc.py --file audit.log --detailed --expand-groups --pager
+python3 parse_avc.py --file audit.log --detailed --pager
 
 # Standalone modes (no meaningful modifiers except --pager)
 python3 parse_avc.py --file audit.log --report brief --pager
@@ -161,9 +157,6 @@ python3 parse_avc.py --file audit.log --pager --detailed
 
 # Use pager with filtering for focused review
 python3 parse_avc.py --file audit.log --pager --process httpd --since yesterday
-
-# Show individual events instead of groups
-python3 parse_avc.py --file audit.log --expand-groups
 
 # Use legacy signature logic for testing
 python3 parse_avc.py --file audit.log --legacy-signatures
@@ -229,8 +222,11 @@ python3 parse_avc.py --file audit.log --since "2025-01-15 08:00" --until "2025-0
 
 ### Action Details
 - **Denial Type**:
-  - `Kernel AVC` - Standard kernel access vector cache denial
-  - `Userspace AVC` - Userspace application denial
+  - `Kernel AVC` - Standard kernel access vector cache denial (AVC)
+  - `Userspace AVC` - Userspace application denial (USER_AVC)
+  - `File Access Notification` - FANOTIFY denial
+  - `Kernel Security Error` - SELinux error (SELINUX_ERR, USER_SELINUX_ERR)
+  - `Policy Reload` - MAC_POLICY_LOAD event (informational)
 - **Syscall**: System call that triggered the denial (e.g., `openat`, `connect`)
 - **Permission**: Specific permission that was denied with human-readable description
   - Example: `read (Read file content)`
@@ -322,7 +318,7 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 
 ### JSON Format Structure
 
-> **🔬 Enhanced JSON Normalization**: Version 1.5.0 includes comprehensive field normalization, two-tier report system, and SELinux policy investigation commands for reliable tool integration, SIEM compatibility, and automated analysis workflows.
+> **🔬 Enhanced JSON Normalization**: Comprehensive field normalization, two-tier report system, and SELinux policy investigation commands for reliable tool integration, SIEM compatibility, and automated analysis workflows.
 
 #### Core Structure
 ```json
@@ -429,7 +425,7 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 ### Performance Optimization
 - **Large Files**: For audit.log files >100MB, consider using `ausearch` to pre-filter by time range:
   ```bash
-  ausearch -m AVC -ts today | python3 parse_avc.py
+  ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts today | python3 parse_avc.py
   ```
 - **Memory Usage**: Use `--json` output for processing large datasets programmatically
 - **Large Outputs**: Use pipe redirection for easier navigation:
@@ -527,11 +523,11 @@ python3 parse_avc.py --file audit.log | wc -l
 #### Time-Based Analysis
 ```bash
 # Create filtered audit log for specific time period
-ausearch -m AVC -ts today > today_avc.log
+ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts today > today_avc.log
 python3 parse_avc.py --file today_avc.log
 
 # Analyze recent activity (last hour)
-ausearch -m AVC -ts recent > recent_avc.log
+ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts recent > recent_avc.log
 python3 parse_avc.py --file recent_avc.log --sort recent
 ```
 
@@ -573,4 +569,4 @@ Look for these indicators in the output:
 
 ---
 
-**SELinux AVC Denial Analyzer v1.6.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators
