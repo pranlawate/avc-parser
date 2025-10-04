@@ -11,7 +11,133 @@ This document maintains a comprehensive record of all feature decisions, includi
 
 ---
 
-## Recent Implementation Updates (Phase 8C)
+## Recent Implementation Updates (Phase 11)
+
+### ✅ COMPLETED: Phase 11E - Code Quality & Development Tooling
+**Implementation**: Modern development workflow with automated quality checks
+**Technical Details**:
+- **Code Quality Cleanup**: Removed 9 unused imports, created constants (SUPPORTED_AVC_TYPES, SELINUX_ERROR_TYPES), extracted helper functions (is_selinux_error_type, context_to_str, is_valid_denial_record)
+- **Pylint Rating**: Improved from 9.x to 10.00/10 with zero issues
+- **Modern Configuration**: Created pyproject.toml with project metadata, dependencies, and dev tool configuration
+- **Ruff Linting/Formatting**: Line-length 100, Python 3.8+ target, auto-fix enabled, consistent code style
+- **Pytest Framework**: Test discovery, markers, strict configuration, verbose output
+- **Coverage Reporting**: Baseline 19.15% source code coverage established with HTML reports
+- **.gitignore Updates**: Added coverage artifacts (htmlcov/, .coverage, .pytest_cache/)
+**Impact**: Professional development workflow with automated quality checks and baseline metrics
+**Quality Metrics**: 169 tests passing, 10.00/10 pylint rating, ruff clean
+**Date**: 2025-10-05 (Phase 11E)
+**Status**: COMPLETED
+
+**Decision Process for Phase 11E**:
+
+1. **✅ ACCEPTED: Awesome-Python Tool Analysis**
+   - **Decision**: Analyze awesome-python repository for high-ROI development tools
+   - **Top Recommendations**: ruff (High ROI/Easy), pytest (High ROI/Easy), coverage (High ROI/Easy), pydantic (Medium ROI/Medium), click (Medium ROI/Medium)
+   - **Key Insight**: Tools that only import in code add user dependencies; dev tools don't
+   - **Rationale**: Systematic evaluation ensures maximum value with minimal overhead
+
+2. **✅ ACCEPTED: Ruff for Linting and Formatting**
+   - **Decision**: Use ruff as unified linter/formatter (replaces pylint + black + isort)
+   - **Configuration**: Line-length 100, Python 3.8+, E/F/W/I/N/UP rules, auto-fix enabled
+   - **Validation**: Found 7 issues, auto-fixed 6, manually fixed 1 (unused exe_path)
+   - **Rationale**: 197x faster than multi-tool workflow, already installed but unconfigured
+
+3. **✅ ACCEPTED: Pytest as Testing Framework**
+   - **Decision**: Adopt pytest with markers and strict configuration
+   - **Validation**: All 169 tests pass before adding to pyproject.toml
+   - **Rationale**: Modern framework with better discovery and ecosystem
+
+4. **✅ ACCEPTED: Coverage Reporting with Baseline (No Thresholds)**
+   - **Decision**: Enable coverage to establish 19.15% baseline without enforcement
+   - **Coverage Analysis**: Core logic well-tested, display/CLI less critical and harder to test
+   - **Approach**: Monitor trends, improve organically (not mandate arbitrary targets)
+   - **Rationale**: Visibility without blocking development; htmlcov/ added to .gitignore
+
+5. **✅ ACCEPTED: pyproject.toml for Modern Configuration**
+   - **Decision**: Use pyproject.toml as centralized config (not publishing to PyPI)
+   - **Clarification**: pyproject.toml ≠ PyPI (user initially confused these)
+   - **Contents**: Metadata, dependencies (rich>=10.0.0), dev tools (ruff, pytest, coverage)
+   - **Rationale**: Modern Python standard (PEP 518), single source of truth
+
+6. **❌ REJECTED: Pydantic for Data Validation**
+   - **Reason**: Adds runtime dependency users must install
+   - **Project Philosophy**: Minimize user dependencies (keep only rich>=10.0.0)
+   - **Alternative**: Continue with dict-based structures and manual validation
+
+7. **❌ REJECTED: Click for CLI Framework**
+   - **Reason**: Adds runtime dependency, requires rewriting existing argparse CLI
+   - **Project Philosophy**: argparse is stdlib (zero dependencies)
+   - **ROI Analysis**: Medium ROI doesn't justify user dependency addition
+
+8. **❌ REJECTED: Mypy for Static Type Checking**
+   - **Reason**: User explicitly ruled out "mypy hosted package" (note: user meant PyPI)
+   - **Alternative**: Rely on ruff's pyupgrade rules for Python modernization
+
+9. **✅ ACCEPTED: Quick Wins Code Cleanup**
+   - **Actions**: Removed 9 unused imports, created constants, extracted helper functions
+   - **Result**: Pylint 10.00/10, ruff clean
+   - **Rationale**: Low-effort, high-impact maintainability improvements
+
+10. **✅ ACCEPTED: Test-First Validation Approach**
+    - **User Requirement**: "Only add it in the file after using and making sure its working well"
+    - **Process**: Test ruff → Test pytest → Test coverage → Then add to pyproject.toml
+    - **Rationale**: Validate tools work before committing to configuration
+
+### ✅ COMPLETED: Phase 11D - Extended Audit Record Support
+**Implementation**: Support for additional SELinux audit record types beyond basic AVC
+**Technical Details**:
+- **FANOTIFY Support**: File access notification denial parsing and display
+- **SELINUX_ERR/USER_SELINUX_ERR**: Kernel and userspace SELinux error handling
+- **MAC_POLICY_LOAD**: Policy reload event tracking (informational)
+- **Specialized Display**: Error types show as 'Kernel Security Error' with invalid context, transition, target class
+- **Policy Reload Display**: Timestamp and user ID for each reload event, shown even when no denials present
+- **Context Handling**: All new types use AvcContext objects for consistency
+- **Validation Updates**: New types recognized (no duplicate warnings), MAC_POLICY_LOAD excluded from unparsed types
+**Impact**: Comprehensive SELinux audit log analysis beyond basic AVC denials
+**Testing**: All 169 tests passing with new record types, test fixtures added
+**Date**: 2025-10-04 (Phase 11D)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Phase 11C - Permissive Mode & Report Completeness
+**Implementation**: Accurate permissive mode detection and enhanced sealert reports
+**Technical Details**:
+- **Permissive Mode Counting**: Event-level counting from individual correlations (not group-level)
+- **Mixed Mode Detection**: Accurately shows both enforcing and permissive events
+- **Complete Path Display**: Sealert reports show all affected target paths (not just first)
+- **Full Raw Messages**: Display complete AVC + SYSCALL + PROCTITLE records for forensic analysis
+- **Parser Enhancement**: SYSCALL exe field extraction from unquoted ausearch format
+**Impact**: Accurate security mode reporting and complete forensic data for incident analysis
+**Testing**: 1 new test for mixed permissive mode detection (169 tests total)
+**Date**: 2025-10-04 (Phase 11C)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Phase 11B - Enhanced Detailed View & Context-Aware Analysis
+**Implementation**: Forensic-level detailed view with context-aware permission descriptions
+**Technical Details**:
+- **Per-PID/Resource Breakdown**: Timestamps, syscalls, exit codes, success/failure status in consolidated groups
+- **Context-Aware Permissions**: Descriptions vary by resource type ("write on dir" = "Modify directory entries" vs "write on file" = "Modify file content")
+- **Multiple tclass Handling**: Separate sesearch commands for each object class, collected as varying field
+- **Resource Type Separation**: Consolidation signature includes resource_type (files vs directories)
+- **Parser Fixes**: Unquoted exe/proctitle field handling for ausearch -i compatibility
+- **Correlation Enhancement**: exe, proctitle, syscall included for fallback and detailed view
+**Impact**: Enhanced forensic analysis with accurate context-aware descriptions
+**Testing**: 8 new regression tests for field extraction (168 tests total after this phase)
+**Date**: 2025-10-04 (Phase 11B)
+**Status**: COMPLETED
+
+### ✅ COMPLETED: Phase 11A - ROI Optimization & Planning
+**Implementation**: ROI analysis and scope definition for Phase 11
+**Technical Details**:
+- **ROI Analysis**: Evaluated all proposed Phase 11 tasks for impact vs effort
+- **Prioritization**: High (CI/CD, performance), Medium (validation), Low (deferred cross-platform/enterprise)
+- **Scope Reduction**: ~60% scope reduction for focused, high-impact implementation
+**Impact**: Clear roadmap with maximum ROI focus
+**Date**: 2025-09-29 (Phase 11A)
+**Status**: COMPLETED
+
+---
+
+## Previous Implementation Updates (Phase 8C)
 
 ### ✅ COMPLETED: SELinux Policy Investigation Integration (Phase 8C)
 **Implementation**: Auto-generated `sesearch` commands for seamless workflow from denial analysis to policy investigation

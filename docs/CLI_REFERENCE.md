@@ -1,10 +1,10 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.6.0** | Complete command-line reference, data fields, and troubleshooting guide with Two-Tier Professional Report System and SELinux Policy Investigation Integration
+**Version 1.7.0** | Complete command-line reference, data fields, and troubleshooting guide with Extended Audit Record Support, Context-Aware Analysis, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
-> **🎯 Production Ready v1.6.0**: Clean modular architecture with 28% code reduction, comprehensive testing, and ROI-optimized development roadmap. Tool includes advanced filtering, professional report formats, and policy investigation integration.
+> **🎯 Production Ready v1.7.0**: Phase 11 complete with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (169 tests). Clean modular architecture with advanced filtering, professional report formats, and policy investigation integration.
 
 > **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 

@@ -13,23 +13,33 @@ Version: 1.6.0
 """
 
 import argparse
-import io
-import json
 import os
 import re
 import signal
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from rich.align import Align
 from rich.console import Console, Group
 from rich.rule import Rule
 
-from selinux.context import AvcContext, PermissionSemanticAnalyzer
-
 # Local modules
-from config import AUDIT_RECORD_RE, FILE_ANALYSIS_LINES, MAX_FILE_SIZE_MB
+from config import AUDIT_RECORD_RE
+from detectors import (
+    detect_dontaudit_disabled,
+    detect_permissive_mode,
+    has_container_paths,
+    has_custom_paths,
+    has_dontaudit_indicators,
+    has_permissive_denials,
+)
+from formatters import (
+    display_report_brief_format,
+    display_report_sealert_format,
+    format_as_json,
+)
+from selinux.context import AvcContext, PermissionSemanticAnalyzer
 from utils import (
     context_matches,
     detect_file_format,
@@ -43,27 +53,80 @@ from utils import (
     signal_handler,
     sort_denials,
 )
-from validators import (
-    validate_arguments,
-    validate_avc_file,
-    validate_file_with_auto_detection,
-    validate_raw_file,
-)
-from formatters import (
-    display_report_brief_format,
-    display_report_sealert_format,
-    format_as_json,
-    normalize_json_fields,
-)
-from detectors import (
-    detect_dontaudit_disabled,
-    detect_permissive_mode,
-    has_container_paths,
-    has_custom_paths,
-    has_dontaudit_indicators,
-    has_permissive_denials,
-)
+from validators import validate_arguments
 
+# Constants for SELinux audit record types
+SUPPORTED_AVC_TYPES = (
+    "AVC",
+    "USER_AVC",
+    "AVC_PATH",
+    "FANOTIFY",
+    "SELINUX_ERR",
+    "USER_SELINUX_ERR",
+    "1400",
+    "1107",
+)
+SUPPORTED_POLICY_TYPES = ("MAC_POLICY_LOAD", "1403")
+ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES
+SELINUX_ERROR_TYPES = ("SELINUX_ERR", "USER_SELINUX_ERR")
+
+
+# Helper functions for code reuse and readability
+def is_selinux_error_type(parsed_log: dict) -> bool:
+    """
+    Check if a parsed log record is a SELINUX_ERR type.
+
+    Args:
+        parsed_log: Parsed AVC/SELINUX_ERR record dictionary
+
+    Returns:
+        bool: True if record is SELINUX_ERR or USER_SELINUX_ERR
+    """
+    return parsed_log.get("denial_type") in SELINUX_ERROR_TYPES
+
+
+def context_to_str(context) -> str | None:
+    """
+    Convert AvcContext object to string, handling None gracefully.
+
+    Args:
+        context: AvcContext object, string, or None
+
+    Returns:
+        str | None: String representation of context, or None if context is None
+    """
+    return str(context) if context else None
+
+
+def is_valid_denial_record(avc_data: dict) -> bool:
+    """
+    Check if parsed record is a valid denial/error record.
+
+    Validates that the record has either:
+    - A permission field (regular AVC)
+    - SELINUX_ERR indicators (error type, operation, invalid context)
+    - Explicit SELINUX_ERR/USER_SELINUX_ERR denial type
+
+    Args:
+        avc_data: Parsed AVC/SELINUX_ERR record dictionary
+
+    Returns:
+        bool: True if record is valid and should be processed
+    """
+    if not avc_data:
+        return False
+
+    # Regular AVC with permission
+    if "permission" in avc_data:
+        return True
+
+    # SELINUX_ERR indicators
+    error_indicators = ["selinux_error_reason", "selinux_operation", "invalid_context"]
+    if any(indicator in avc_data for indicator in error_indicators):
+        return True
+
+    # Explicit error types
+    return is_selinux_error_type(avc_data)
 
 
 def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
@@ -95,8 +158,6 @@ def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
     body_text = match.group(10) or None
 
     return True, host, record_type, event_id, body_text
-
-
 
 
 def validate_log_entry(
@@ -153,9 +214,7 @@ def validate_log_entry(
 
     # Generate warnings for malformed content
     if malformed_lines > 0:
-        warnings.append(
-            f"Found {malformed_lines} malformed or non-audit lines (skipped)"
-        )
+        warnings.append(f"Found {malformed_lines} malformed or non-audit lines (skipped)")
 
     # Check if we have any usable content
     if not valid_lines:
@@ -184,9 +243,7 @@ def validate_log_entry(
             timestamps.append(ts_match.group(1))
 
     if len(set(timestamps)) > 1:
-        warnings.append(
-            "Multiple different timestamps found - events may span different times"
-        )
+        warnings.append("Multiple different timestamps found - events may span different times")
 
     sanitized_log = "\n".join(valid_lines)
     return True, sanitized_log, warnings
@@ -242,21 +299,21 @@ def _parse_avc_log_internal(log_block: str) -> tuple[list, set]:
     shared_context = parse_timestamp_from_audit_block(log_block)
 
     # Extract shared context from non-AVC records
-    context_data, context_unparsed = extract_shared_context_from_non_avc_records(
-        log_block
-    )
+    context_data, context_unparsed = extract_shared_context_from_non_avc_records(log_block)
     shared_context.update(context_data)
     unparsed_types.update(context_unparsed)
 
     # Process each AVC, USER_AVC, FANOTIFY, and SELINUX_ERR line separately
     for line in log_block.strip().split("\n"):
         line = line.strip()
-        if re.search(r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line):
+        if re.search(
+            r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line
+        ):
             # Parse this specific AVC/SELINUX_ERR line with error handling
             try:
                 avc_data = process_individual_avc_record(line, shared_context)
-                # For SELINUX_ERR, we don't have "permission", so check for error indicators or basic context
-                if avc_data and ("permission" in avc_data or "selinux_error_reason" in avc_data or "selinux_operation" in avc_data or "invalid_context" in avc_data or avc_data.get("denial_type") in ["SELINUX_ERR", "USER_SELINUX_ERR"]):
+                # Validate record has required fields (regular AVC or SELINUX_ERR)
+                if is_valid_denial_record(avc_data):
                     avc_denials.append(avc_data)
             except Exception as parse_error:  # pylint: disable=broad-exception-caught
                 # Individual AVC parsing failed - skip this record but continue with others
@@ -312,8 +369,6 @@ def parse_timestamp_from_audit_block(log_block: str) -> dict:
     return timestamp_context
 
 
-
-
 def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, set]:
     """
     Extract shared context information from non-AVC audit records.
@@ -343,9 +398,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
             "success": r"success=(yes|no)",  # Success flag
         },
         "PROCTITLE": {"proctitle": r"proctitle=(.+)"},  # Process command line
-        "SOCKADDR": {
-            "saddr": r"saddr=([a-fA-F0-9]+)"
-        },  # Socket address info (hexadecimal format)
+        "SOCKADDR": {"saddr": r"saddr=([a-fA-F0-9]+)"},  # Socket address info (hexadecimal format)
     }
 
     # Process non-AVC lines for shared context using enhanced parsing
@@ -353,9 +406,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
         line = line.strip()
 
         # Use enhanced audit record parsing for better extraction
-        parse_succeeded, host, record_type, event_id, body_text = (
-            parse_audit_record_text(line)
-        )
+        parse_succeeded, host, record_type, event_id, body_text = parse_audit_record_text(line)
         if not parse_succeeded:
             # Fallback to simple regex for malformed lines
             match = re.search(r"type=(\w+)", line)
@@ -387,13 +438,19 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
 
                         # Try hex decode first (for raw audit.log processing)
                         try:
-                            if all(c in "0123456789ABCDEFabcdef" for c in value) and len(value) % 2 == 0:
+                            if (
+                                all(c in "0123456789ABCDEFabcdef" for c in value)
+                                and len(value) % 2 == 0
+                            ):
                                 decoded = bytes.fromhex(value).decode()
-                                decoded_with_spaces = decoded.replace('\x00', ' ')
+                                decoded_with_spaces = decoded.replace("\x00", " ")
 
                                 # Check for audit system truncation (128 char limit for proctitle)
-                                if (len(value) == 256 and len(decoded_with_spaces) == 128 and
-                                    not decoded.endswith('\x00')):
+                                if (
+                                    len(value) == 256
+                                    and len(decoded_with_spaces) == 128
+                                    and not decoded.endswith("\x00")
+                                ):
                                     decoded_with_spaces += " [TRUNCATED BY AUDIT]"
 
                                 shared_context[key] = decoded_with_spaces
@@ -414,7 +471,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                             shared_context["path"] = value.strip()
                     else:
                         shared_context[key] = value.strip()
-        elif log_type not in ("AVC", "USER_AVC", "AVC_PATH", "FANOTIFY", "SELINUX_ERR", "USER_SELINUX_ERR", "MAC_POLICY_LOAD", "1400", "1107", "1403"):
+        elif log_type not in ALL_SUPPORTED_TYPES:
             # Track unparsed types (excluding all supported AVC/SELinux-related types)
             unparsed_types.add(log_type)
 
@@ -436,7 +493,9 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
         avc_data = shared_context.copy()  # Start with shared context
 
         # Determine record type and extract content accordingly
-        record_type_match = re.search(r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line)
+        record_type_match = re.search(
+            r"type=(AVC|USER_AVC|AVC_PATH|FANOTIFY|SELINUX_ERR|USER_SELINUX_ERR|1400|1107)", line
+        )
         if not record_type_match:
             return {}
 
@@ -447,7 +506,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             # SELINUX_ERR format: security_compute_sid: invalid context ... for scontext=... tcontext=... tclass=...
             selinux_err_match = re.search(
                 r"(?:security_compute_sid|security_bounded_transition|op=\w+).*?scontext=(\S+).*?tcontext=(\S+).*?tclass=(\S+)",
-                line
+                line,
             )
             if selinux_err_match:
                 # Parse scontext into AvcContext object (same as AVC handling)
@@ -501,7 +560,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 # Parse the error message content
                 selinux_err_match = re.search(
                     r"(?:op=(\w+)).*?(?:oldcontext|scontext)=(\S+).*?(?:newcontext|tcontext)=(\S+)",
-                    err_content
+                    err_content,
                 )
                 if selinux_err_match:
                     avc_data["selinux_operation"] = selinux_err_match.group(1)
@@ -624,9 +683,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 if key in ("comm", "exe") and len(field_match.groups()) > 1:
                     # Handle comm and exe fields that can be quoted or unquoted
                     # ausearch -i strips quotes, so we need to handle both formats
-                    avc_data[key] = (
-                        field_match.group(1) or field_match.group(2)
-                    ).strip()
+                    avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
                 elif key == "path_unquoted":
                     # Only use unquoted path if we don't already have a quoted path
                     if "path" not in avc_data:
@@ -645,17 +702,27 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 elif key == "proctitle":
                     # Handle hex-encoded proctitle in AVC records (same as shared context processing)
                     # Handle quoted or unquoted proctitle
-                    raw_proctitle = (field_match.group(1) or field_match.group(2)).strip() if len(field_match.groups()) > 1 else field_match.group(1).strip()
+                    raw_proctitle = (
+                        (field_match.group(1) or field_match.group(2)).strip()
+                        if len(field_match.groups()) > 1
+                        else field_match.group(1).strip()
+                    )
                     try:
                         # Check if it's hex-encoded (all hex characters and even length)
-                        if all(c in "0123456789ABCDEFabcdef" for c in raw_proctitle) and len(raw_proctitle) % 2 == 0:
-                            decoded = bytes.fromhex(raw_proctitle).decode('utf-8', errors='ignore')
+                        if (
+                            all(c in "0123456789ABCDEFabcdef" for c in raw_proctitle)
+                            and len(raw_proctitle) % 2 == 0
+                        ):
+                            decoded = bytes.fromhex(raw_proctitle).decode("utf-8", errors="ignore")
                             # Replace null bytes with spaces (they're used as separators in proctitle)
-                            decoded_with_spaces = decoded.replace('\x00', ' ')
+                            decoded_with_spaces = decoded.replace("\x00", " ")
 
                             # Check for audit system truncation (128 char limit for proctitle)
-                            if (len(raw_proctitle) == 256 and len(decoded_with_spaces) == 128 and
-                                not decoded.endswith('\x00')):
+                            if (
+                                len(raw_proctitle) == 256
+                                and len(decoded_with_spaces) == 128
+                                and not decoded.endswith("\x00")
+                            ):
                                 # Add truncation indicator
                                 decoded_with_spaces += " [TRUNCATED BY AUDIT]"
 
@@ -686,9 +753,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 # For directories, the name is often just the directory name without full path
                 # Mark this as a partial path for better display and indicate it's incomplete
                 if avc_data.get("tclass") == "dir":
-                    avc_data["path"] = (
-                        f".../{name_value}"  # Indicate this is a partial path
-                    )
+                    avc_data["path"] = f".../{name_value}"  # Indicate this is a partial path
                     avc_data["path_type"] = "directory_name"
                 else:
                     avc_data["path"] = name_value
@@ -708,9 +773,7 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
             avc_data["path_type"] = "file_path"
 
         # Use comm as fallback for proctitle if proctitle is null or missing
-        if avc_data.get("proctitle") in ("(null)", "null", "", None) and avc_data.get(
-            "comm"
-        ):
+        if avc_data.get("proctitle") in ("(null)", "null", "", None) and avc_data.get("comm"):
             avc_data["proctitle"] = avc_data["comm"]
 
         # Add semantic analysis for enhanced user comprehension
@@ -722,10 +785,14 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
 
             # Add context-aware permission description
             # Map tclass to resource_type for context-aware descriptions
-            resource_type = "directory" if obj_class == "dir" else "file" if obj_class == "file" else None
+            resource_type = (
+                "directory" if obj_class == "dir" else "file" if obj_class == "file" else None
+            )
             if resource_type and resource_type in ["file", "directory"]:
                 avc_data["permission_description"] = (
-                    PermissionSemanticAnalyzer.get_permission_description_with_context(permission, resource_type)
+                    PermissionSemanticAnalyzer.get_permission_description_with_context(
+                        permission, resource_type
+                    )
                 )
             else:
                 avc_data["permission_description"] = (
@@ -734,41 +801,34 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
 
             # Add contextual analysis
             process_name = avc_data.get("comm")
-            avc_data["contextual_analysis"] = (
-                PermissionSemanticAnalyzer.get_contextual_analysis(
-                    permission, obj_class, source_context, target_context, process_name
-                )
+            avc_data["contextual_analysis"] = PermissionSemanticAnalyzer.get_contextual_analysis(
+                permission, obj_class, source_context, target_context, process_name
             )
 
             # Add object class description
-            avc_data["class_description"] = (
-                PermissionSemanticAnalyzer.get_class_description(obj_class)
+            avc_data["class_description"] = PermissionSemanticAnalyzer.get_class_description(
+                obj_class
             )
 
             # Add source type description if available
             if source_context and hasattr(source_context, "get_type_description"):
-                avc_data["source_type_description"] = (
-                    source_context.get_type_description()
-                )
+                avc_data["source_type_description"] = source_context.get_type_description()
 
             # Add target type description if available
             if target_context and hasattr(target_context, "get_type_description"):
-                avc_data["target_type_description"] = (
-                    target_context.get_type_description()
-                )
+                avc_data["target_type_description"] = target_context.get_type_description()
 
             # Add port description for network denials
             if avc_data.get("dest_port"):
-                avc_data["port_description"] = (
-                    PermissionSemanticAnalyzer.get_port_description(
-                        avc_data["dest_port"]
-                    )
+                avc_data["port_description"] = PermissionSemanticAnalyzer.get_port_description(
+                    avc_data["dest_port"]
                 )
 
         return avc_data
 
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         # Individual AVC parsing failed - return empty dict
+        # Note: We catch all exceptions to prevent single malformed record from breaking entire parse
         return {}
 
 
@@ -787,7 +847,7 @@ def parse_mac_policy_load_events(log_block: str) -> list:
     """
     policy_events = []
 
-    for line in log_block.strip().split('\n'):
+    for line in log_block.strip().split("\n"):
         # Match MAC_POLICY_LOAD or numeric type 1403
         if not re.search(r"type=(MAC_POLICY_LOAD|1403)", line):
             continue
@@ -798,7 +858,9 @@ def parse_mac_policy_load_events(log_block: str) -> list:
         # Raw: audit(1163776448.949:12869)
         # ausearch -i: audit(17/11/06 20:44:08.949:12869)
         ts_match_raw = re.search(r"audit\((\d+\.\d+):(\d+)\)", line)
-        ts_match_interpreted = re.search(r"audit\((\d{2}/\d{2}/\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d+):(\d+)\)", line)
+        ts_match_interpreted = re.search(
+            r"audit\((\d{2}/\d{2}/\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d+):(\d+)\)", line
+        )
 
         if ts_match_raw:
             # Raw format
@@ -907,11 +969,7 @@ def build_correlation_event(parsed_log: dict, permission: str) -> dict:
         "success": parsed_log.get("success"),
     }
     # Only store non-null values to keep correlations clean
-    return {
-        k: v
-        for k, v in correlation_event.items()
-        if v not in [None, "(null)", "null", ""]
-    }
+    return {k: v for k, v in correlation_event.items() if v not in [None, "(null)", "null", ""]}
 
 
 def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str:
@@ -934,14 +992,14 @@ def get_enhanced_permissions_display(denial_info: dict, parsed_log: dict) -> str
         # Multiple permissions case
         enhanced_perms = []
         for perm in sorted(denial_info["permissions"]):
-            if parsed_log.get("permission") == perm and parsed_log.get(
-                "permission_description"
-            ):
+            if parsed_log.get("permission") == perm and parsed_log.get("permission_description"):
                 perm_desc = parsed_log["permission_description"]
             else:
                 # Use context-aware description if we have a resource type
                 if resource_type and resource_type in ["file", "directory"]:
-                    perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(perm, resource_type)
+                    perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(
+                        perm, resource_type
+                    )
                 else:
                     perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
 
@@ -1347,18 +1405,22 @@ def validate_grouping_optimality(unique_denials: dict) -> dict:
             group_details = []
             for signature in group_signatures:
                 denial_info = unique_denials[signature]
-                group_details.append({
-                    "signature": signature,
-                    "count": denial_info["count"],
-                    "sample_process": denial_info["log"].get("comm", "unknown"),
-                    "sample_path": denial_info["log"].get("path", "unknown")
-                })
+                group_details.append(
+                    {
+                        "signature": signature,
+                        "count": denial_info["count"],
+                        "sample_process": denial_info["log"].get("comm", "unknown"),
+                        "sample_path": denial_info["log"].get("path", "unknown"),
+                    }
+                )
 
-            optimization_potential.append({
-                "sesearch_command": sesearch_cmd,
-                "duplicate_groups": group_details,
-                "merge_potential": len(group_signatures)
-            })
+            optimization_potential.append(
+                {
+                    "sesearch_command": sesearch_cmd,
+                    "duplicate_groups": group_details,
+                    "merge_potential": len(group_signatures),
+                }
+            )
 
     # Calculate efficiency metrics
     total_groups = len(unique_denials)
@@ -1370,10 +1432,8 @@ def validate_grouping_optimality(unique_denials: dict) -> dict:
         "unique_sesearch_commands": unique_commands,
         "optimization_potential": optimization_potential,
         "efficiency_score": efficiency_score,
-        "is_optimal": len(optimization_potential) == 0
+        "is_optimal": len(optimization_potential) == 0,
     }
-
-
 
 
 def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tuple:
@@ -1392,8 +1452,8 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         scontext_val = parsed_log.get("scontext")
         tcontext_val = parsed_log.get("tcontext")
         return (
-            str(scontext_val) if scontext_val else None,
-            str(tcontext_val) if tcontext_val else None,
+            context_to_str(scontext_val),
+            context_to_str(tcontext_val),
             parsed_log.get("tclass"),
             parsed_log.get("permission"),
         )
@@ -1417,7 +1477,7 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         # Filesystem objects: group by (process_category, target_type, object_group, path_pattern, permission_category)
         signature = (
             process_category,
-            str(tcontext) if tcontext else None,
+            context_to_str(tcontext),
             object_group,
             path_pattern,
             permission_category,
@@ -1427,7 +1487,7 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         dest_port = parsed_log.get("dest_port", "")
         signature = (
             process_category,
-            str(tcontext) if tcontext else None,
+            context_to_str(tcontext),
             object_group,
             dest_port,
             permission_category,
@@ -1436,7 +1496,7 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         # Other objects: use simpler grouping
         signature = (
             process_category,
-            str(tcontext) if tcontext else None,
+            context_to_str(tcontext),
             object_group,
             permission_category,
         )
@@ -1534,9 +1594,7 @@ def filter_denials(
 
         # Time range filtering
         if (since_dt or until_dt) and include_denial:
-            denial_time = denial_info.get("last_seen_obj") or denial_info.get(
-                "first_seen_obj"
-            )
+            denial_time = denial_info.get("last_seen_obj") or denial_info.get("first_seen_obj")
             if denial_time:
                 if since_dt and denial_time < since_dt:
                     include_denial = False
@@ -1559,12 +1617,6 @@ def filter_denials(
             filtered_denials.append(denial_info)
 
     return filtered_denials
-
-
-
-
-
-
 
 
 def print_summary(console: Console, denial_info: dict, denial_num: int):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -1600,9 +1652,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
 
     # Check if this denial contains permissive mode events and add indicator
     has_permissive = has_permissive_denials(denial_info)
-    permissive_indicator = (
-        " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
-    )
+    permissive_indicator = " [bright_blue]🛡️ Permissive[/bright_blue]" if has_permissive else ""
 
     header = f"[bold green]Unique Denial Group #{denial_num}[/bold green] ({count} occurrences, last seen {last_seen_ago}){dontaudit_indicator}{permissive_indicator}"
     console.print(Rule(header))
@@ -1664,11 +1714,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     for label, key in process_fields:
         # Check if we have multiple values for this field
         multi_key = f"{key}s"
-        if (
-            multi_key in denial_info
-            and denial_info[multi_key]
-            and len(denial_info[multi_key]) > 0
-        ):
+        if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
             values = ", ".join(sorted(denial_info[multi_key]))
             console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
             # Apply professional color scheme based on field type
@@ -1715,9 +1761,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
             elif key == "comm":
                 # Enhance comm display with source type description if available
                 if parsed_log.get("source_type_description"):
-                    enhanced_comm = (
-                        f"{parsed_log[key]} ({parsed_log['source_type_description']})"
-                    )
+                    enhanced_comm = f"{parsed_log[key]} ({parsed_log['source_type_description']})"
                     console.print(f"[green]{enhanced_comm}[/green]")
                 else:
                     console.print(f"[green]{parsed_log[key]}[/green]")
@@ -1778,11 +1822,7 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
     for label, key in target_fields:
         # Check if we have multiple values for this field
         multi_key = f"{key}s"
-        if (
-            multi_key in denial_info
-            and denial_info[multi_key]
-            and len(denial_info[multi_key]) > 0
-        ):
+        if multi_key in denial_info and denial_info[multi_key] and len(denial_info[multi_key]) > 0:
             values = ", ".join(sorted(denial_info[multi_key]))
             console.print(f"  [bold]{label}:[/bold]".ljust(22), end="")
             if key == "path":
@@ -1804,13 +1844,9 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                     if parsed_log.get("target_type_description"):
                         target_desc = parsed_log["target_type_description"]
                         enhanced_value = f"{display_value} ({target_desc})"
-                        console.print(
-                            f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]"
-                        )
+                        console.print(f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]")
                     else:
-                        console.print(
-                            f"[bright_cyan bold]{display_value}[/bright_cyan bold]"
-                        )
+                        console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{values}[/dim white]")
@@ -1830,16 +1866,10 @@ def print_summary(console: Console, denial_info: dict, denial_num: int):  # pyli
                 display_value = str(parsed_log[key]) if parsed_log[key] else ""
                 # Enhance with target type description if available
                 if parsed_log.get("target_type_description"):
-                    enhanced_value = (
-                        f"{display_value} ({parsed_log['target_type_description']})"
-                    )
-                    console.print(
-                        f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]"
-                    )
+                    enhanced_value = f"{display_value} ({parsed_log['target_type_description']})"
+                    console.print(f"[bright_cyan bold]{enhanced_value}[/bright_cyan bold]")
                 else:
-                    console.print(
-                        f"[bright_cyan bold]{display_value}[/bright_cyan bold]"
-                    )
+                    console.print(f"[bright_cyan bold]{display_value}[/bright_cyan bold]")
             elif key == "saddr":
                 # Socket address information
                 console.print(f"[dim white]{parsed_log[key]}[/dim white]")
@@ -1963,9 +1993,7 @@ def group_events_by_resource(correlations: list) -> dict:
                 }
 
             resource_groups[resource_key]["events"].append(event)
-            resource_groups[resource_key]["permissions"].add(
-                event.get("permission", "")
-            )
+            resource_groups[resource_key]["permissions"].add(event.get("permission", ""))
             resource_groups[resource_key]["pids"].add(event.get("pid", ""))
             resource_groups[resource_key]["comms"].add(event.get("comm", ""))
         else:
@@ -2056,11 +2084,13 @@ def consolidate_resource_groups(grouped_events: dict) -> dict:
                 for perm in group["permissions"]:
                     if perm not in resources_by_permission:
                         resources_by_permission[perm] = []
-                    resources_by_permission[perm].append({
-                        "resource": group["resource"],
-                        "resource_type": group["resource_type"],
-                        "count": group["count"]
-                    })
+                    resources_by_permission[perm].append(
+                        {
+                            "resource": group["resource"],
+                            "resource_type": group["resource_type"],
+                            "count": group["count"],
+                        }
+                    )
                 all_events.extend(group["all_events"])
 
             # Create consolidated group
@@ -2072,18 +2102,17 @@ def consolidate_resource_groups(grouped_events: dict) -> dict:
                 "resource_count": len(groups),
                 "resources_by_permission": resources_by_permission,
                 "all_events": all_events,
-                "permissions": sorted(resources_by_permission.keys())
+                "permissions": sorted(resources_by_permission.keys()),
             }
 
             consolidated_groups.append(consolidated)
 
-    return {
-        "grouped": consolidated_groups,
-        "individual": grouped_events["individual"]
-    }
+    return {"grouped": consolidated_groups, "individual": grouped_events["individual"]}
 
 
-def display_consolidated_group(console: Console, group: dict, parsed_log: dict, detailed: bool = False):
+def display_consolidated_group(
+    console: Console, group: dict, parsed_log: dict, detailed: bool = False
+):
     """
     Display a consolidated group where same PIDs access multiple resources.
 
@@ -2093,7 +2122,6 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
         parsed_log: Main denial log data for context
         detailed: Whether to show detailed view
     """
-    from rich.tree import Tree
 
     pids = group["pids"]
     comms = group["comms"]
@@ -2141,11 +2169,13 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
     # Display header with correlation info
     pid_count = len(pids)
     if perfect_correlation:
-        correlation_note = f" [dim](all PIDs access all resources)[/dim]"
+        correlation_note = " [dim](all PIDs access all resources)[/dim]"
     else:
         correlation_note = ""
 
-    console.print(f"• {pid_count} PIDs ({process_display}), {total_events} events across {resource_count} resources{correlation_note}")
+    console.print(
+        f"• {pid_count} PIDs ({process_display}), {total_events} events across {resource_count} resources{correlation_note}"
+    )
 
     # Show PID list
     pid_chunks = [pids[i : i + 8] for i in range(0, len(pids), 8)]
@@ -2155,11 +2185,11 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
         console.print(f"  {tree_symbol} {', '.join(chunk)}")
 
     # Check if any events are permissive
-    group_is_permissive = any(
-        event.get("permissive") == "1" for event in group["all_events"]
-    )
+    group_is_permissive = any(event.get("permissive") == "1" for event in group["all_events"])
     if group_is_permissive:
-        enforcement_status = "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+        enforcement_status = (
+            "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+        )
     else:
         enforcement_status = "[Enforcing] [red]✗ BLOCKED[/red]"
 
@@ -2177,9 +2207,12 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
         primary_resource_type = list(resource_types)[0] if len(resource_types) == 1 else None
 
         from selinux.context import PermissionSemanticAnalyzer
+
         # Get context-aware description if we have a single resource type
         if primary_resource_type and primary_resource_type in ["file", "directory"]:
-            perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(perm, primary_resource_type)
+            perm_desc = PermissionSemanticAnalyzer.get_permission_description_with_context(
+                perm, primary_resource_type
+            )
         else:
             perm_desc = PermissionSemanticAnalyzer.get_permission_description(perm)
 
@@ -2209,12 +2242,13 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
             else:
                 resource_display = resource
 
-            console.print(f"  {res_symbol} {resource_display} ({res_count} events) {enforcement_status}")
+            console.print(
+                f"  {res_symbol} {resource_display} ({res_count} events) {enforcement_status}"
+            )
 
     # Show Process Context once for the entire consolidated group
     console.print("")
     proctitle = parsed_log.get("proctitle", "")
-    exe_path = parsed_log.get("exe", "")
 
     # Generate contextual analysis - use first permission for context
     first_perm = sorted(resources_by_permission.keys())[0]
@@ -2240,6 +2274,7 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
     contextual_analysis = ""
     if tclass:
         from selinux.context import PermissionSemanticAnalyzer
+
         contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
             first_perm, tclass, scontext, tcontext, process_name
         )
@@ -2269,7 +2304,9 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
             is_last_pid = pid_idx == len(events_by_pid) - 1
             pid_branch = "  └─" if is_last_pid else "  ├─"
 
-            console.print(f"{pid_branch} PID {pid} ({len(pid_events)} event{'s' if len(pid_events) != 1 else ''}):")
+            console.print(
+                f"{pid_branch} PID {pid} ({len(pid_events)} event{'s' if len(pid_events) != 1 else ''}):"
+            )
 
             # Group this PID's events by resource
             events_by_resource = {}
@@ -2309,7 +2346,9 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
                 event_count = len(res_events)
 
                 console.print(f"{indent}{res_branch} {resource_display}")
-                console.print(f"{indent}   Permission: [bright_cyan]{permission}[/bright_cyan], {event_count} event{'s' if event_count != 1 else ''}")
+                console.print(
+                    f"{indent}   Permission: [bright_cyan]{permission}[/bright_cyan], {event_count} event{'s' if event_count != 1 else ''}"
+                )
 
                 # Show timestamps and syscalls for these events
                 for evt_idx, event in enumerate(res_events[:3]):  # Show first 3 events
@@ -2327,10 +2366,14 @@ def display_consolidated_group(console: Console, group: dict, parsed_log: dict, 
                         result = ""
 
                     evt_branch = "   " if evt_idx < 2 else "   "
-                    console.print(f"{indent}   {evt_branch}• {timestamp} via [dim]{syscall}[/dim] (exit={exit_code}{', ' + result if result else ''})")
+                    console.print(
+                        f"{indent}   {evt_branch}• {timestamp} via [dim]{syscall}[/dim] (exit={exit_code}{', ' + result if result else ''})"
+                    )
 
                 if event_count > 3:
-                    console.print(f"{indent}      [dim]... and {event_count - 3} more event{'s' if event_count - 3 != 1 else ''}[/dim]")
+                    console.print(
+                        f"{indent}      [dim]... and {event_count - 3} more event{'s' if event_count - 3 != 1 else ''}[/dim]"
+                    )
 
 
 def print_rich_summary(
@@ -2353,6 +2396,7 @@ def print_rich_summary(
         denial_num (int): Sequential denial number for display
     """
     from rich.panel import Panel
+
     from selinux.context import PermissionSemanticAnalyzer
 
     parsed_log = denial_info["log"]
@@ -2383,9 +2427,7 @@ def print_rich_summary(
     if has_custom:
         # Show primary pattern or "custom paths" if multiple
         if len(custom_patterns) == 1:
-            custom_indicator = (
-                f" • [bright_magenta]📁 {custom_patterns[0]}[/bright_magenta]"
-            )
+            custom_indicator = f" • [bright_magenta]📁 {custom_patterns[0]}[/bright_magenta]"
         else:
             custom_indicator = " • [bright_magenta]📁 custom paths[/bright_magenta]"
         header_bionic += custom_indicator
@@ -2437,9 +2479,7 @@ def print_rich_summary(
             # Different days - show full range
             timestamp_display = f"{first_seen_str} – {last_seen_str}"
 
-        when_what_content.append(
-            f"[bold white]{timestamp_display}[/bold white]{avc_type_suffix}"
-        )
+        when_what_content.append(f"[bold white]{timestamp_display}[/bold white]{avc_type_suffix}")
     elif parsed_log.get("datetime_str"):
         # Single occurrence
         when_what_content.append(
@@ -2450,11 +2490,7 @@ def print_rich_summary(
     permissions_display = get_enhanced_permissions_display(denial_info, parsed_log)
 
     # Handle multiple tclasses (e.g., file and dir in same denial group)
-    if (
-        "tclasss" in denial_info
-        and denial_info["tclasss"]
-        and len(denial_info["tclasss"]) > 1
-    ):
+    if "tclasss" in denial_info and denial_info["tclasss"] and len(denial_info["tclasss"]) > 1:
         # Multiple tclasses - show all of them
         tclass_list = sorted(list(denial_info["tclasss"]))
         # Map to descriptions if available
@@ -2481,9 +2517,7 @@ def print_rich_summary(
     if when_what_content:
         # Center each line individually for proper alignment
         centered_lines = [Align.center(line) for line in when_what_content]
-        panel_content = Panel(
-            Group(*centered_lines), border_style="dim", padding=(0, 3)
-        )
+        panel_content = Panel(Group(*centered_lines), border_style="dim", padding=(0, 3))
         # Responsive width: minimum 60% of screen, maximum 120 characters
         panel_width = min(max(int(console.width * 0.6), 60), 120)
         console.print(Align.center(panel_content, width=panel_width))
@@ -2492,7 +2526,9 @@ def print_rich_summary(
     scontext = str(parsed_log.get("scontext", ""))
     tcontext = str(parsed_log.get("tcontext", ""))
     if scontext and tcontext:
-        context_text = f"[bright_cyan]{scontext}[/bright_cyan] → [bright_cyan]{tcontext}[/bright_cyan]"
+        context_text = (
+            f"[bright_cyan]{scontext}[/bright_cyan] → [bright_cyan]{tcontext}[/bright_cyan]"
+        )
         centered_context = Align.center(context_text)
         context_panel = Panel(centered_context, border_style="dim", padding=(0, 3))
         # Responsive width: minimum 60% of screen, maximum 120 characters
@@ -2509,9 +2545,7 @@ def print_rich_summary(
             console.print("[bold]Events:[/bold]")
 
         # Apply smart event grouping by exact resource
-        grouped_events = group_events_by_resource(
-            denial_info["correlations"]
-        )
+        grouped_events = group_events_by_resource(denial_info["correlations"])
 
         # Consolidate groups with same PIDs accessing different resources
         grouped_events = consolidate_resource_groups(grouped_events)
@@ -2533,17 +2567,13 @@ def print_rich_summary(
             comms = group["comms"]
 
             # Format permissions
-            perm_display = (
-                permissions[0] if len(permissions) == 1 else ", ".join(permissions)
-            )
+            perm_display = permissions[0] if len(permissions) == 1 else ", ".join(permissions)
 
             # Get process name and description
             process_name = comms[0] if comms else "unknown"
             process_desc = parsed_log.get("source_type_description", "")
             if process_desc:
-                process_display = (
-                    f"[green]{process_name}[/green] [dim]({process_desc})[/dim]"
-                )
+                process_display = f"[green]{process_name}[/green] [dim]({process_desc})[/dim]"
             else:
                 process_display = f"[green]{process_name}[/green]"
 
@@ -2569,15 +2599,11 @@ def print_rich_summary(
                             overlay_part = parts[1]
                             # Get container ID and internal path
                             overlay_parts = overlay_part.split("/")
-                            if (
-                                len(overlay_parts) >= 3
-                            ):  # container-id/diff/internal/path
+                            if len(overlay_parts) >= 3:  # container-id/diff/internal/path
                                 container_id = overlay_parts[0][
                                     :12
                                 ]  # First 12 chars of container ID
-                                internal_path = "/".join(
-                                    overlay_parts[2:]
-                                )  # Skip 'diff' part
+                                internal_path = "/".join(overlay_parts[2:])  # Skip 'diff' part
                                 resource_display = f"[cyan]container file[/cyan] [bright_white]{internal_path}[/bright_white] [dim](container [bright_cyan]{container_id}[/bright_cyan])[/dim]"
                             else:
                                 filename = resource.split("/")[-1]
@@ -2595,9 +2621,7 @@ def print_rich_summary(
                                 overlay_parts = container_part.split("/overlay/")
                                 if len(overlay_parts) > 1:
                                     overlay_subpart = overlay_parts[1].split("/")
-                                    if (
-                                        len(overlay_subpart) >= 3
-                                    ):  # container-id/diff/internal/path
+                                    if len(overlay_subpart) >= 3:  # container-id/diff/internal/path
                                         container_id = overlay_subpart[0][:12]
                                         internal_path = "/".join(overlay_subpart[2:])
                                         resource_display = f"[cyan]container file[/cyan] [bright_white]{internal_path}[/bright_white] [dim](container [bright_cyan]{container_id}[/bright_cyan])[/dim]"
@@ -2641,9 +2665,7 @@ def print_rich_summary(
                 resource_display = f"socket {socket_addr}"
             elif resource_type in ["key", "capability", "process", "dbus"]:
                 # For object classes without specific resource identifiers
-                class_desc = PermissionSemanticAnalyzer.get_class_description(
-                    resource_type
-                )
+                class_desc = PermissionSemanticAnalyzer.get_class_description(resource_type)
                 resource_display = f"{class_desc} resource"
             else:
                 resource_display = resource
@@ -2658,7 +2680,9 @@ def print_rich_summary(
 
             # Determine enforcement status display
             if group_is_permissive:
-                enforcement_status = "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+                enforcement_status = (
+                    "[bright_blue]Permissive[/bright_blue] [bright_blue]⚠️  ALLOWED[/bright_blue]"
+                )
             else:
                 enforcement_status = "[Enforcing] [red]✗ BLOCKED[/red]"
 
@@ -2667,8 +2691,7 @@ def print_rich_summary(
             pid_label = "PID" if pid_count == 1 else "PIDs"
 
             # Check if this is a SELINUX_ERR (no PID info)
-            denial_type = parsed_log.get("denial_type", "")
-            is_selinux_error = denial_type in ["SELINUX_ERR", "USER_SELINUX_ERR"]
+            is_selinux_error = is_selinux_error_type(parsed_log)
 
             if pid_count == 1:
                 # Simple format for single PID - no tree structure needed
@@ -2676,29 +2699,31 @@ def print_rich_summary(
 
                 # Different display for SELINUX_ERR (no PID/process info)
                 if is_selinux_error:
-                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security computation error"
+                    error_type = (
+                        parsed_log.get("selinux_operation")
+                        or parsed_log.get("selinux_error_reason")
+                        or "security computation error"
+                    )
                     invalid_ctx = parsed_log.get("invalid_context", "")
                     event_count_display = f" ({count}x)" if count > 1 else ""
-                    console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}{event_count_display}")
+                    console.print(
+                        f"• [yellow]Kernel Security Error[/yellow]: {error_type}{event_count_display}"
+                    )
                     if invalid_ctx:
                         console.print(f"  Invalid context: [red]{invalid_ctx}[/red]")
                     console.print(
                         f"  Transition: {parsed_log.get('scontext', 'unknown')} → {parsed_log.get('tcontext', 'unknown')}"
                     )
-                    console.print(f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] {enforcement_status}")
+                    console.print(
+                        f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] {enforcement_status}"
+                    )
                 else:
                     # Regular AVC: process-level denial
                     # Count events for this specific PID in this group
                     pid_events_count = len(
-                        [
-                            event
-                            for event in group["all_events"]
-                            if event.get("pid") == single_pid
-                        ]
+                        [event for event in group["all_events"] if event.get("pid") == single_pid]
                     )
-                    pid_count_display = (
-                        f" ({pid_events_count}x)" if pid_events_count > 1 else ""
-                    )
+                    pid_count_display = f" ({pid_events_count}x)" if pid_events_count > 1 else ""
                     console.print(
                         f"• {pid_label} {single_pid}{pid_count_display} ({process_display})"
                     )
@@ -2709,7 +2734,11 @@ def print_rich_summary(
                 # Tree structure for multiple PIDs
                 # Calculate total events for this permission group
                 total_events = len(group["all_events"])
-                events_info = f", {total_events} event{'s' if total_events != 1 else ''}" if total_events != pid_count else ""
+                events_info = (
+                    f", {total_events} event{'s' if total_events != 1 else ''}"
+                    if total_events != pid_count
+                    else ""
+                )
                 console.print(f"• {pid_count} {pid_label} ({process_display}){events_info}")
 
                 # Tree structure for PID list (8 PIDs per line)
@@ -2739,18 +2768,14 @@ def print_rich_summary(
                 if group_permission and tclass:
                     # Generate fresh analysis specific to this group's permission
                     process_name = parsed_log.get("comm")
-                    contextual_analysis = (
-                        PermissionSemanticAnalyzer.get_contextual_analysis(
-                            group_permission, tclass, scontext, tcontext, process_name
-                        )
+                    contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
+                        group_permission, tclass, scontext, tcontext, process_name
                     )
 
                 if contextual_analysis or proctitle:
                     console.print("  └─ Process Context:")
                     if contextual_analysis:
-                        console.print(
-                            f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]"
-                        )
+                        console.print(f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]")
                     if proctitle and proctitle != parsed_log.get("comm", ""):
                         console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
 
@@ -2781,9 +2806,7 @@ def print_rich_summary(
                     for event in pid_events:
                         permission = event.get("permission", "")
                         timestamp = event.get("timestamp", "")
-                        syscall = event.get(
-                            "syscall", parsed_log.get("syscall", "unknown")
-                        )
+                        syscall = event.get("syscall", parsed_log.get("syscall", "unknown"))
                         exit_code = event.get("exit", "unknown")
 
                         # Create key for identical events (ignore microsecond differences)
@@ -2804,9 +2827,7 @@ def print_rich_summary(
 
                     # Display consolidated events
                     consolidated_list = list(consolidated_events.values())
-                    display_events = consolidated_list[
-                        :3
-                    ]  # Limit to 3 unique event types per PID
+                    display_events = consolidated_list[:3]  # Limit to 3 unique event types per PID
 
                     for i, consolidated_event in enumerate(display_events):
                         permission = consolidated_event["permission"]
@@ -2815,9 +2836,7 @@ def print_rich_summary(
                         exit_code = consolidated_event["exit_code"]
                         count = consolidated_event["count"]
 
-                        is_last_event = (
-                            i == len(display_events) - 1 and len(consolidated_list) <= 3
-                        )
+                        is_last_event = i == len(display_events) - 1 and len(consolidated_list) <= 3
                         event_branch = "└─" if is_last_event and is_last_pid else "├─"
                         pid_prefix = "   " if is_last_pid else "│  "
 
@@ -2853,20 +2872,12 @@ def print_rich_summary(
                     comm = exe.split("/")[-1] if "/" in exe else exe
                 else:
                     # Fallback 2: proctitle (process title)
-                    proctitle = correlation.get("proctitle") or parsed_log.get(
-                        "proctitle"
-                    )
+                    proctitle = correlation.get("proctitle") or parsed_log.get("proctitle")
                     if proctitle and proctitle not in ["(null)", "null", ""]:
                         # Use proctitle, taking just the first word (command name) and clean it up
-                        first_word = (
-                            proctitle.split()[0] if proctitle.split() else "unknown"
-                        )
+                        first_word = proctitle.split()[0] if proctitle.split() else "unknown"
                         # Remove common suffixes like ":" from process titles
-                        comm = (
-                            first_word.rstrip(":")
-                            if first_word != "unknown"
-                            else "unknown"
-                        )
+                        comm = first_word.rstrip(":") if first_word != "unknown" else "unknown"
                     else:
                         # Fallback 3: Extract from scontext (e.g., system_dbusd_t → dbusd)
                         scontext = parsed_log.get("scontext")
@@ -2918,9 +2929,7 @@ def print_rich_summary(
                     target_desc = f"{dbus_bionic} {dest_port}"
                 else:
                     # Network port
-                    port_desc = PermissionSemanticAnalyzer.get_port_description(
-                        dest_port
-                    )
+                    port_desc = PermissionSemanticAnalyzer.get_port_description(dest_port)
                     port_bionic = format_bionic_text("port", "white")
                     if port_desc != f"port {dest_port}":
                         target_desc = f"{port_bionic} {dest_port} ({port_desc})"
@@ -2941,8 +2950,7 @@ def print_rich_summary(
                 mode = "[cyan]Enforcing[/cyan]"
 
             # Display correlation event
-            denial_type = parsed_log.get("denial_type", "")
-            is_selinux_error = denial_type in ["SELINUX_ERR", "USER_SELINUX_ERR"]
+            is_selinux_error = is_selinux_error_type(parsed_log)
 
             if detailed:
                 # Enhanced detailed view with additional information
@@ -2957,7 +2965,11 @@ def print_rich_summary(
                 # Different display for SELINUX_ERR (no PID/process info)
                 if is_selinux_error:
                     # SELINUX_ERR: kernel-level security computation error
-                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security computation error"
+                    error_type = (
+                        parsed_log.get("selinux_operation")
+                        or parsed_log.get("selinux_error_reason")
+                        or "security computation error"
+                    )
                     invalid_ctx = parsed_log.get("invalid_context", "")
                     console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}")
                     if invalid_ctx:
@@ -2965,7 +2977,9 @@ def print_rich_summary(
                     console.print(
                         f"  Transition: {parsed_log.get('scontext', 'unknown')} → {parsed_log.get('tcontext', 'unknown')}"
                     )
-                    console.print(f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] [{mode}] {enforcement}")
+                    console.print(
+                        f"  Target class: [bright_cyan]{parsed_log.get('tclass', 'unknown')}[/bright_cyan] [{mode}] {enforcement}"
+                    )
                 else:
                     # Regular AVC: process-level denial
                     denied_bionic = format_bionic_text("denied", "white")
@@ -2997,9 +3011,7 @@ def print_rich_summary(
                         # Determine if this should be the last item for proper tree branching
                         has_analysis = (
                             permission
-                            and hasattr(
-                                PermissionSemanticAnalyzer, "get_contextual_analysis"
-                            )
+                            and hasattr(PermissionSemanticAnalyzer, "get_contextual_analysis")
                             and parsed_log.get("contextual_analysis", "")
                         )
                         branch = "├─" if has_analysis else "└─"
@@ -3021,9 +3033,7 @@ def print_rich_summary(
                                 )
                             )
                             if contextual_analysis:
-                                console.print(
-                                    f"  └─ Analysis: [dim]{contextual_analysis}[/dim]"
-                                )
+                                console.print(f"  └─ Analysis: [dim]{contextual_analysis}[/dim]")
 
                     # Fallback closing branch if no other context is available
                     if not (
@@ -3031,9 +3041,7 @@ def print_rich_summary(
                         or (proctitle and proctitle != comm)
                         or (
                             permission
-                            and hasattr(
-                                PermissionSemanticAnalyzer, "get_contextual_analysis"
-                            )
+                            and hasattr(PermissionSemanticAnalyzer, "get_contextual_analysis")
                             and parsed_log.get("contextual_analysis", "")
                         )
                     ):
@@ -3043,11 +3051,17 @@ def print_rich_summary(
                 # Standard compact view
                 if is_selinux_error:
                     # SELINUX_ERR compact view
-                    error_type = parsed_log.get("selinux_operation") or parsed_log.get("selinux_error_reason") or "security error"
+                    error_type = (
+                        parsed_log.get("selinux_operation")
+                        or parsed_log.get("selinux_error_reason")
+                        or "security error"
+                    )
                     invalid_ctx = parsed_log.get("invalid_context", "")
                     console.print(f"• [yellow]Kernel Security Error[/yellow]: {error_type}")
                     if invalid_ctx:
-                        console.print(f"  Invalid context: [red]{invalid_ctx}[/red] [{mode}] {enforcement}")
+                        console.print(
+                            f"  Invalid context: [red]{invalid_ctx}[/red] [{mode}] {enforcement}"
+                        )
                     else:
                         console.print(f"  [{mode}] {enforcement}")
                 else:
@@ -3075,13 +3089,11 @@ def print_rich_summary(
     sesearch_cmd = generate_sesearch_command(sesearch_log)
 
     # If we have multiple tclasses, show additional sesearch commands
-    if (
-        "tclasss" in denial_info
-        and denial_info["tclasss"]
-        and len(denial_info["tclasss"]) > 1
-    ):
+    if "tclasss" in denial_info and denial_info["tclasss"] and len(denial_info["tclasss"]) > 1:
         # Generate additional sesearch commands for other tclasses
-        other_tclasses = sorted([tc for tc in denial_info["tclasss"] if tc != parsed_log.get("tclass")])
+        other_tclasses = sorted(
+            [tc for tc in denial_info["tclasss"] if tc != parsed_log.get("tclass")]
+        )
         for tclass in other_tclasses:
             other_log = sesearch_log.copy()
             other_log["tclass"] = tclass
@@ -3095,7 +3107,7 @@ def print_rich_summary(
             Align.center(sesearch_text),
             title="[bold yellow]Policy Investigation Command[/bold yellow]",
             border_style="yellow",
-            padding=(0, 2)
+            padding=(0, 2),
         )
         panel_width = min(max(int(console.width * 0.8), 60), 140)
         console.print(Align.center(sesearch_panel, width=panel_width))
@@ -3126,7 +3138,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     )
 
     # Input Options
-    input_group = parser.add_argument_group('Input Options')
+    input_group = parser.add_argument_group("Input Options")
     input_group.add_argument(
         "-f",
         "--file",
@@ -3147,7 +3159,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     )
 
     # Display Options
-    display_group = parser.add_argument_group('Display Options')
+    display_group = parser.add_argument_group("Display Options")
     display_group.add_argument(
         "--json", action="store_true", help="Output the parsed data in JSON format."
     )
@@ -3175,7 +3187,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     )
 
     # Filtering Options
-    filter_group = parser.add_argument_group('Filtering Options')
+    filter_group = parser.add_argument_group("Filtering Options")
     filter_group.add_argument(
         "--process",
         type=str,
@@ -3208,7 +3220,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     )
 
     # Sorting Options
-    sort_group = parser.add_argument_group('Sorting Options')
+    sort_group = parser.add_argument_group("Sorting Options")
     sort_group.add_argument(
         "--sort",
         type=str,
@@ -3218,7 +3230,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     )
 
     # Advanced Options
-    advanced_group = parser.add_argument_group('Advanced Options')
+    advanced_group = parser.add_argument_group("Advanced Options")
     advanced_group.add_argument(
         "--legacy-signatures",
         action="store_true",
@@ -3254,9 +3266,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         # Determine the correct file path (could be from --file or --raw-file)
         file_path = args.file if args.file else args.raw_file
         if not args.json:
-            ausearch_message = (
-                f"Raw file input provided. Running ausearch on '{file_path}'..."
-            )
+            ausearch_message = f"Raw file input provided. Running ausearch on '{file_path}'..."
         try:
             ausearch_cmd = [
                 "ausearch",
@@ -3266,17 +3276,13 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 "-if",
                 file_path,
             ]
-            result = subprocess.run(
-                ausearch_cmd, capture_output=True, text=True, check=False
-            )
+            result = subprocess.run(ausearch_cmd, capture_output=True, text=True, check=False)
 
             # Check if ausearch found no matches (normal case)
             if "<no matches>" in result.stderr:
                 # No AVC records found - this is normal, not an error
                 console.print("ℹ️  [blue]No AVC records found in the audit log.[/blue]")
-                console.print(
-                    "   This means no SELinux denials occurred during the logged period."
-                )
+                console.print("   This means no SELinux denials occurred during the logged period.")
                 console.print(
                     "   [dim]This is often a good sign - your system's SELinux policy is working correctly.[/dim]"
                 )
@@ -3291,9 +3297,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 )
         except FileNotFoundError:
             print_error("❌ [bold red]Error: ausearch Command Not Found[/bold red]")
-            print_error(
-                "   The 'ausearch' command is required for processing raw audit files."
-            )
+            print_error("   The 'ausearch' command is required for processing raw audit files.")
             print_error("   [dim]Please install the audit package:[/dim]")
             print_error("   • [cyan]sudo dnf install audit[/cyan] (Fedora/RHEL)")
             print_error("   • [cyan]sudo apt install auditd[/cyan] (Ubuntu/Debian)")
@@ -3311,13 +3315,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         file_path = args.file if args.file else args.avc_file
         # File path already shown in auto-detection message
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 log_string = f.read()
         except Exception as e:
             # This should rarely happen due to pre-validation, but handle gracefully
-            console.print(
-                "❌ [bold red]Error: Unexpected file reading error[/bold red]"
-            )
+            console.print("❌ [bold red]Error: Unexpected file reading error[/bold red]")
             console.print(f"   {str(e)}")
             sys.exit(1)
     else:  # interactive mode
@@ -3417,26 +3419,29 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         if other_warnings:
             for warning in other_warnings:
                 console.print(f"   • {warning}")
-        console.print(
-            "   • [bold green]Successfully processed all AVC data[/bold green]"
-        )
+        console.print("   • [bold green]Successfully processed all AVC data[/bold green]")
         console.print()  # Extra line for readability
 
     # Process all AVC denials with smart signature generation
     for parsed_log in all_avc_denials:
         # Handle both regular AVC denials (with permission) and SELINUX_ERR records (without permission)
-        if "permission" in parsed_log or parsed_log.get("denial_type") in ["SELINUX_ERR", "USER_SELINUX_ERR"]:
+        if "permission" in parsed_log or parsed_log.get("denial_type") in [
+            "SELINUX_ERR",
+            "USER_SELINUX_ERR",
+        ]:
             # For regular AVC, use permission; for SELINUX_ERR, use error type as identifier
             if "permission" in parsed_log:
                 permission = parsed_log.get("permission")
             else:
                 # SELINUX_ERR doesn't have permission, use error type + operation/reason as identifier
-                permission = parsed_log.get("selinux_error_reason") or parsed_log.get("selinux_operation") or "selinux_error"
+                permission = (
+                    parsed_log.get("selinux_error_reason")
+                    or parsed_log.get("selinux_operation")
+                    or "selinux_error"
+                )
 
             # Generate smart signature using new logic (or legacy for regression testing)
-            signature = generate_smart_signature(
-                parsed_log, legacy_mode=args.legacy_signatures
-            )
+            signature = generate_smart_signature(parsed_log, legacy_mode=args.legacy_signatures)
 
             dt_obj = parsed_log.get("datetime_obj")
 
@@ -3551,9 +3556,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
         # Check for detection warnings (on full results before filtering for complete context)
         dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
-        permissive_detected, permissive_count, total_events = detect_permissive_mode(
-            sorted_denials
-        )
+        permissive_detected, permissive_count, total_events = detect_permissive_mode(sorted_denials)
 
         # Check for custom paths detection
         custom_paths_detected, found_custom_patterns = False, []
@@ -3571,9 +3574,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             [],
         )
         for denial_info in sorted_denials:
-            has_container, container_patterns, sample_paths = has_container_paths(
-                denial_info
-            )
+            has_container, container_patterns, sample_paths = has_container_paths(denial_info)
             if has_container:
                 container_issues_detected = True
                 found_container_patterns.extend(container_patterns)
@@ -3606,14 +3607,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 )
 
             # Display filtering info if applicable
-            if (
-                args.process
-                or args.path
-                or args.since
-                or args.until
-                or args.source
-                or args.target
-            ):
+            if args.process or args.path or args.since or args.until or args.source or args.target:
                 filter_msg = []
                 if args.process:
                     filter_msg.append(f"process='{args.process}'")
@@ -3646,8 +3640,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         console.print("═" * 79)
                         console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
                         console.print("Enhanced audit mode is active on this system.")
-                        console.print(f"Typically suppressed permissions detected: {indicators_str}")
-                        console.print("This means you're seeing permissions that are normally hidden.")
+                        console.print(
+                            f"Typically suppressed permissions detected: {indicators_str}"
+                        )
+                        console.print(
+                            "This means you're seeing permissions that are normally hidden."
+                        )
                         console.print("═" * 79)
                         console.print()
                     else:
@@ -3689,7 +3687,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
-                        console.print(f"{permissive_count} of {total_events} events were in permissive mode.")
+                        console.print(
+                            f"{permissive_count} of {total_events} events were in permissive mode."
+                        )
                         console.print("These denials were logged but not enforced.")
                         console.print("═" * 79)
                         console.print()
@@ -3707,9 +3707,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             Align.center(
                                 f"[blue]{permissive_count} of {total_events} events were in permissive mode.[/blue]"
                             ),
-                            Align.center(
-                                "[dim]These denials were logged but not enforced.[/dim]"
-                            ),
+                            Align.center("[dim]These denials were logged but not enforced.[/dim]"),
                         ]
 
                         permissive_panel = Panel(
@@ -3750,9 +3748,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             Align.center(
                                 f"[magenta]Non-standard paths found: {patterns_str}[/magenta]"
                             ),
-                            Align.center(
-                                "[dim]These may require custom fcontext rules.[/dim]"
-                            ),
+                            Align.center("[dim]These may require custom fcontext rules.[/dim]"),
                         ]
 
                         custom_panel = Panel(
@@ -3786,18 +3782,28 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 if len(parts) == 2:
                                     actual_base = parts[0] + "/containers/storage/overlay/"
                                     console.print(f"Base path: {actual_base}")
-                                    console.print("Container path: [container-id]/diff/[container-files]")
+                                    console.print(
+                                        "Container path: [container-id]/diff/[container-files]"
+                                    )
                             elif "/.local/share/containers/" in sample_path:
                                 parts = sample_path.split("/.local/share/containers/")
                                 if len(parts) == 2:
-                                    actual_base = parts[0] + "/.local/share/containers/storage/overlay/"
+                                    actual_base = (
+                                        parts[0] + "/.local/share/containers/storage/overlay/"
+                                    )
                                     console.print(f"Base path: {actual_base}")
-                                    console.print("Container path: [container-id]/diff/[container-files]")
+                                    console.print(
+                                        "Container path: [container-id]/diff/[container-files]"
+                                    )
                             elif "/var/lib/containers/" in sample_path:
                                 console.print("Base path: /var/lib/containers/storage/overlay/")
-                                console.print("Container path: [container-id]/diff/[container-files]")
+                                console.print(
+                                    "Container path: [container-id]/diff/[container-files]"
+                                )
                             else:
-                                console.print("Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]")
+                                console.print(
+                                    "Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]"
+                                )
 
                         console.print()
                         console.print("Recommendation: container-selinux policy package")
@@ -3830,8 +3836,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 parts = sample_path.split("/.local/share/containers/")
                                 if len(parts) == 2:
                                     actual_base = (
-                                        parts[0]
-                                        + "/.local/share/containers/storage/overlay/"
+                                        parts[0] + "/.local/share/containers/storage/overlay/"
                                     )
                                     sample_path_lines = [
                                         f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
@@ -3860,9 +3865,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 "[cyan]SELinux denials accessing container overlay storage.[/cyan]"
                             ),
                             Align.center(""),  # Empty line
-                            Align.center(
-                                "[dim]Complete path = Base path + Container path:[/dim]"
-                            ),
+                            Align.center("[dim]Complete path = Base path + Container path:[/dim]"),
                         ]
 
                         # Add the sample path lines if available
@@ -3925,10 +3928,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             if all_policy_loads:
                 console.print("\n" + "─" * console.width)
                 console.print("[bold cyan]📋 SELinux Policy Load Events[/bold cyan]")
-                console.print(f"\nDetected [bright_cyan]{len(all_policy_loads)}[/bright_cyan] policy reload(s):\n")
+                console.print(
+                    f"\nDetected [bright_cyan]{len(all_policy_loads)}[/bright_cyan] policy reload(s):\n"
+                )
                 for event in all_policy_loads:
-                    timestamp_str = event.get('datetime_str', 'unknown')
-                    auid = event.get('auid_display', 'unknown')
+                    timestamp_str = event.get("datetime_str", "unknown")
+                    auid = event.get("auid_display", "unknown")
                     console.print(f"  • {timestamp_str} - User ID: {auid}")
                 console.print()
 
@@ -4019,8 +4024,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 pager_console.print("═" * 79)
                                 pager_console.print()
                                 pager_console.print("Enhanced audit mode is active on this system.")
-                                pager_console.print(f"Typically suppressed permissions detected: {indicators_str}")
-                                pager_console.print("This means you're seeing permissions that are normally hidden.")
+                                pager_console.print(
+                                    f"Typically suppressed permissions detected: {indicators_str}"
+                                )
+                                pager_console.print(
+                                    "This means you're seeing permissions that are normally hidden."
+                                )
                                 pager_console.print("═" * 79)
                                 pager_console.print()
                             else:
@@ -4052,12 +4061,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     border_style="bright_yellow",
                                     padding=(1, 4),
                                 )
-                                panel_width = min(
-                                    max(int(pager_console.width * 0.6), 60), 120
-                                )
-                                pager_console.print(
-                                    Align.center(warning_panel, width=panel_width)
-                                )
+                                panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                                pager_console.print(Align.center(warning_panel, width=panel_width))
                                 pager_console.print()
 
                         # Display permissive mode warning if found
@@ -4068,7 +4073,9 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 pager_console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
                                 pager_console.print("═" * 79)
                                 pager_console.print()
-                                pager_console.print(f"{permissive_count} of {total_events} events were in permissive mode.")
+                                pager_console.print(
+                                    f"{permissive_count} of {total_events} events were in permissive mode."
+                                )
                                 pager_console.print("These denials were logged but not enforced.")
                                 pager_console.print("═" * 79)
                                 pager_console.print()
@@ -4097,9 +4104,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     border_style="bright_blue",
                                     padding=(1, 4),
                                 )
-                                panel_width = min(
-                                    max(int(pager_console.width * 0.6), 60), 120
-                                )
+                                panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
                                 pager_console.print(
                                     Align.center(permissive_panel, width=panel_width)
                                 )
@@ -4109,9 +4114,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         if custom_paths_detected:
                             patterns_str = ", ".join(found_custom_patterns[:3])
                             if len(found_custom_patterns) > 3:
-                                patterns_str += (
-                                    f" (+{len(found_custom_patterns) - 3} more)"
-                                )
+                                patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
                             if args.report:
                                 # Simple text format for --report mode
@@ -4148,12 +4151,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     border_style="bright_magenta",
                                     padding=(1, 4),
                                 )
-                                panel_width = min(
-                                    max(int(pager_console.width * 0.6), 60), 120
-                                )
-                                pager_console.print(
-                                    Align.center(custom_panel, width=panel_width)
-                                )
+                                panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                                pager_console.print(Align.center(custom_panel, width=panel_width))
                                 pager_console.print()
 
                         # Display container issues warning if found
@@ -4164,34 +4163,53 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 pager_console.print("🐳  CONTAINER STORAGE DETECTED")
                                 pager_console.print("═" * 79)
                                 pager_console.print()
-                                pager_console.print("SELinux denials accessing container overlay storage.")
+                                pager_console.print(
+                                    "SELinux denials accessing container overlay storage."
+                                )
                                 pager_console.print()
 
                                 # Show sample path information
                                 if container_sample_paths:
                                     sample_path = container_sample_paths[0]
-                                    pager_console.print("Complete path = Base path + Container path:")
+                                    pager_console.print(
+                                        "Complete path = Base path + Container path:"
+                                    )
 
                                     if "/containers/storage/overlay/" in sample_path:
                                         parts = sample_path.split("/containers/storage/overlay/")
                                         if len(parts) == 2:
                                             actual_base = parts[0] + "/containers/storage/overlay/"
                                             pager_console.print(f"Base path: {actual_base}")
-                                            pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                            pager_console.print(
+                                                "Container path: [container-id]/diff/[container-files]"
+                                            )
                                     elif "/.local/share/containers/" in sample_path:
                                         parts = sample_path.split("/.local/share/containers/")
                                         if len(parts) == 2:
-                                            actual_base = parts[0] + "/.local/share/containers/storage/overlay/"
+                                            actual_base = (
+                                                parts[0]
+                                                + "/.local/share/containers/storage/overlay/"
+                                            )
                                             pager_console.print(f"Base path: {actual_base}")
-                                            pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                            pager_console.print(
+                                                "Container path: [container-id]/diff/[container-files]"
+                                            )
                                     elif "/var/lib/containers/" in sample_path:
-                                        pager_console.print("Base path: /var/lib/containers/storage/overlay/")
-                                        pager_console.print("Container path: [container-id]/diff/[container-files]")
+                                        pager_console.print(
+                                            "Base path: /var/lib/containers/storage/overlay/"
+                                        )
+                                        pager_console.print(
+                                            "Container path: [container-id]/diff/[container-files]"
+                                        )
                                     else:
-                                        pager_console.print("Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]")
+                                        pager_console.print(
+                                            "Generic pattern: [storage-location]/overlay/[container-id]/diff/[files]"
+                                        )
 
                                 pager_console.print()
-                                pager_console.print("Recommendation: container-selinux policy package")
+                                pager_console.print(
+                                    "Recommendation: container-selinux policy package"
+                                )
                                 pager_console.print("═" * 79)
                                 pager_console.print()
                             else:
@@ -4209,22 +4227,16 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     # Determine container storage type and show generic patterns
                                     if "/containers/storage/overlay/" in sample_path:
                                         # Extract the actual base path up to /containers/storage/overlay/
-                                        parts = sample_path.split(
-                                            "/containers/storage/overlay/"
-                                        )
+                                        parts = sample_path.split("/containers/storage/overlay/")
                                         if len(parts) == 2:
-                                            actual_base = (
-                                                parts[0] + "/containers/storage/overlay/"
-                                            )
+                                            actual_base = parts[0] + "/containers/storage/overlay/"
                                             sample_path_lines = [
                                                 f"[dim]Base path: [bright_cyan]{actual_base}[/bright_cyan][/dim]",
                                                 "[dim]Container path: [bright_cyan]\\[container-id]/diff/\\[container-files][/bright_cyan][/dim]",
                                             ]
                                     elif "/.local/share/containers/" in sample_path:
                                         # Extract the actual base path up to /.local/share/containers/storage/overlay/
-                                        parts = sample_path.split(
-                                            "/.local/share/containers/"
-                                        )
+                                        parts = sample_path.split("/.local/share/containers/")
                                         if len(parts) == 2:
                                             actual_base = (
                                                 parts[0]
@@ -4282,9 +4294,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     border_style="bright_cyan",
                                     padding=(1, 4),
                                 )
-                                panel_width = min(
-                                    max(int(pager_console.width * 0.6), 60), 120
-                                )
+                                panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
                                 pager_console.print(
                                     Align.center(container_panel, width=panel_width)
                                 )
@@ -4337,9 +4347,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             pager_console.print(
                                 "\n[yellow]Note:[/yellow] The following record types were found in the log but are not currently parsed:"
                             )
-                            pager_console.print(
-                                f"  {', '.join(sorted(list(all_unparsed_types)))}"
-                            )
+                            pager_console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
                 # Generate all output using the pager console
                 display_all_content_pager()
@@ -4363,9 +4371,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 except FileNotFoundError:
                     # Try fallback to more
                     try:
-                        pager_process = subprocess.Popen(
-                            ["more"], stdin=subprocess.PIPE, text=True
-                        )
+                        pager_process = subprocess.Popen(["more"], stdin=subprocess.PIPE, text=True)
                         pager_process.communicate(input=colored_output)
                         pager_found = True
                     except FileNotFoundError:
@@ -4373,9 +4379,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 if not pager_found:
                     # Fallback: just print normally if no pager available
-                    console.print(
-                        "[yellow]No pager available, showing output directly:[/yellow]"
-                    )
+                    console.print("[yellow]No pager available, showing output directly:[/yellow]")
                     display_all_content()
 
             except Exception as e:

@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.6.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, advanced filtering capabilities, and normalized JSON output.
+**Version 1.7.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware analysis, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
@@ -115,7 +115,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
 📊 **Development Plans**: See [ROADMAP.md](ROADMAP.md) for future plans and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for implementation details.
 
-🎯 **Current Status (v1.6.0)**: Production-ready with clean modular architecture. Next phase: ROI-optimized performance validation and CI/CD automation.
+🎯 **Current Status (v1.7.0)**: Production-ready with clean modular architecture, modern development tooling, extended audit record support, and enhanced forensic analysis capabilities. Next phase: CI/CD automation and performance benchmarking.
 
 ## 🏗️ Architecture
 
@@ -168,18 +168,23 @@ avc-parser/
 │   ├── generate_test_data.py # Synthetic test data generator
 │   ├── profile_performance.py # Performance profiling tool
 │   └── README.md           # Scripts documentation
-└── tests/                   # Comprehensive test suite (160 tests)
-    ├── test_*.py           # Feature-specific test modules
-    └── testAVC/, testRAW/  # Sample audit logs and test fixtures
+├── tests/                   # Comprehensive test suite (169 tests)
+│   ├── test_*.py           # Feature-specific test modules
+│   └── testAVC/, testRAW/  # Sample audit logs and test fixtures
+└── pyproject.toml          # Modern Python project configuration
+    ├── Project metadata and dependencies
+    ├── Development tooling (ruff, pytest, coverage)
+    └── Quality assurance settings
 ```
 
 **Architecture Benefits**:
 - **28% Code Reduction**: Main file reduced by 1,432 lines (5,168→3,736) with zero functionality loss
-- **100% Test Coverage**: All 160 tests pass throughout entire refactoring process
+- **100% Test Coverage**: All 169 tests pass throughout entire refactoring process
 - **Enhanced Maintainability**: Clean modular structure with logical separation of concerns
+- **Modern Development Tooling**: Ruff linting/formatting, pytest framework, coverage reporting
 - **Developer Experience**: Comprehensive examples, utilities, and development tools
 - **Integration Ready**: SIEM patterns, batch processing, and performance tools included
-- **Quality Assurance**: Log validation, test data generation, and profiling utilities
+- **Quality Assurance**: Log validation, test data generation, profiling, and automated testing
 
 ## 🚀 Quick Start
 
@@ -328,8 +333,9 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json > analysis.json
 - Comprehensive filtering (time, process, path, context)
 - JSON export with structured output
 
-**Quality Assurance**: ✅ Complete  
-- 146 comprehensive tests with regression prevention
+**Quality Assurance**: ✅ Complete
+- 169 comprehensive tests with regression prevention
+- Modern development tooling (ruff, pytest, coverage)
 - Modular architecture for maintainability
 - Cross-platform compatibility
 
@@ -355,4 +361,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.6.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators

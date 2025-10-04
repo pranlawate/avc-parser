@@ -1,0 +1,92 @@
+[project]
+name = "avc-parser"
+version = "1.7.0"
+description = "SELinux AVC denial parser and analyzer with extended audit record support"
+requires-python = ">=3.8"
+dependencies = [
+    "rich>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.ruff]
+# Line length to match your current style
+line-length = 100
+
+# Target Python 3.8+ (compatible with older systems)
+target-version = "py38"
+
+# Enable pycodestyle (E), pyflakes (F), and other useful rules
+lint.select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort (import sorting)
+    "N",   # pep8-naming
+    "UP",  # pyupgrade (modernize Python code)
+]
+
+# Ignore specific rules that might be too strict
+lint.ignore = [
+    "E501",  # line too long (handled by formatter)
+    "N802",  # function name should be lowercase (allow setUp, etc.)
+    "N806",  # variable should be lowercase (allow single letter vars)
+]
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+# Fix issues automatically when possible
+lint.fixable = ["ALL"]
+lint.unfixable = []
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Use Unix line endings
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "setup.py",
+    ".venv/*",
+    "venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false

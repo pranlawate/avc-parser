@@ -1,7 +1,8 @@
 # OPTIMIZED MAKEFILE FOR AVC PARSER
-# Ultra-fast development workflow with ruff + winning tools
+# Ultra-fast development workflow with ruff + pytest + coverage (Phase 11E)
+# Modern configuration via pyproject.toml
 
-.PHONY: help format check lint security dead-code flow-diagram deps-graph test install-tools clean all quick-check
+.PHONY: help format check lint security dead-code flow-diagram deps-graph test test-cov install-tools clean all quick-check
 
 # Default target
 help:
@@ -10,7 +11,8 @@ help:
 	@echo "  quick-check      - Ultra-fast quality check (< 1 second)"
 	@echo "  format           - Format code (ruff)"
 	@echo "  lint             - Full quality analysis"
-	@echo "  test             - Run comprehensive test suite"
+	@echo "  test             - Run test suite (pytest, 169 tests)"
+	@echo "  test-cov         - Run tests with coverage report"
 	@echo "  security         - Security analysis (bandit + safety)"
 	@echo ""
 	@echo "Analysis tools:"
@@ -19,9 +21,13 @@ help:
 	@echo "  flow-diagram     - Function dependency visualization"
 	@echo "  deps-graph       - Import dependency analysis"
 	@echo ""
+	@echo "Coverage reports:"
+	@echo "  test-cov-html    - Generate HTML coverage report"
+	@echo ""
 	@echo "Setup:"
-	@echo "  install-tools    - Install optimized dev tools"
-	@echo "  clean            - Remove generated files"
+	@echo "  install          - Install runtime dependencies (rich)"
+	@echo "  install-tools    - Install dev tools (ruff, pytest, coverage)"
+	@echo "  clean            - Remove generated files and caches"
 
 # === TIER 1: ULTRA-FAST DAILY WORKFLOW ===
 
@@ -33,9 +39,9 @@ quick-check:
 
 # Code formatting and organization (ruff all-in-one)
 format:
-	@echo "🎨 Formatting code (ruff)..."
-	@ruff format parse_avc.py selinux/context.py utils.py
-	@ruff check parse_avc.py selinux/context.py utils.py --fix --quiet || true
+	@echo "🎨 Formatting code (ruff - config: pyproject.toml)..."
+	@ruff format .
+	@ruff check . --fix --quiet || true
 	@echo "✅ Code formatted and organized"
 
 # Fast syntax check only
@@ -85,42 +91,63 @@ deps-graph:
 	@pydeps parse_avc.py --show-deps --max-cluster-size=10 --output avc_import_deps.svg 2>/dev/null || echo "SVG generation skipped"
 	@echo "✅ Import dependency analysis completed"
 
-# Testing infrastructure (NEW CAPABILITY)
+# Testing infrastructure (pytest - Phase 11E)
 test:
-	@echo "🧪 Running comprehensive test suite..."
-	@python3 -m unittest discover tests/ -v
-	@echo "✅ Test suite completed"
+	@echo "🧪 Running test suite (pytest - config: pyproject.toml)..."
+	@pytest
+	@echo "✅ All 169 tests passed"
 
-# Regression prevention framework (PHASE 7 COMPLETED)
+# Test with coverage reporting (Phase 11E)
+test-cov:
+	@echo "🧪 Running tests with coverage (pytest-cov - config: pyproject.toml)..."
+	@pytest --cov --cov-report=term-missing
+	@echo "✅ Coverage report complete"
+
+# Coverage HTML report
+test-cov-html:
+	@echo "🧪 Generating HTML coverage report..."
+	@pytest --cov --cov-report=html
+	@echo "✅ HTML report: htmlcov/index.html"
+
+# Regression prevention framework (PHASE 7 COMPLETED - legacy)
 test-regression:
-	@echo "🛡️ Running regression prevention suite..."
+	@echo "🛡️ Running regression prevention suite (legacy)..."
 	@python3 tests/test_runner.py
 	@echo "✅ Regression prevention completed"
 
 # === SETUP & MAINTENANCE ===
 
-# Install winning tools
+# Install dev tools from pyproject.toml (Phase 11E)
 install-tools:
-	@echo "🛠️ Installing optimized dev tools..."
-	@pip install -r dev-requirements.txt
-	@echo "✅ All dev tools installed from dev-requirements.txt"
+	@echo "🛠️ Installing dev tools (from pyproject.toml)..."
+	@pip install -e ".[dev]"
+	@echo "✅ All dev tools installed: ruff, pytest, pytest-cov"
+
+# Install for production (runtime dependencies only)
+install:
+	@echo "📦 Installing runtime dependencies..."
+	@pip install -e .
+	@echo "✅ Runtime dependencies installed: rich>=10.0.0"
 
 # Cleanup
 clean:
 	@echo "🧹 Cleaning generated files..."
 	@rm -f *.svg *.png *.gv
-	@rm -rf __pycache__ *.pyc .mypy_cache htmlcov
+	@rm -rf __pycache__ *.pyc .mypy_cache .ruff_cache htmlcov .coverage .pytest_cache
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@echo "✅ Cleaned up"
 
-# Complete workflow for modularization safety
-all: format quick-check test security flow-diagram deps-graph
-	@echo "🎉 Complete workflow finished - ready for safe modularization"
+# Complete workflow (Phase 11E updated)
+all: format quick-check test-cov
+	@echo "🎉 Complete workflow finished - code quality verified"
 
 # === TOOL EVOLUTION NOTES ===
-# WINNERS (adopted): ruff (all-in-one: formatting + linting + imports), pydeps, unittest
-# REJECTED: pytest (timeout), flake8 (broken pipe), pylint (slow)
-# REPLACED: pyflakes + isort + black → ruff (single tool, 197x performance improvement)
-# PENDING: radon (SIGPIPE fix submitted upstream, PR awaiting merge)
+# Phase 11E (2025-10-05): Modern development tooling with pyproject.toml
+# WINNERS (adopted): ruff (formatting + linting + imports), pytest (testing), pytest-cov (coverage)
+# CONFIGURATION: Centralized in pyproject.toml (modern Python standard)
+# REPLACED: unittest → pytest (better discovery, markers, strict config)
+# METRICS: 169 tests, 10.00/10 pylint, 19.15% coverage baseline
+# REJECTED: pydantic/click (add user dependencies), mypy (deferred)
 #
 # Manual alternatives for specialized needs:
 # - Type checking: Run mypy manually when needed

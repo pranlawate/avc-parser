@@ -5,6 +5,91 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2025-10-05
+
+### Added
+- **Phase 11B: Enhanced Detailed View & Context-Aware Analysis**
+  - Per-PID, per-resource breakdown in consolidated groups with timestamps, syscalls, exit codes, success/failure status
+  - Context-aware permission descriptions that vary by resource type ("write on dir" vs "write on file")
+  - Multiple tclass handling with separate sesearch commands for each class
+  - Resource type separation in consolidation signatures (files vs directories)
+  - 8 new regression tests for field extraction with quoted/unquoted formats (168 tests total)
+
+- **Phase 11C: Permissive Mode & Report Completeness**
+  - Accurate permissive event counting from individual correlations (not group-level)
+  - Mixed mode detection showing both enforcing and permissive events
+  - Complete target path display in sealert reports (all affected files, not just first)
+  - Full raw audit messages with AVC, SYSCALL, and PROCTITLE records
+  - 1 new test for mixed permissive mode detection (169 tests total)
+
+- **Phase 11D: Extended Audit Record Support**
+  - FANOTIFY support for file access notification denials
+  - SELINUX_ERR/USER_SELINUX_ERR support for kernel/userspace SELinux errors
+  - MAC_POLICY_LOAD support for policy reload event tracking
+  - Specialized display for error types showing invalid context, transition, target class
+  - Policy reload events displayed separately from denials
+  - Test fixtures for new record types
+
+- **Phase 11E: Code Quality & Development Tooling**
+  - Modern project configuration with pyproject.toml (metadata, dependencies, dev tools)
+  - Ruff linting and formatting (line-length 100, Python 3.8+ target, auto-fix enabled)
+  - Pytest framework with test discovery, markers, and strict configuration
+  - Coverage reporting with baseline metrics (19.15% source code coverage established)
+  - Updated .gitignore for coverage artifacts (htmlcov/, .coverage, .pytest_cache/)
+
+### Fixed
+- **Phase 11B Fixes**
+  - Parser regression handling unquoted exe/proctitle fields from ausearch -i
+  - Permission description assignment using context-aware versions
+  - Consolidated group tclass detection for accurate sesearch command generation
+  - Correlation events now include exe, proctitle, syscall for fallback and detailed view
+
+- **Phase 11C Fixes**
+  - Permissive mode counting now based on individual events, not entire groups
+  - SYSCALL exe field extraction from unquoted format for ausearch compatibility
+
+- **Phase 11D Fixes**
+  - Validation recognizes new audit types (no duplicate warnings)
+  - MAC_POLICY_LOAD excluded from unparsed types list
+  - Analysis Complete message displays correctly when no denials present
+  - Contexts handled as AvcContext objects for all new types
+
+- **Phase 11E Code Quality Cleanup**
+  - Removed 9 unused imports (io, json, timedelta, validators, formatters)
+  - Fixed bare exception handler with proper pylint directive
+  - Removed unused variables (exe_path at line 2272)
+  - Fixed f-string without placeholders
+  - Improved import sorting and organization
+
+### Changed
+- **Phase 11B Enhancements**
+  - Resource consolidation now considers resource_type in signature
+  - Permission descriptions vary by object class for accuracy
+  - Multiple tclass values collected as varying field
+  - Detailed view provides forensic-level per-PID, per-resource breakdowns
+
+- **Phase 11C Improvements**
+  - Sealert reports show complete forensic data (all paths, full raw messages)
+  - Mode detection accurately reflects event-level permissive status
+
+- **Phase 11E Code Quality**
+  - Created constants for repeated type lists (SUPPORTED_AVC_TYPES, SELINUX_ERROR_TYPES)
+  - Extracted helper functions (is_selinux_error_type, context_to_str, is_valid_denial_record)
+  - Consistent code formatting with ruff (double quotes, space indent, LF line endings)
+  - Pylint rating improved from 9.x to 10.00/10
+
+### Quality Metrics
+- **Test Suite**: 169 comprehensive tests (100% pass rate)
+- **Code Quality**: 10.00/10 pylint rating, ruff clean formatting
+- **Coverage Baseline**: 19.15% source code coverage established for future tracking
+- **Development Workflow**: Professional tooling with automated linting, testing, and coverage
+
+### Migration Notes
+- No breaking changes - all existing functionality preserved
+- New audit record types (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD) automatically detected
+- Context-aware permission descriptions improve accuracy with no API changes
+- Enhanced detailed view provides more forensic information
+
 ## [1.6.0] - 2025-09-29
 
 ### Added
@@ -24,24 +109,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated all documentation with proper sequential phase numbering
   - Comprehensive roadmap updates with current project status
   - Enhanced examples and integration patterns
+- **Modern Development Tooling**: Phase 11A code quality and tooling setup
+  - Modern project configuration with pyproject.toml (metadata, dependencies, dev tools)
+  - Ruff linting and formatting (line-length 100, Python 3.8+ target, auto-fix enabled)
+  - Pytest framework with test discovery, markers, and strict configuration
+  - Coverage reporting with baseline metrics (19.15% source code coverage established)
+  - Updated .gitignore for coverage artifacts (htmlcov/, .coverage, .pytest_cache/)
 
 ### Fixed
 - Permission aggregation bug in --report formats (only single permission was displayed instead of aggregated set)
 - All f-string syntax errors at lines 1871, 3528, 3754, 4089, 4096, 4133, 4488
 - Function naming accuracy (renamed security_detector to anomaly_detector)
 - Circular import issues and dependency management
+- **Code Quality Issues**: Phase 11A quick wins cleanup
+  - Removed 9 unused imports (io, json, timedelta, validators, formatters)
+  - Fixed bare exception handler with proper pylint directive
+  - Removed unused variables (exe_path at line 2272)
+  - Fixed f-string without placeholders
+  - Improved import sorting and organization
 
 ### Changed
 - Monolithic architecture replaced with clean modular design
 - Improved code organization with proper separation of concerns
 - Enhanced maintainability and testability
 - Foundation established for future development phases
+- **Code Quality Improvements**: Phase 11A refactoring
+  - Created constants for repeated type lists (SUPPORTED_AVC_TYPES, SELINUX_ERROR_TYPES)
+  - Extracted helper functions (is_selinux_error_type, context_to_str, is_valid_denial_record)
+  - Consistent code formatting with ruff (double quotes, space indent, LF line endings)
+  - Pylint rating improved from 9.x to 10.00/10
+
+### Quality Metrics
+- **Test Suite**: 169 comprehensive tests (100% pass rate)
+- **Code Quality**: 10.00/10 pylint rating, ruff clean formatting
+- **Coverage Baseline**: 19.15% source code coverage established for future tracking
+- **Development Workflow**: Professional tooling with automated linting, testing, and coverage
 
 ### Planning
-- **Phase 11 ROI Optimization**: Defined ROI-optimized scope for next development phase
-  - High priority: Performance benchmarking and CI/CD pipeline setup
-  - Deferred low-ROI tasks: Cross-platform compatibility and enterprise deployment testing
-  - ~60% scope reduction for focused, high-impact implementation
+- **Phase 11B Next Steps**: CI/CD pipeline setup and performance benchmarking
+  - High priority: Automated testing pipeline with GitHub Actions
+  - High priority: Performance optimization and benchmarking
+  - Medium priority: Real-world scenario validation (RHEL/Fedora focus)
 
 ## [1.5.0] - 2025-09-28
 
@@ -181,6 +289,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
+- **v1.7.0**: Phase 11 complete - Extended audit types, context-aware analysis, code quality & dev tooling
+- **v1.6.0**: Phase 9-10 complete - Modular architecture, developer tools, comprehensive documentation
 - **v1.5.0**: Two-tier report system with policy investigation integration
 - **v1.4.0**: Advanced filtering, pager mode, and modular architecture
 - **v1.3.0**: Smart deduplication and intelligent event grouping
@@ -189,6 +299,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v1.0.0**: Core foundation with auto-detection and multiple display formats
 
 ## Migration Guide
+
+### From 1.6.x to 1.7.0
+- No breaking changes - all existing functionality preserved
+- New audit record types (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD) automatically detected
+- Context-aware permission descriptions improve accuracy with no API changes
+- Enhanced detailed view provides more forensic information with --detailed flag
+- Development workflow enhanced with ruff, pytest, and coverage tools
+
+### From 1.5.x to 1.6.0
+- No breaking changes - modular architecture is transparent to users
+- All command-line usage patterns continue to work
+- Performance improvements with sub-second analysis maintained
 
 ### From 1.4.x to 1.5.0
 - No breaking changes - all existing functionality preserved

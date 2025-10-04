@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - Examples & Usage Patterns
 
-**Version 1.6.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Two-Tier Professional Report System and SELinux Policy Investigation Integration
+**Version 1.7.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Extended Audit Record Support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), Context-Aware Analysis, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
 

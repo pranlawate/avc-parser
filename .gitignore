@@ -7,6 +7,14 @@ testRAW/
 # Performance profiling reports
 performance_profile_*.json
 
+# Test coverage reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Ruff cache
+.ruff_cache/
+
 # Quality tool outputs (now in docs/diagrams/)
 docs/diagrams/*.svg
 docs/diagrams/*.png
