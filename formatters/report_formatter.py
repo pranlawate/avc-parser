@@ -72,16 +72,55 @@ def display_report_sealert_format(
     dest_port = parsed_log.get("dest_port", "")
 
     console.print("Raw Audit Message:")
-    audit_parts = []
-    audit_parts.append(f"avc: denied {{ {permissions_display} }}")
-    audit_parts.append(f"for pid={pid} comm=\"{comm}\"")
 
+    # AVC line
+    avc_parts = []
+    avc_parts.append(f"avc: denied {{ {permissions_display} }}")
+    avc_parts.append(f"for pid={pid} comm=\"{comm}\"")
     if path:
-        audit_parts.append(f"path=\"{path}\"")
+        avc_parts.append(f"path=\"{path}\"")
     elif dest_port:
-        audit_parts.append(f"dest={dest_port}")
+        avc_parts.append(f"dest={dest_port}")
 
-    console.print(f"  {' '.join(audit_parts)}")
+    scontext = parsed_log.get("scontext", "")
+    tcontext = parsed_log.get("tcontext", "")
+    if scontext:
+        avc_parts.append(f"scontext={scontext}")
+    if tcontext:
+        avc_parts.append(f"tcontext={tcontext}")
+    if tclass:
+        avc_parts.append(f"tclass={tclass}")
+
+    console.print(f"  type=AVC {' '.join(avc_parts)}")
+
+    # SYSCALL line (if available)
+    syscall = parsed_log.get("syscall", "")
+    exit_code = parsed_log.get("exit", "")
+    success = parsed_log.get("success", "")
+    exe = parsed_log.get("exe", "")
+
+    if syscall or exit_code or exe:
+        syscall_parts = []
+        if syscall:
+            syscall_parts.append(f"syscall={syscall}")
+        if success:
+            syscall_parts.append(f"success={success}")
+        if exit_code:
+            syscall_parts.append(f"exit={exit_code}")
+        if comm:
+            syscall_parts.append(f"comm=\"{comm}\"")
+        if exe:
+            syscall_parts.append(f"exe=\"{exe}\"")
+        if scontext:
+            syscall_parts.append(f"subj={scontext}")
+
+        console.print(f"  type=SYSCALL {' '.join(syscall_parts)}")
+
+    # PROCTITLE line (if available)
+    proctitle = parsed_log.get("proctitle", "")
+    if proctitle:
+        console.print(f"  type=PROCTITLE proctitle=\"{proctitle}\"")
+
     console.print()
 
     # Analysis Details in two-column format
@@ -105,7 +144,25 @@ def display_report_sealert_format(
 
     # Target path or port information
     if path:
-        console.print(f"  Target Path           {path}")
+        # Collect all unique paths from correlations if available
+        all_paths = set()
+        if correlations:
+            for corr in correlations:
+                corr_path = corr.get("path")
+                if corr_path:
+                    all_paths.add(corr_path)
+
+        if len(all_paths) > 1:
+            # Multiple paths - show count and list first few
+            paths_list = sorted(list(all_paths))
+            console.print(f"  Target Paths          {len(paths_list)} files:")
+            for i, p in enumerate(paths_list[:5]):  # Show first 5
+                console.print(f"                        - {p}")
+            if len(paths_list) > 5:
+                console.print(f"                        ... and {len(paths_list) - 5} more")
+        else:
+            # Single path
+            console.print(f"  Target Path           {path}")
     elif dest_port:
         port_desc = parsed_log.get("port_description", "")
         port_line = f"  Target Port           {dest_port}"
@@ -135,10 +192,26 @@ def display_report_sealert_format(
     elif comm != "unknown":
         console.print(f"  Process Info          {comm}")
 
-    # SELinux mode and status
-    is_permissive = parsed_log.get("permissive") == "1"
-    status_symbol = "⚠️  ALLOWED" if is_permissive else "✗ BLOCKED"
-    mode = "Permissive" if is_permissive else "Enforcing"
+    # SELinux mode and status - check all events for mixed mode
+    permissive_set = set()
+    if correlations:
+        for corr in correlations:
+            perm_val = corr.get("permissive")
+            if perm_val:
+                permissive_set.add(perm_val)
+
+    # Determine mode based on all events
+    if len(permissive_set) > 1:
+        # Mixed mode - some enforcing, some permissive
+        mode = "Mixed (Enforcing + Permissive)"
+        status_symbol = "⚠️  PARTIALLY ALLOWED"
+    elif "1" in permissive_set:
+        mode = "Permissive"
+        status_symbol = "⚠️  ALLOWED"
+    else:
+        mode = "Enforcing"
+        status_symbol = "✗ BLOCKED"
+
     console.print(f"  SELinux Mode          {mode} ({status_symbol})")
 
     # Time range if multiple events

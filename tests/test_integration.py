@@ -859,6 +859,58 @@ type=AVC msg=audit(1694170523.456:123): avc:  denied  { noatsecure } for  pid=12
         self.assertIn("executive summaries", result.stdout, "Help should describe brief format")
         self.assertIn("technical analysis", result.stdout, "Help should describe sealert format")
 
+    def test_mixed_permissive_mode_detection(self):
+        """Test that mixed permissive/enforcing mode is correctly detected and counted."""
+        # Create test data with one enforcing and one permissive event
+        test_content = """----
+type=AVC msg=audit(09/04/2025 18:19:00.303:503): avc: denied  { read } for  pid=1234 comm="httpd" path="/var/www/html/file1.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=0
+type=AVC msg=audit(09/04/2025 18:19:00.303:503): avc: denied  { write } for  pid=5678 comm="httpd-worker" path="/var/www/html/file2.html" scontext=system_u:system_r:httpd_t:s0 tcontext=unconfined_u:object_r:default_t:s0 tclass=file permissive=1
+----"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as tmp_file:
+            tmp_file.write(test_content)
+            tmp_file_path = tmp_file.name
+
+        try:
+            # Test default output
+            result = subprocess.run(
+                [sys.executable, "parse_avc.py", "--file", tmp_file_path],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+
+            self.assertEqual(result.returncode, 0, f"Parser failed: {result.stderr}")
+            output = result.stdout
+
+            # Should detect permissive mode but count correctly
+            self.assertIn("PERMISSIVE MODE DETECTED", output, "Should detect permissive mode")
+            self.assertIn("1 of 2 events", output, "Should correctly count 1 of 2 events as permissive")
+
+            # Should show both enforcement statuses in events
+            self.assertIn("Enforcing", output, "Should show enforcing status")
+            self.assertIn("Permissive", output, "Should show permissive status")
+
+            # Test sealert format
+            result_sealert = subprocess.run(
+                [sys.executable, "parse_avc.py", "--file", tmp_file_path, "--report", "sealert"],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+
+            self.assertEqual(result_sealert.returncode, 0, f"Parser failed: {result_sealert.stderr}")
+            sealert_output = result_sealert.stdout
+
+            # Should detect mixed mode in sealert
+            self.assertIn("Mixed (Enforcing + Permissive)", sealert_output,
+                         "Sealert should detect mixed mode")
+            self.assertIn("PARTIALLY ALLOWED", sealert_output,
+                         "Sealert should indicate partial allowance")
+
+        finally:
+            os.unlink(tmp_file_path)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

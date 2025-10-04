@@ -339,7 +339,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
         },
         "SYSCALL": {
             "syscall": r"syscall=([\w\d]+)",  # System call name/number
-            "exe": r"exe=\"([^\"]+)\"",  # Executable path
+            "exe": r'exe=(?:"([^"]+)"|([^\s]+))',  # Executable path - quotes optional
             "exit": r"exit=([^\s(]+)",  # Exit code (EACCES, 0, etc.) - stop at parentheses
             "success": r"success=(yes|no)",  # Success flag
         },
@@ -375,7 +375,11 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
             for key, pattern in patterns[log_type].items():
                 field_match = re.search(pattern, line)
                 if field_match:
-                    value = field_match.group(1)
+                    # Handle patterns with multiple capture groups (quoted/unquoted)
+                    if key == "exe" and log_type == "SYSCALL" and len(field_match.groups()) > 1:
+                        value = (field_match.group(1) or field_match.group(2)).strip()
+                    else:
+                        value = field_match.group(1)
                     if key == "proctitle":
                         value = value.strip()  # Remove any trailing whitespace
                         # Check if it's quoted

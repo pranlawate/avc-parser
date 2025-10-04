@@ -149,11 +149,19 @@ def detect_permissive_mode(unique_denials: list) -> tuple[bool, int, int]:
     total_count = 0
 
     for denial_info in unique_denials:
-        denial_count = denial_info.get("count", 1)
-        total_count += denial_count
-
-        if has_permissive_denials(denial_info):
-            permissive_count += denial_count
+        # Count actual permissive events from correlations for accuracy
+        correlations = denial_info.get("correlations", [])
+        if correlations:
+            for corr in correlations:
+                total_count += 1
+                if corr.get("permissive") == "1":
+                    permissive_count += 1
+        else:
+            # Fallback to denial count if no correlations
+            denial_count = denial_info.get("count", 1)
+            total_count += denial_count
+            if has_permissive_denials(denial_info):
+                permissive_count += denial_count
 
     return permissive_count > 0, permissive_count, total_count
 
