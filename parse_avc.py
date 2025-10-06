@@ -11,6 +11,7 @@ Author: Pranav Lawate
 License: MIT
 Version: 1.6.0
 """
+from __future__ import annotations
 
 import argparse
 import os
@@ -129,7 +130,7 @@ def is_valid_denial_record(avc_data: dict) -> bool:
     return is_selinux_error_type(avc_data)
 
 
-def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
+def parse_audit_record_text(input_line: str) -> tuple[bool, str | None, str | None, str | None, str | None]:
     """
     Parse audit record using enhanced setroubleshoot regex pattern.
 
@@ -137,7 +138,7 @@ def parse_audit_record_text(input_line: str) -> tuple[bool, str, str, str, str]:
         input_line (str): Raw audit log line to parse
 
     Returns:
-        tuple[bool, str, str, str, str]: (parse_succeeded, host, record_type, event_id, body_text)
+        tuple[bool, str | None, str | None, str | None, str | None]: (parse_succeeded, host, record_type, event_id, body_text)
             - parse_succeeded: True if line matches audit record format
             - host: Node hostname if present (or None)
             - record_type: Record type (AVC, USER_AVC, SYSCALL, etc.) if present
