@@ -99,6 +99,130 @@ def context_to_str(context) -> str | None:
     return str(context) if context else None
 
 
+def normalize_path_smart(path: str, avc_pid: str | int = None, tclass: str = None) -> tuple[str, dict]:
+    """
+    Smart path normalization that preserves security-relevant information.
+
+    Based on setroubleshoot's approach but enhanced to detect security issues.
+    This is system-independent - only string/regex manipulation, no filesystem access.
+
+    Normalizations:
+    - /proc/PID/... → /proc/<pid>/... (only if PID matches accessing process)
+    - pipe:[12345] → pipe (ephemeral inode numbers)
+    - socket:[67890] → socket (ephemeral inode numbers)
+    - Abstract sockets: \0path → @path (display convention)
+
+    Args:
+        path: The path to normalize
+        avc_pid: The PID of the accessing process (from AVC record)
+        tclass: The object class (file, pipe, socket, etc.)
+
+    Returns:
+        tuple[str, dict]: (normalized_path, metadata)
+            metadata contains:
+                - 'normalized': bool - whether path was modified
+                - 'cross_process_access': bool - if /proc access crosses process boundary
+                - 'original_path': str - original path before normalization
+                - 'normalization_type': str - what type of normalization applied
+    """
+    if not path:
+        return path, {'normalized': False}
+
+    metadata = {
+        'normalized': False,
+        'cross_process_access': False,
+        'original_path': path,
+        'normalization_type': None
+    }
+
+    normalized_path = path
+
+    # 1. Handle /proc/PID paths with smart cross-process detection
+    if path.startswith('/proc/'):
+        proc_match = re.match(r'^/proc/(\d+)(/.*)?$', path)
+        if proc_match:
+            path_pid = proc_match.group(1)
+            rest = proc_match.group(2) or ''
+
+            # Convert avc_pid to string for comparison
+            avc_pid_str = str(avc_pid) if avc_pid is not None else None
+
+            if avc_pid_str and path_pid == avc_pid_str:
+                # Process accessing its own /proc - safe to normalize
+                normalized_path = f'/proc/<pid>{rest}'
+                metadata['normalized'] = True
+                metadata['normalization_type'] = 'proc_self'
+            elif avc_pid_str and path_pid != avc_pid_str:
+                # SECURITY ISSUE: Process accessing another process's /proc!
+                # Keep original path but flag it for user attention
+                metadata['cross_process_access'] = True
+                metadata['normalization_type'] = 'proc_cross_process'
+                # Don't normalize - user MUST see the actual PIDs
+                normalized_path = path
+            else:
+                # No AVC pid available - normalize conservatively
+                # This maintains deduplication but user should be aware
+                normalized_path = f'/proc/<pid>{rest}'
+                metadata['normalized'] = True
+                metadata['normalization_type'] = 'proc_unknown'
+
+    # 2. Handle pipe:[inode], socket:[inode], anon_inode:[...] patterns
+    elif not normalized_path.startswith('/'):
+        # Match patterns like: pipe:[12345], socket:[67890], anon_inode:[eventfd]
+        pipe_match = re.match(r'^(\w+):\[([^\]]*)\]$', normalized_path)
+        if pipe_match:
+            if tclass:
+                # Use the object class name (more accurate than the prefix)
+                normalized_path = tclass
+                metadata['normalized'] = True
+                metadata['normalization_type'] = 'pipe_socket_inode'
+            else:
+                # Fall back to just the prefix
+                normalized_path = pipe_match.group(1)
+                metadata['normalized'] = True
+                metadata['normalization_type'] = 'pipe_socket_prefix'
+
+        # 3. Handle abstract UNIX sockets (\0 prefix)
+        # Abstract sockets use null byte as prefix - convention is to show as @
+        if normalized_path and normalized_path[0] == '\0':
+            normalized_path = "@" + normalized_path.strip('\0')
+            metadata['normalized'] = True
+            metadata['normalization_type'] = 'abstract_socket'
+
+    return normalized_path, metadata
+
+
+def resolve_relative_path_with_cwd(path: str, cwd: str = None) -> str:
+    """
+    Resolve relative paths to absolute using CWD (Current Working Directory).
+
+    Based on setroubleshoot's approach (audit_data.py:827-828).
+    System-independent - uses os.path.join and os.path.normpath (no filesystem I/O).
+
+    Args:
+        path: The path (may be relative or absolute)
+        cwd: Current working directory from CWD audit record
+
+    Returns:
+        str: Absolute path if resolution possible, otherwise original path
+
+    Examples:
+        path="foo.txt", cwd="/home/user" → "/home/user/foo.txt"
+        path="/etc/passwd", cwd="/home/user" → "/etc/passwd" (already absolute)
+        path="foo.txt", cwd=None → "foo.txt" (no CWD available)
+    """
+    if not path or not cwd:
+        return path
+
+    # Only resolve if path is relative AND cwd is absolute
+    if not os.path.isabs(path) and os.path.isabs(cwd):
+        # Join and normalize (removes .., ., redundant slashes)
+        resolved = os.path.normpath(os.path.join(cwd, path))
+        return resolved
+
+    return path
+
+
 def is_valid_denial_record(avc_data: dict) -> bool:
     """
     Check if parsed record is a valid denial/error record.
@@ -852,6 +976,76 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
         # Mark path type if we have a path
         if avc_data.get("path") and "path_type" not in avc_data:
             avc_data["path_type"] = "file_path"
+
+        # Apply exe/comm resolution priority (based on setroubleshoot's approach)
+        # Priority: SYSCALL exe > AVC exe > SYSCALL comm > AVC comm > scontext.type
+        # We need to determine which source to use for exe and comm
+        syscall_exe = shared_context.get("exe")  # From SYSCALL record
+        syscall_comm = shared_context.get("comm")  # From SYSCALL record (if present there)
+        # Note: shared_context may have comm from various sources, we need AVC-specific comm
+
+        # Store original sources for transparency
+        avc_has_exe = "_avc_exe" in avc_data or (
+            "exe" in avc_data and avc_data.get("_from_avc_fields")
+        )
+        avc_has_comm = "_avc_comm" in avc_data or (
+            "comm" in avc_data and avc_data.get("_from_avc_fields")
+        )
+
+        # Apply priority for exe
+        if not syscall_exe and avc_has_exe:
+            # Only AVC has exe, use it (already in avc_data)
+            pass
+        elif syscall_exe and not avc_has_exe:
+            # Only SYSCALL has exe, ensure it's set
+            avc_data["exe"] = syscall_exe
+        elif syscall_exe and avc_has_exe:
+            # Both have exe - prefer SYSCALL (setroubleshoot's priority)
+            avc_data["exe"] = syscall_exe
+            avc_data["_exe_source"] = "syscall"  # Mark source for transparency
+
+        # Apply priority for comm: SYSCALL comm > AVC comm
+        if syscall_comm and avc_has_comm:
+            # Both sources - prefer SYSCALL
+            avc_data["comm"] = syscall_comm
+            avc_data["_comm_source"] = "syscall"
+
+        # Ultimate fallback for display: use scontext.type if no exe/comm
+        if not avc_data.get("exe") and not avc_data.get("comm"):
+            if avc_data.get("scontext") and hasattr(avc_data["scontext"], "type"):
+                avc_data["_source_fallback"] = avc_data["scontext"].type
+
+        # Apply system-independent optimizations (based on setroubleshoot's approach)
+        if avc_data.get("path"):
+            original_path = avc_data["path"]
+
+            # 1. Resolve relative paths using CWD
+            cwd = shared_context.get("cwd")
+            if cwd:
+                avc_data["path"] = resolve_relative_path_with_cwd(avc_data["path"], cwd)
+
+            # 2. Apply smart path normalization
+            avc_pid = avc_data.get("pid")
+            tclass = avc_data.get("tclass")
+            normalized_path, norm_metadata = normalize_path_smart(
+                avc_data["path"], avc_pid, tclass
+            )
+
+            # Store normalization metadata for user visibility
+            if norm_metadata.get("normalized"):
+                avc_data["_path_normalized"] = True
+                avc_data["_path_original"] = original_path
+                avc_data["_path_normalization_type"] = norm_metadata.get("normalization_type")
+
+            # CRITICAL: Flag cross-process /proc access for security visibility
+            if norm_metadata.get("cross_process_access"):
+                avc_data["_cross_process_access"] = True
+                avc_data["_security_note"] = (
+                    f"Process PID {avc_pid} accessing /proc of different process - "
+                    "potential security issue"
+                )
+
+            avc_data["path"] = normalized_path
 
         # Use comm as fallback for proctitle if proctitle is null or missing
         if avc_data.get("proctitle") in ("(null)", "null", "", None) and avc_data.get("comm"):
