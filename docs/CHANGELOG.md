@@ -5,6 +5,52 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Smart Path Normalization** (Based on setroubleshoot)
+  - `/proc/<pid>` normalization with cross-process access detection (security-aware)
+    - Process accessing own /proc: `/proc/1234/fd` → `/proc/<pid>/fd` (normalized)
+    - Cross-process access: `/proc/5678/fd` preserved + flagged as potential security issue
+    - Prevents hiding security-critical cross-process access patterns
+  - Pipe/socket instance stripping: `pipe:[12345]` → `pipe` (uses tclass for accuracy)
+  - Abstract socket handling: `\0path` → `@path` (display convention)
+  - Comprehensive test suite with 15+ test cases validating all edge cases
+
+- **Enhanced Path Resolution**
+  - CWD-based relative path resolution using os.path.join
+  - Handles `../` normalization correctly for cleaner absolute paths
+  - Only applies to relative paths when CWD is available and absolute
+
+- **Sophisticated PATH Record Matching**
+  - Implements setroubleshoot's PATH record selection algorithm
+  - Avoids PARENT nametype records when possible
+  - Matches PATH records by name field from AVC record for accuracy
+  - Collects all PATH records instead of just using last one
+
+- **Source Resolution Priority**
+  - Implements setroubleshoot's exe/comm priority: SYSCALL > AVC > scontext.type
+  - Maintains transparency with source tracking metadata
+  - More accurate process identification
+
+### Fixed
+- **Path Resolution Priority Bug**
+  - AVC record paths now correctly take priority over PATH record paths
+  - Fixed fallback logic that was incorrectly overwriting valid AVC paths with dev:inode identifiers
+  - PATH records only used when AVC record has no path field
+
+- **Python 3.9 Compatibility**
+  - Fixed import ordering (moved `from __future__ import annotations` to top)
+  - Ensures compatibility with Python 3.9 while maintaining 3.10+ syntax
+
+### Changed
+- **Path Normalization Benefits**
+  - Better deduplication (ephemeral PIDs and inodes normalized)
+  - More readable output (abstract sockets, normalized paths)
+  - Security-aware (cross-process access flagged, not hidden)
+  - System-independent (no filesystem I/O, no external commands)
+  - Forensically accurate (shows patterns, not ephemeral instances)
+
 ## [1.7.0] - 2025-10-05
 
 ### Added

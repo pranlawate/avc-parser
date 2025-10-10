@@ -100,7 +100,13 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 - **Grouping Validation**: Efficiency analysis detecting when denial groups share identical policy queries for optimization insights
 - **Correlation Tracking**: Individual PID-to-resource mappings solve deduplication information loss
 - **PID Event Counting**: Shows event frequency per PID in compact view (e.g., `PID 1234 (3x)`) for better correlation understanding
-- **Enhanced Path Resolution**: PATH record correlation with dev+inode fallback for complex scenarios
+- **Enhanced Path Resolution**: Sophisticated PATH record matching (based on setroubleshoot) with dev+inode fallback for complex scenarios
+- **Smart Path Normalization**: Security-aware normalization removes ephemeral data while preserving critical information
+  - `/proc/<pid>` normalization with cross-process access detection (flags security issues instead of hiding them)
+  - Pipe/socket instance stripping (`pipe:[12345]` → `pipe`) for better deduplication
+  - Abstract socket display convention (`\0path` → `@path`) for readability
+  - CWD-based relative path resolution for accurate absolute paths
+  - System-independent (no filesystem access, works on any platform)
 - **dontaudit Detection**: Automatic detection of disabled dontaudit rules using permission indicators
 - **Advanced Filtering**: Comprehensive filtering by process, path, time range, and SELinux contexts (`--process`, `--path`, `--since`, `--until`, `--source`, `--target`)
 - **Time Range Analysis**: Flexible time specifications from relative keywords (`yesterday`) to specific timestamps (`2025-01-15 14:30`)
