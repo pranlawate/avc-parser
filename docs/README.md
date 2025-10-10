@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.7.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware analysis, advanced filtering capabilities, and normalized JSON output.
+**Version 1.8.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware analysis, smart path normalization with security awareness, exit code translation, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
@@ -126,7 +126,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
 📊 **Development Plans**: See [ROADMAP.md](ROADMAP.md) for future plans and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for implementation details.
 
-🎯 **Current Status (v1.7.0)**: Production-ready with clean modular architecture, modern development tooling, extended audit record support, and enhanced forensic analysis capabilities. Next phase: CI/CD automation and performance benchmarking.
+🎯 **Current Status (v1.8.0)**: Production-ready with setroubleshoot-based optimizations (smart path normalization, exit code translation), clean modular architecture, modern development tooling, extended audit record support, and enhanced forensic analysis capabilities. Python 3.9+ compatible. Next phase: CI/CD automation and performance benchmarking.
 
 ## 🏗️ Architecture
 
@@ -382,4 +382,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.8.0** | Made for forensic analysts and system administrators

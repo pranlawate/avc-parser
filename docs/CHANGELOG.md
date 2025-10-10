@@ -5,7 +5,7 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.8.0] - 2025-10-10
 
 ### Added
 - **Exit Code Translation** (Based on setroubleshoot)
@@ -343,6 +343,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
+- **v1.8.0**: Setroubleshoot-based optimizations - Exit code translation, smart path normalization, sophisticated path resolution
 - **v1.7.0**: Phase 11 complete - Extended audit types, context-aware analysis, code quality & dev tooling
 - **v1.6.0**: Phase 9-10 complete - Modular architecture, developer tools, comprehensive documentation
 - **v1.5.0**: Two-tier report system with policy investigation integration
@@ -353,6 +354,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v1.0.0**: Core foundation with auto-detection and multiple display formats
 
 ## Migration Guide
+
+### From 1.7.x to 1.8.0
+- No breaking changes - all existing functionality preserved
+- Exit codes now automatically translated to human-readable names (e.g., `-13` → `EACCES`)
+- Paths automatically normalized for better deduplication (ephemeral PIDs/inodes removed)
+- Cross-process access patterns flagged for security awareness
+- Python 3.9+ compatibility maintained with `from __future__ import annotations`
+- All new features are system-independent and work on any platform
 
 ### From 1.6.x to 1.7.0
 - No breaking changes - all existing functionality preserved

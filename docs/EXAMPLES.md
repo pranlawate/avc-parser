@@ -1,6 +1,6 @@
 # SELinux AVC Denial Analyzer - Examples & Usage Patterns
 
-**Version 1.7.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Extended Audit Record Support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), Context-Aware Analysis, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
+**Version 1.8.0** | Comprehensive examples and usage patterns for the SELinux AVC Denial Analyzer with Extended Audit Record Support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), Context-Aware Analysis, Smart Path Normalization, Exit Code Translation, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
 
@@ -499,4 +499,4 @@ python3 parse_avc.py --file audit.log | grep "PID"
 - [ROADMAP.md](ROADMAP.md) - Development roadmap and features
 - [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) - Feature scope and decisions
 
-**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.8.0** | Made for forensic analysts and system administrators

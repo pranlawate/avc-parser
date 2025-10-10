@@ -1,6 +1,6 @@
 [project]
 name = "avc-parser"
-version = "1.7.0"
+version = "1.8.0"
 description = "SELinux AVC denial parser and analyzer with extended audit record support"
 requires-python = ">=3.8"
 dependencies = [

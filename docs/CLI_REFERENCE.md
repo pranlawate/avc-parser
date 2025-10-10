@@ -1,10 +1,10 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.7.0** | Complete command-line reference, data fields, and troubleshooting guide with Extended Audit Record Support, Context-Aware Analysis, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
+**Version 1.8.0** | Complete command-line reference, data fields, and troubleshooting guide with Extended Audit Record Support, Context-Aware Analysis, Smart Path Normalization, Exit Code Translation, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
-> **🎯 Production Ready v1.7.0**: Phase 11 complete with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (169 tests). Clean modular architecture with advanced filtering, professional report formats, and policy investigation integration.
+> **🎯 Production Ready v1.8.0**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.9+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (169 tests).
 
 > **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 
@@ -569,4 +569,4 @@ Look for these indicators in the output:
 
 ---
 
-**SELinux AVC Denial Analyzer v1.7.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.8.0** | Made for forensic analysts and system administrators
