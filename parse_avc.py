@@ -382,13 +382,15 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
     """
     shared_context = {}
     unparsed_types = set()
+    path_records = []  # Collect all PATH records for sophisticated matching
 
     # Define regex patterns for extracting context from non-AVC audit records
     patterns = {
         "CWD": {"cwd": r"cwd=\"([^\"]+)\""},  # Current working directory
         "PATH": {
-            "path": r"name=\"([^\"]+)\"",  # Quoted file path
-            "path_unquoted": r"name=([^\s]+)",  # Unquoted path (fallback)
+            "name": r"name=\"([^\"]+)\"",  # Quoted file path (note: changed from 'path' to 'name')
+            "name_unquoted": r"name=([^\s]+)",  # Unquoted path (fallback)
+            "nametype": r"nametype=(\w+)",  # PATH record type (NORMAL, PARENT, etc.)
             "inode": r"inode=(\d+)",  # File inode number
             "dev": r"dev=([^\s]+)",  # Device identifier
         },
@@ -422,7 +424,22 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
             if event_id:
                 shared_context["event_id"] = event_id
 
-        if log_type in patterns:
+        if log_type == "PATH":
+            # Collect PATH records for sophisticated matching later
+            path_record = {}
+            for key, pattern in patterns["PATH"].items():
+                field_match = re.search(pattern, line)
+                if field_match:
+                    value = field_match.group(1)
+                    if key == "name_unquoted":
+                        # Only use unquoted name if we don't already have a quoted name
+                        if "name" not in path_record:
+                            path_record["name"] = value.strip()
+                    else:
+                        path_record[key] = value.strip()
+            if path_record.get("name"):
+                path_records.append(path_record)
+        elif log_type in patterns:
             for key, pattern in patterns[log_type].items():
                 field_match = re.search(pattern, line)
                 if field_match:
@@ -466,17 +483,61 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                             if len(value) == 128:
                                 value += " [TRUNCATED BY AUDIT]"
                             shared_context[key] = value
-                    elif key == "path_unquoted":
-                        # Only use unquoted path if we don't already have a quoted path
-                        if "path" not in shared_context:
-                            shared_context["path"] = value.strip()
                     else:
                         shared_context[key] = value.strip()
         elif log_type not in ALL_SUPPORTED_TYPES:
             # Track unparsed types (excluding all supported AVC/SELinux-related types)
             unparsed_types.add(log_type)
 
+    # Store collected PATH records in shared_context for sophisticated matching
+    if path_records:
+        shared_context["_path_records"] = path_records
+
     return shared_context, unparsed_types
+
+
+def select_best_path_from_path_records(path_records: list, avc_name: str = None) -> str | None:
+    """
+    Select the best path from multiple PATH records using setroubleshoot's logic.
+
+    This implements the sophisticated matching algorithm from setroubleshoot:
+    1. Avoid PARENT nametype records if possible
+    2. Prefer paths that end with the name field from AVC record
+    3. Otherwise use the last non-PARENT record
+
+    Args:
+        path_records: List of PATH record dictionaries with 'name', 'nametype', etc.
+        avc_name: Optional name field from AVC record for matching
+
+    Returns:
+        str | None: Best matching path or None if no suitable path found
+    """
+    if not path_records:
+        return None
+
+    best_path = None
+
+    # Iterate through PATH records
+    for path_record in path_records:
+        nametype = path_record.get("nametype", "")
+        path = path_record.get("name")
+
+        if not path:
+            continue
+
+        # Skip PARENT records if we already have a path
+        if best_path and nametype == "PARENT":
+            continue
+
+        # Update best_path
+        best_path = path
+
+        # If we have an AVC name and this path ends with it, and it's not PARENT, this is ideal
+        if avc_name and nametype != "PARENT" and path.endswith(avc_name):
+            # Found perfect match - return immediately
+            return path
+
+    return best_path
 
 
 def process_individual_avc_record(line: str, shared_context: dict) -> dict:
@@ -685,10 +746,16 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                     # Handle comm and exe fields that can be quoted or unquoted
                     # ausearch -i strips quotes, so we need to handle both formats
                     avc_data[key] = (field_match.group(1) or field_match.group(2)).strip()
+                elif key == "path":
+                    # Quoted path from AVC record - highest priority
+                    avc_data["path"] = field_match.group(1).strip()
+                    avc_data["_path_from_avc"] = True  # Internal marker
                 elif key == "path_unquoted":
-                    # Only use unquoted path if we don't already have a quoted path
-                    if "path" not in avc_data:
+                    # Unquoted path from AVC - only use if no quoted path from AVC already exists
+                    # This allows AVC path to override shared_context path from PATH records
+                    if not avc_data.get("_path_from_avc"):
                         avc_data["path"] = field_match.group(1).strip()
+                        avc_data["_path_from_avc"] = True  # Mark as coming from AVC record
                 elif key in ("scontext", "tcontext"):
                     # Parse SELinux contexts into AvcContext objects for enhanced analysis
                     context_string = field_match.group(1).strip()
@@ -737,13 +804,25 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 else:
                     avc_data[key] = field_match.group(1).strip()
 
-        # Enhanced path resolution logic
+        # Enhanced path resolution logic (following setroubleshoot's approach)
+        # Only use PATH records if AVC record doesn't have a path
+        if not avc_data.get("_path_from_avc"):
+            # No path in AVC record, use sophisticated PATH record matching
+            path_records = shared_context.get("_path_records", [])
+            avc_name = avc_data.get("name")  # Name field from AVC for matching
+
+            if path_records:
+                # Use setroubleshoot's sophisticated matching logic
+                best_path = select_best_path_from_path_records(path_records, avc_name)
+                if best_path:
+                    avc_data["path"] = best_path
+                    avc_data["path_type"] = "file_path"
+                    avc_data["_path_from_path_record"] = True
+
+        # Fallback options only if we still don't have a path
         if "path" not in avc_data or not avc_data["path"]:
-            # No path in AVC, try to use PATH record data or build from available info
-            if shared_context.get("path"):
-                avc_data["path"] = shared_context["path"]
-                avc_data["path_type"] = "file_path"
-            elif avc_data.get("name") and avc_data["name"] not in ("?", '"?"'):
+            # Try name field first
+            if avc_data.get("name") and avc_data["name"] not in ("?", '"?"'):
                 # We have a meaningful name field, use it as the path (common for directory access)
                 # Skip meaningless names like "?" which appear in D-Bus records
                 name_value = avc_data["name"]
@@ -759,18 +838,19 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                 else:
                     avc_data["path"] = name_value
                     avc_data["path_type"] = "name_only"
+            # Try dev+inode from AVC record
             elif avc_data.get("dev") and avc_data.get("ino"):
-                # Create a dev+inode identifier when path is missing
                 avc_data["path"] = f"dev:{avc_data['dev']},inode:{avc_data['ino']}"
                 avc_data["path_type"] = "dev_inode"
+            # Try dev+inode from PATH record
             elif shared_context.get("dev") and shared_context.get("inode"):
-                # Use PATH record dev+inode if available
                 dev_val = shared_context["dev"]
                 inode_val = shared_context["inode"]
                 avc_data["path"] = f"dev:{dev_val},inode:{inode_val}"
                 avc_data["path_type"] = "dev_inode"
-        else:
-            # We have a path, mark it as a regular path
+
+        # Mark path type if we have a path
+        if avc_data.get("path") and "path_type" not in avc_data:
             avc_data["path_type"] = "file_path"
 
         # Use comm as fallback for proctitle if proctitle is null or missing
