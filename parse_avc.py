@@ -14,6 +14,7 @@ Version: 1.6.0
 from __future__ import annotations
 
 import argparse
+import errno
 import os
 import re
 import signal
@@ -221,6 +222,54 @@ def resolve_relative_path_with_cwd(path: str, cwd: str = None) -> str:
         return resolved
 
     return path
+
+
+def translate_exit_code(exit_value: str | int) -> str:
+    """
+    Translate numeric exit codes to human-readable error names.
+
+    Based on setroubleshoot's approach (audit_data.py:375-379).
+    System-independent - uses Python's built-in errno module.
+
+    Args:
+        exit_value: Exit code as string or int (e.g., "-13", -13, "0", "EACCES")
+
+    Returns:
+        str: Human-readable error name or original value if not translatable
+
+    Examples:
+        translate_exit_code("-13") → "EACCES"
+        translate_exit_code("0") → "SUCCESS"
+        translate_exit_code("-2") → "ENOENT"
+        translate_exit_code("EACCES") → "EACCES" (already translated)
+    """
+    if not exit_value:
+        return exit_value
+
+    # If already a string name (not numeric), return as-is
+    exit_str = str(exit_value).strip()
+    if not exit_str.lstrip('-').isdigit():
+        return exit_str
+
+    try:
+        # Convert to integer and get absolute value
+        exit_code = int(exit_str)
+        abs_code = abs(exit_code)
+
+        # Special case: 0 is success (not in errno.errorcode)
+        if abs_code == 0:
+            return "SUCCESS"
+
+        # Look up error name in errno module
+        if abs_code in errno.errorcode:
+            return errno.errorcode[abs_code]
+
+        # Not in errno table, return original
+        return exit_str
+
+    except (ValueError, TypeError):
+        # Not a valid integer, return original
+        return exit_str
 
 
 def is_valid_denial_record(avc_data: dict) -> bool:
@@ -607,6 +656,14 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                             if len(value) == 128:
                                 value += " [TRUNCATED BY AUDIT]"
                             shared_context[key] = value
+                    elif key == "exit":
+                        # Translate numeric exit codes to error names (based on setroubleshoot)
+                        # e.g., "-13" → "EACCES", "0" → "SUCCESS"
+                        translated = translate_exit_code(value)
+                        shared_context[key] = translated
+                        # Store original for reference
+                        if translated != value:
+                            shared_context["_exit_code_original"] = value
                     else:
                         shared_context[key] = value.strip()
         elif log_type not in ALL_SUPPORTED_TYPES:

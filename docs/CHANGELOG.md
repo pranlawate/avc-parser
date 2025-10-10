@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Exit Code Translation** (Based on setroubleshoot)
+  - Automatic translation of numeric exit codes to human-readable error names
+  - Uses Python's built-in `errno` module (system-independent)
+  - Examples: `-13` → `EACCES`, `0` → `SUCCESS`, `-2` → `ENOENT`
+  - Original numeric value preserved in `_exit_code_original` for reference
+  - Significantly improves forensic analysis readability
+  - Works with both raw audit logs and pre-processed logs
+
 - **Smart Path Normalization** (Based on setroubleshoot)
   - `/proc/<pid>` normalization with cross-process access detection (security-aware)
     - Process accessing own /proc: `/proc/1234/fd` → `/proc/<pid>/fd` (normalized)
