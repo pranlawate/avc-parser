@@ -193,18 +193,6 @@ avc-parser/
 
 ## 🚀 Quick Start
 
-### **Try the Examples**
-```bash
-# Quick demonstration
-python3 examples/basic_analysis.py
-
-# SIEM integration patterns
-python3 examples/json_integration.py
-
-# Batch processing workflow
-python3 examples/batch_processing.py
-```
-
 ### **Validate Your Logs**
 ```bash
 # Check if your log file will work well
