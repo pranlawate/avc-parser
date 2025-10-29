@@ -77,10 +77,25 @@ def display_report_sealert_format(
     avc_parts = []
     avc_parts.append(f"avc: denied {{ {permissions_display} }}")
     avc_parts.append(f"for pid={pid} comm=\"{comm}\"")
+
+    # Add name field if present (often just filename without full path)
+    name = parsed_log.get("name", "")
+    if name and name not in ["?", '"?"']:
+        avc_parts.append(f"name={name}")
+
     if path:
         avc_parts.append(f"path=\"{path}\"")
     elif dest_port:
         avc_parts.append(f"dest={dest_port}")
+
+    # Add device and inode information if available
+    dev = parsed_log.get("dev", "")
+    if dev:
+        avc_parts.append(f"dev=\"{dev}\"")
+
+    ino = parsed_log.get("ino", "")
+    if ino:
+        avc_parts.append(f"ino={ino}")
 
     scontext = parsed_log.get("scontext", "")
     tcontext = parsed_log.get("tcontext", "")
@@ -90,6 +105,11 @@ def display_report_sealert_format(
         avc_parts.append(f"tcontext={tcontext}")
     if tclass:
         avc_parts.append(f"tclass={tclass}")
+
+    # Add permissive flag if present
+    permissive = parsed_log.get("permissive", "")
+    if permissive:
+        avc_parts.append(f"permissive={permissive}")
 
     console.print(f"  type=AVC {' '.join(avc_parts)}")
 
