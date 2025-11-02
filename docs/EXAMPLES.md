@@ -456,6 +456,100 @@ python3 parse_avc.py --file /var/log/audit/audit.log --sort recent
 python3 parse_avc.py --file /var/log/audit/audit.log --detailed
 ```
 
+## 🛠️ **Debugging and Troubleshooting**
+
+### Quick Summary with --stats
+Get an instant overview without viewing full details:
+```bash
+$ python3 parse_avc.py --file testAVC/tpm-enforcing.log --stats
+
+📊 SELinux AVC Log Summary
+═══════════════════════════════════════════════════════════════════════════════
+File:              testAVC/tpm-enforcing.log (698.4 KB)
+Total Events:      877
+Unique Denials:    202
+Blocks Processed:  620
+Time Range:        2025-11-01 22:08:25 to 2025-11-01 22:34:16 (25 minutes)
+
+Top Processes:
+  1. sudo                 (504 events)
+  2. unix_chkpwd          (59 events)
+  3. cryptsetup           (52 events)
+
+Top Source Contexts:
+  1. staff_sudo_t         (528 events)
+  2. sysadm_t             (96 events)
+  3. firewalld_t          (69 events)
+
+Security Notices:
+  ⚠️  DONTAUDIT RULES DISABLED (enhanced audit mode)
+
+💡 Next Steps:
+  • View all denials:     python3 parse_avc.py --file testAVC/tpm-enforcing.log
+  • Focus on sudo:        python3 parse_avc.py --file testAVC/tpm-enforcing.log --process sudo
+  • Export to JSON:       python3 parse_avc.py --file testAVC/tpm-enforcing.log --json
+```
+
+**Use Case**: Triage logs quickly to decide if deep analysis is needed.
+
+### Verbose Debugging with --verbose
+Troubleshoot unexpected results with debug output:
+```bash
+$ python3 parse_avc.py --file testAVC/file_context_AVC.log --verbose
+
+→ Debug: Split input into 1 log blocks
+→ Debug: Parsing 1 log blocks
+→ Debug: Successfully parsed 1 AVC denials from 1 valid blocks
+→ Debug: Created 1 unique denial groups from 1 total events
+🔍 Auto-detected: Pre-processed format
+   Will parse the file testAVC/file_context_AVC.log directly
+
+Found 1 AVC events. Displaying 1 unique denials...
+[... normal output continues ...]
+```
+
+**Use Case**: Diagnose why filters aren't matching or report issues with detailed context.
+
+### Combining Verbose with Filtering
+```bash
+$ python3 parse_avc.py --file testAVC/tpm-enforcing.log --verbose --process systemd-crypten
+
+→ Debug: Split input into 620 log blocks
+→ Debug: Parsing 620 log blocks
+→ Debug: Successfully parsed 877 AVC denials from 620 valid blocks
+→ Debug: Created 202 unique denial groups from 877 total events
+→ Debug: Filtering: 201 denials filtered out, 1 remaining
+[... shows only systemd-crypten denials ...]
+```
+
+**Use Case**: Verify filtering is working as expected.
+
+### Empty Filter Results (Enhanced Guidance)
+When filters don't match anything, you get helpful suggestions:
+```bash
+$ python3 parse_avc.py --file testAVC/tpm-enforcing.log --process nonexistent
+
+Found 877 AVC events. Displaying 202 unique denials...
+Applied filters: process='nonexistent'
+Showing 0 of 202 unique denials after filtering.
+
+⚠️  No denials matched your filter criteria
+
+You filtered for:
+  • process='nonexistent'
+
+But found 0 matches out of 202 total denials.
+
+💡 Suggestions:
+  • Remove filters to see all denials: python3 parse_avc.py --file testAVC/tpm-enforcing.log
+  • Check available process names:
+    python3 parse_avc.py --file testAVC/tpm-enforcing.log | grep 'PID'
+  • Try wildcard patterns:
+    --process '*nonex*'
+```
+
+**Use Case**: Quickly correct typos and discover what's actually in the log.
+
 ## 💡 **Advanced Usage Tips**
 
 ### Performance Optimization

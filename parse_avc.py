@@ -39,6 +39,7 @@ from detectors import (
 from formatters import (
     display_report_brief_format,
     display_report_sealert_format,
+    display_stats_summary,
     format_as_json,
 )
 from selinux.context import AvcContext, PermissionSemanticAnalyzer
@@ -73,7 +74,27 @@ ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES
 SELINUX_ERROR_TYPES = ("SELINUX_ERR", "USER_SELINUX_ERR")
 
 
+# Global verbose flag (set from args in main())
+VERBOSE_MODE = False
+
+
 # Helper functions for code reuse and readability
+def verbose_print(message: str, console: Console = None):
+    """
+    Print debug message if verbose mode is enabled.
+
+    Args:
+        message: Debug message to print
+        console: Optional Rich console instance (uses stderr if not provided)
+    """
+    if VERBOSE_MODE:
+        if console:
+            console.print(f"[dim cyan]→ Debug:[/dim cyan] {message}", style="dim")
+        else:
+            # Use stderr console for verbose output
+            Console(stderr=True).print(f"[dim cyan]→ Debug:[/dim cyan] {message}", style="dim")
+
+
 def is_selinux_error_type(parsed_log: dict) -> bool:
     """
     Check if a parsed log record is a SELINUX_ERR type.
@@ -3568,6 +3589,17 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         action="store_true",
         help="Use legacy signature logic for regression testing (disables smart deduplication).",
     )
+    advanced_group.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output for debugging and troubleshooting.",
+    )
+    advanced_group.add_argument(
+        "--stats",
+        action="store_true",
+        help="Display summary statistics only (quick overview without full output).",
+    )
     args = parser.parse_args()
 
     # Set up signal handler for graceful interruption (Ctrl+C)
@@ -3575,6 +3607,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     # Create a Rich Console instance
     console = Console()
+
+    # Set global verbose mode
+    global VERBOSE_MODE
+    VERBOSE_MODE = args.verbose
 
     # Comprehensive argument validation with enhanced error messages
     input_type = validate_arguments(args, console)
@@ -3669,6 +3705,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     # Split log into blocks using '----' separator
     log_blocks = [block.strip() for block in log_string.split("----") if block.strip()]
+    verbose_print(f"Split input into {len(log_blocks)} log blocks", console)
     if not log_blocks:
         if not args.json:
             console.print("Error: No valid log blocks found.", style="bold red")
@@ -3682,6 +3719,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     valid_blocks = []
     all_avc_denials = []
     all_policy_loads = []
+
+    verbose_print(f"Parsing {len(log_blocks)} log blocks", console)
 
     for i, block in enumerate(log_blocks):
         # Validate and sanitize the log block
@@ -3719,6 +3758,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 "   [dim]All input blocks contained malformed or unrecognizable data.[/dim]"
             )
         sys.exit(1)
+
+    verbose_print(f"Successfully parsed {len(all_avc_denials)} AVC denials from {len(valid_blocks)} valid blocks", console)
 
     # Display validation summary (non-JSON mode only)
     if validation_warnings and not args.json:
@@ -3858,6 +3899,44 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         denial_entry[field_key] = {parsed_log[field]}
 
                 unique_denials[signature] = denial_entry
+
+    verbose_print(f"Created {len(unique_denials)} unique denial groups from {len(all_avc_denials)} total events", console)
+
+    # Handle --stats mode (summary only)
+    if args.stats:
+        # Prepare statistics
+        total_events = sum(denial["count"] for denial in unique_denials.values())
+
+        # Detect security notices
+        all_denials_list = list(unique_denials.values())
+        dontaudit_detected, _ = detect_dontaudit_disabled(all_denials_list)
+        permissive_detected, _, _ = detect_permissive_mode(all_denials_list)
+
+        # Prepare file info
+        file_info = None
+        if args.file:
+            import os
+            file_size_kb = os.path.getsize(args.file) / 1024 if os.path.exists(args.file) else None
+            file_info = {
+                "name": args.file,
+                "size_kb": file_size_kb,
+            }
+
+        security_notices = {
+            "dontaudit": dontaudit_detected,
+            "permissive": permissive_detected,
+        }
+
+        display_stats_summary(
+            list(unique_denials.values()),
+            total_events,
+            len(valid_blocks),
+            file_info=file_info,
+            security_notices=security_notices,
+            console=console,
+        )
+        return
+
     if args.json:
         format_as_json(unique_denials, valid_blocks, generate_sesearch_command)
 
@@ -3882,6 +3961,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 args.source,
                 args.target,
             )
+            if any([args.process, args.path, args.since, args.until, args.source, args.target]):
+                filtered_count = len(filtered_denials)
+                total_count = len(sorted_denials)
+                filtered_out = total_count - filtered_count
+                verbose_print(f"Filtering: {filtered_out} denials filtered out, {filtered_count} remaining", console)
         except ValueError as e:
             console.print(f"[red]Error in filtering: {e}[/red]")
             return
@@ -3958,6 +4042,35 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 console.print(
                     f"Showing {len(filtered_denials)} of {len(sorted_denials)} unique denials after filtering."
                 )
+
+                # Enhanced empty result message
+                if len(filtered_denials) == 0:
+                    console.print()
+                    console.print("⚠️  [bold yellow]No denials matched your filter criteria[/bold yellow]")
+                    console.print()
+                    console.print("[bold]You filtered for:[/bold]")
+                    for msg in filter_msg:
+                        console.print(f"  • {msg}")
+                    console.print()
+                    console.print(f"[bold]But found 0 matches out of {len(sorted_denials)} total denials.[/bold]")
+                    console.print()
+                    console.print("💡 [bold]Suggestions:[/bold]")
+                    console.print(f"  • Remove filters to see all denials: [cyan]python3 parse_avc.py --file {args.file if args.file else '<file>'}[/cyan]")
+
+                    # Suggest checking process names if process filter was used
+                    if args.process:
+                        console.print("  • Check available process names:")
+                        console.print(f"    [cyan]python3 parse_avc.py --file {args.file if args.file else '<file>'} | grep 'PID'[/cyan]")
+
+                    # Suggest wildcard usage
+                    if args.process or args.path:
+                        console.print("  • Try wildcard patterns:")
+                        if args.process:
+                            console.print(f"    [cyan]--process '*{args.process[:5]}*'[/cyan]")
+                        if args.path:
+                            console.print(f"    [cyan]--path '{args.path}*'[/cyan]")
+
+                    console.print()
 
             if filtered_denials:
                 if not args.report:

@@ -48,6 +48,8 @@ This document provides comprehensive reference information for using the SELinux
 | Option | Description |
 |--------|-------------|
 | `--legacy-signatures` | Use legacy signature logic for regression testing (disables smart deduplication) |
+| `-v, --verbose` | Enable verbose output for debugging and troubleshooting |
+| `--stats` | Display summary statistics only (quick overview without full output) |
 | `--pager` | Use interactive pager for large outputs (like 'less' command) - only works in terminal environments |
 | `-h, --help` | Show help message |
 
@@ -149,6 +151,15 @@ python3 parse_avc.py --file audit.log --sort chrono
 
 ### Advanced Options
 ```bash
+# Get quick summary statistics
+python3 parse_avc.py --file audit.log --stats
+
+# Enable verbose debugging output
+python3 parse_avc.py --file audit.log --verbose
+
+# Combine verbose with filtering for troubleshooting
+python3 parse_avc.py --file audit.log --verbose --process httpd
+
 # Use interactive pager for large outputs
 python3 parse_avc.py --file audit.log --pager
 
@@ -287,6 +298,56 @@ This ensures meaningful process names appear in analysis instead of "unknown" va
 - **ausearch Integration**: Timezone environment variables (TZ=) are not currently passed to ausearch subprocess
 - **Workaround**: Run the tool in the desired timezone environment: `TZ="Asia/Kolkata" python3 parse_avc.py --file audit.log`
 - **Planned Enhancement**: Native timezone support in Phase 4B-3
+
+## 🛠️ **Debugging and Troubleshooting**
+
+### Quick Summary with --stats
+Get an instant overview of a log file without viewing full details:
+```bash
+python3 parse_avc.py --file audit.log --stats
+```
+
+Output includes:
+- Total events and unique denials
+- Time range of activity
+- Top processes causing denials
+- Top permissions denied
+- Security notices (dontaudit, permissive mode)
+- Next steps suggestions
+
+**Use Case**: Quickly assess log severity before deep-dive analysis.
+
+### Verbose Debugging with --verbose
+Enable debug output to troubleshoot unexpected results:
+```bash
+python3 parse_avc.py --file audit.log --verbose
+```
+
+Verbose output shows:
+- Number of log blocks detected and parsed
+- Parsing success rate (e.g., "Successfully parsed 877 AVC denials from 620 valid blocks")
+- Grouping statistics ("Created 202 unique denial groups from 877 total events")
+- Filtering details ("Filtering: 201 denials filtered out, 1 remaining")
+
+**Use Case**: Diagnose why filters aren't matching, understand parsing behavior, or report issues.
+
+### Empty Filter Results
+When filters produce no matches, you'll see helpful guidance:
+```
+⚠️  No denials matched your filter criteria
+
+You filtered for:
+  • process='nonexistent'
+
+But found 0 matches out of 202 total denials.
+
+💡 Suggestions:
+  • Remove filters to see all denials: python3 parse_avc.py --file audit.log
+  • Check available process names: python3 parse_avc.py --file audit.log | grep 'PID'
+  • Try wildcard patterns: --process '*nonex*'
+```
+
+**Use Case**: Quickly correct filter typos or understand what's in the log.
 
 ## 🔍 **Data Field Examples**
 
