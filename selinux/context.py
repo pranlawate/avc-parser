@@ -36,7 +36,11 @@ class AvcContext:
                     # Handle MLS labels that may contain colons (e.g., s0:c0.c1023)
                     self.mls = ":".join(fields[3:])
                 else:
-                    # Default MLS level if not present
+                    # TODO: FIX - Don't hardcode "s0" as default MLS level
+                    # Problem: This assumes MLS field when it may not be present
+                    # Better: Use None to indicate missing MLS, or validate at parse time
+                    # See: Interview prep discussion about data integrity
+                    # Fix approach: self.mls = None (explicit missing) or raise warning
                     self.mls = "s0"
 
     def __str__(self) -> str:
