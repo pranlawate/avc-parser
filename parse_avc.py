@@ -1847,6 +1847,16 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
         )
     else:
         # Other objects: use simpler grouping
+        # TODO: FIX - MLS over-separation for capability/system classes
+        # Problem: Full tcontext includes MLS (s0 vs s0-s0:c0.c1023) causing separate groups
+        # Example: unix_chkpwd with different MCS categories creates 2 groups for same fix
+        #   - PID 4320:  tcontext=system_u:system_r:chkpwd_t:s0
+        #   - PID 3999:  tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023
+        #   Both need: sesearch -A -s chkpwd_t -t chkpwd_t -c capability -p dac_override
+        # Fix approach: For capability/capability2 classes, use only tcontext.type (not full context)
+        #   signature = (process_category, tcontext.type, object_group, permission_category)
+        # Validation function detects this: efficiency < 100% (multiple groups, same sesearch)
+        # See: Interview discussion about balancing precision vs usability
         signature = (
             process_category,
             context_to_str(tcontext),
