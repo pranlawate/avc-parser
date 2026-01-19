@@ -2,7 +2,7 @@
 # Ultra-fast development workflow with ruff + pytest + coverage (Phase 11E)
 # Modern configuration via pyproject.toml
 
-.PHONY: help format check lint security dead-code flow-diagram deps-graph test test-cov install-tools clean all quick-check
+.PHONY: help format check lint security dead-code flow-diagram deps-graph test test-cov install install-tools install-wrapper install-wrapper-user uninstall-wrapper clean all quick-check
 
 # Default target
 help:
@@ -27,6 +27,9 @@ help:
 	@echo "Setup:"
 	@echo "  install          - Install runtime dependencies (rich)"
 	@echo "  install-tools    - Install dev tools (ruff, pytest, coverage)"
+	@echo "  install-wrapper  - Install wrapper (interactive: /usr/local/bin or ~/bin)"
+	@echo "  install-wrapper-user - Install wrapper to ~/bin (non-interactive)"
+	@echo "  uninstall-wrapper - Remove wrapper scripts"
 	@echo "  clean            - Remove generated files and caches"
 
 # === TIER 1: ULTRA-FAST DAILY WORKFLOW ===
@@ -128,6 +131,62 @@ install:
 	@echo "📦 Installing runtime dependencies..."
 	@pip install -e .
 	@echo "✅ Runtime dependencies installed: rich>=10.0.0"
+
+# Install wrapper script (interactive - asks user for location)
+install-wrapper:
+	@echo "🔧 Installing avc-parser wrapper..."
+	@echo ""
+	@echo "Choose installation location:"
+	@echo "  1) /usr/local/bin (requires sudo, available system-wide)"
+	@echo "  2) ~/bin (no sudo, user-only)"
+	@echo ""
+	@read -p "Enter choice [1/2]: " choice; \
+	if [ "$$choice" = "1" ]; then \
+		echo "Installing to /usr/local/bin..."; \
+		echo '#!/bin/bash' | sudo tee /usr/local/bin/avc-parser > /dev/null; \
+		echo 'cd $(shell pwd)' | sudo tee -a /usr/local/bin/avc-parser > /dev/null; \
+		echo 'exec python3 parse_avc.py "$$@"' | sudo tee -a /usr/local/bin/avc-parser > /dev/null; \
+		sudo chmod +x /usr/local/bin/avc-parser; \
+		echo "✅ Wrapper installed to /usr/local/bin"; \
+	elif [ "$$choice" = "2" ]; then \
+		echo "Installing to ~/bin..."; \
+		mkdir -p ~/bin; \
+		echo '#!/bin/bash' > ~/bin/avc-parser; \
+		echo 'cd $(shell pwd)' >> ~/bin/avc-parser; \
+		echo 'exec python3 parse_avc.py "$$@"' >> ~/bin/avc-parser; \
+		chmod +x ~/bin/avc-parser; \
+		echo "✅ Wrapper installed to ~/bin"; \
+		if ! echo $$PATH | grep -q "$$HOME/bin"; then \
+			echo "⚠️  ~/bin is not in your PATH. Add to ~/.bashrc:"; \
+			echo "   export PATH=\"\$$HOME/bin:\$$PATH\""; \
+			echo "   Then run: source ~/.bashrc"; \
+		fi; \
+	else \
+		echo "❌ Invalid choice. Installation cancelled."; \
+		exit 1; \
+	fi
+
+# Install wrapper script to ~/bin (no sudo needed, non-interactive)
+install-wrapper-user:
+	@echo "🔧 Installing avc-parser wrapper to ~/bin..."
+	@mkdir -p ~/bin
+	@echo '#!/bin/bash' > ~/bin/avc-parser
+	@echo 'cd $(shell pwd)' >> ~/bin/avc-parser
+	@echo 'exec python3 parse_avc.py "$$@"' >> ~/bin/avc-parser
+	@chmod +x ~/bin/avc-parser
+	@echo "✅ Wrapper installed to ~/bin"
+	@if ! echo $$PATH | grep -q "$$HOME/bin"; then \
+		echo "⚠️  ~/bin is not in your PATH. Add to ~/.bashrc:"; \
+		echo "   export PATH=\"\$$HOME/bin:\$$PATH\""; \
+		echo "   Then run: source ~/.bashrc"; \
+	fi
+
+# Remove wrapper script
+uninstall-wrapper:
+	@echo "🗑️ Removing avc-parser wrapper..."
+	@sudo rm -f /usr/local/bin/avc-parser 2>/dev/null || echo "  (skipped /usr/local/bin - no sudo access or not found)"
+	@rm -f ~/bin/avc-parser 2>/dev/null || echo "  (~/bin/avc-parser not found)"
+	@echo "✅ Wrapper removal complete"
 
 # Cleanup
 clean:

@@ -5,6 +5,23 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-01-19
+
+### Added
+- **Wrapper Installation System**
+  - Interactive `make install-wrapper` command for easy CLI access
+  - Supports both `/usr/local/bin` (system-wide) and `~/bin` (user-only) installation
+  - Auto-detects if `~/bin` is in PATH and shows conditional warning
+  - `make uninstall-wrapper` removes wrapper from both locations safely
+  - `make install-wrapper-user` for non-interactive ~/bin installation
+  - Enables running tool as `avc-parser` instead of `python3 parse_avc.py`
+  - Manual installation instructions for systems without make
+
+### Changed
+- Updated all documentation to use `avc-parser` command in examples
+- README now includes wrapper installation as recommended setup step
+- All command examples now show `avc-parser` as the primary usage method
+
 ## [1.8.0] - 2025-10-10
 
 ### Added
@@ -343,6 +360,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
+- **v1.8.1**: Wrapper installation system for easy CLI access
 - **v1.8.0**: Setroubleshoot-based optimizations - Exit code translation, smart path normalization, sophisticated path resolution
 - **v1.7.0**: Phase 11 complete - Extended audit types, context-aware analysis, code quality & dev tooling
 - **v1.6.0**: Phase 9-10 complete - Modular architecture, developer tools, comprehensive documentation

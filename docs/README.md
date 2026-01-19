@@ -1,55 +1,59 @@
 # SELinux AVC Denial Analyzer
 
-**Version 1.8.0** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware analysis, smart path normalization with security awareness, exit code translation, advanced filtering capabilities, and normalized JSON output.
+**Version 1.8.1** | A forensic-focused tool for analyzing SELinux audit logs with intelligent deduplication, two-tier professional report system, SELinux policy investigation integration, extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware analysis, smart path normalization with security awareness, exit code translation, advanced filtering capabilities, and normalized JSON output.
 
 ## ⚡ Quick Start
 
 ```bash
-# Install dependencies
+# Clone and setup
+git clone https://github.com/pranlawate/avc-parser.git
+cd avc-parser
 pip3 install rich
+make install-wrapper  # Optional: Install wrapper for easy access
 
 # === BASIC USAGE ===
 # Analyze audit logs (auto-detects format)
-python3 parse_avc.py --file /var/log/audit/audit.log
+avc-parser --file /var/log/audit/audit.log
+# Or without wrapper: python3 parse_avc.py --file /var/log/audit/audit.log
 
 # === DISPLAY MODES ===
 # Enhanced detailed analysis with per-PID breakdowns
-python3 parse_avc.py --file /var/log/audit/audit.log --detailed
+avc-parser --file /var/log/audit/audit.log --detailed
 
 # Field-by-field technical deep-dive
-python3 parse_avc.py --file /var/log/audit/audit.log --fields
+avc-parser --file /var/log/audit/audit.log --fields
 
 # Report formats for different audiences
-python3 parse_avc.py --file /var/log/audit/audit.log --report        # Brief (executive summaries)
-python3 parse_avc.py --file /var/log/audit/audit.log --report sealert # Technical analysis
+avc-parser --file /var/log/audit/audit.log --report        # Brief (executive summaries)
+avc-parser --file /var/log/audit/audit.log --report sealert # Technical analysis
 
 # JSON export for automation/SIEM
-python3 parse_avc.py --file /var/log/audit/audit.log --json
+avc-parser --file /var/log/audit/audit.log --json
 
 # === FILTERING OPTIONS ===
 # Filter by process name
-python3 parse_avc.py --file /var/log/audit/audit.log --process httpd
+avc-parser --file /var/log/audit/audit.log --process httpd
 
 # Filter by path with wildcards
-python3 parse_avc.py --file /var/log/audit/audit.log --path "/var/www/*"
+avc-parser --file /var/log/audit/audit.log --path "/var/www/*"
 
 # Filter by time range
-python3 parse_avc.py --file /var/log/audit/audit.log --since yesterday --until today
-python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
+avc-parser --file /var/log/audit/audit.log --since yesterday --until today
+avc-parser --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
 
 # Filter by SELinux context
-python3 parse_avc.py --file /var/log/audit/audit.log --source httpd_t --target "*default*"
+avc-parser --file /var/log/audit/audit.log --source httpd_t --target "*default*"
 
 # === SORTING OPTIONS ===
 # Sort by frequency (most common first)
-python3 parse_avc.py --file /var/log/audit/audit.log --sort count
+avc-parser --file /var/log/audit/audit.log --sort count
 
 # Sort chronologically
-python3 parse_avc.py --file /var/log/audit/audit.log --sort chrono
+avc-parser --file /var/log/audit/audit.log --sort chrono
 
 # === ADVANCED OPTIONS ===
 # Interactive pager for large outputs
-python3 parse_avc.py --file /var/log/audit/audit.log --pager
+avc-parser --file /var/log/audit/audit.log --pager
 
 # === OUTPUT FEATURES ===
 # Example: Auto-generated policy investigation commands
@@ -126,7 +130,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --pager
 
 📊 **Development Plans**: See [ROADMAP.md](ROADMAP.md) for future plans and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for implementation details.
 
-🎯 **Current Status (v1.8.0)**: Production-ready with setroubleshoot-based optimizations (smart path normalization, exit code translation), clean modular architecture, modern development tooling, extended audit record support, and enhanced forensic analysis capabilities. Python 3.9+ compatible. Next phase: CI/CD automation and performance benchmarking.
+🎯 **Current Status (v1.8.1)**: Production-ready with setroubleshoot-based optimizations (smart path normalization, exit code translation), clean modular architecture, modern development tooling, extended audit record support, enhanced forensic analysis capabilities, and convenient wrapper installation system. Python 3.9+ compatible. Next phase: CI/CD automation and performance benchmarking.
 
 ## 🏗️ Architecture
 
@@ -208,14 +212,16 @@ python3 scripts/validate_logs.py /var/log/audit/audit.log
 ### **Basic Usage**
 ```bash
 # Analyze denials with rich output
-python3 parse_avc.py --file /var/log/audit/audit.log
+avc-parser --file /var/log/audit/audit.log
 
 # Generate JSON for SIEM integration
-python3 parse_avc.py --file /var/log/audit/audit.log --json
+avc-parser --file /var/log/audit/audit.log --json
 
 # Create security report
-python3 parse_avc.py --file /var/log/audit/audit.log --report brief
+avc-parser --file /var/log/audit/audit.log --report brief
 ```
+
+**Note:** Replace `avc-parser` with `python3 parse_avc.py` if you didn't install the wrapper.
 
 📖 **For comprehensive usage examples, see [EXAMPLES.md](EXAMPLES.md)**
 
@@ -224,6 +230,7 @@ python3 parse_avc.py --file /var/log/audit/audit.log --report brief
 - Python 3.8+
 - Python Rich library (`rich>=10.0.0`)
 - `audit` package (for `ausearch`): Usually pre-installed on most systems
+- `make` (optional, for wrapper installation)
 
 ## Installation
 
@@ -238,25 +245,55 @@ python3 parse_avc.py --file /var/log/audit/audit.log --report brief
 
 2. **Install Dependencies**:
    ```bash
+   cd avc-parser
    pip3 install rich
    sudo dnf install audit  # If needed (Fedora/RHEL)
    sudo apt install auditd  # If needed (Ubuntu/Debian)
    ```
 
+3. **Optional: Install Wrapper for Easy Access** (Recommended):
+   ```bash
+   # Interactive installation - choose between /usr/local/bin or ~/bin
+   make install-wrapper
+
+   # Now you can run from anywhere as:
+   avc-parser --file /var/log/audit/audit.log
+   ```
+
+   **Without make:**
+   ```bash
+   # Manual installation to ~/bin (no sudo required)
+   mkdir -p ~/bin
+   cat > ~/bin/avc-parser << 'EOF'
+   #!/bin/bash
+   cd /path/to/avc-parser
+   exec python3 parse_avc.py "$@"
+   EOF
+   chmod +x ~/bin/avc-parser
+
+   # Ensure ~/bin is in your PATH (add to ~/.bashrc if needed)
+   export PATH="$HOME/bin:$PATH"
+   ```
+
 ## 🚀 Usage
+
+**Note:** If you installed the wrapper, replace `python3 parse_avc.py` with `avc-parser` in all commands below.
 
 ### **Recommended: Auto-Detection** ✨
 Single flag automatically detects file format (raw audit.log vs pre-processed):
 ```bash
+# With wrapper
+avc-parser --file /var/log/audit/audit.log
+
+# Without wrapper
 python3 parse_avc.py --file /var/log/audit/audit.log
-python3 parse_avc.py --file avc_denials.log
 ```
 
 ### **Alternative Methods:**
 
 **Raw Audit File Processing:**
 ```bash
-python3 parse_avc.py --raw-file /var/log/audit/audit.log
+avc-parser --raw-file /var/log/audit/audit.log
 ```
 
 **Pre-processed AVC File:**
@@ -264,12 +301,12 @@ python3 parse_avc.py --raw-file /var/log/audit/audit.log
 # Create AVC file:
 ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts recent > avc_denials.log
 # Parse it:
-python3 parse_avc.py --avc-file avc_denials.log
+avc-parser --avc-file avc_denials.log
 ```
 
 **Interactive Mode:**
 ```bash
-python3 parse_avc.py
+avc-parser
 # Paste logs and press Ctrl+D (Linux/macOS) or Ctrl+Z+Enter (Windows)
 ```
 
@@ -277,25 +314,25 @@ python3 parse_avc.py
 
 **Rich Terminal Format** (default): Professional panels with correlation events
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log
-python3 parse_avc.py --file /var/log/audit/audit.log --detailed  # Enhanced with per-PID breakdowns
+avc-parser --file /var/log/audit/audit.log
+avc-parser --file /var/log/audit/audit.log --detailed  # Enhanced with per-PID breakdowns
 ```
 
 **Report Formats**: Professional text formats for different audiences
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --report        # Brief format (executive summaries)
-python3 parse_avc.py --file /var/log/audit/audit.log --report brief  # Brief format (explicit)
-python3 parse_avc.py --file /var/log/audit/audit.log --report sealert # Technical analysis format
+avc-parser --file /var/log/audit/audit.log --report        # Brief format (executive summaries)
+avc-parser --file /var/log/audit/audit.log --report brief  # Brief format (explicit)
+avc-parser --file /var/log/audit/audit.log --report sealert # Technical analysis format
 ```
 
 **Technical Analysis**: Field-by-field breakdown for deep investigation
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --fields
+avc-parser --file /var/log/audit/audit.log --fields
 ```
 
 **Machine Integration**: Structured output for automation and SIEM
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --json
+avc-parser --file /var/log/audit/audit.log --json
 # Output includes: "sesearch_command": "sesearch -A -s httpd_t -t default_t -c file -p read,write"
 ```
 
@@ -303,39 +340,39 @@ python3 parse_avc.py --file /var/log/audit/audit.log --json
 
 **Process Filtering**: Focus on specific services
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --process httpd
+avc-parser --file /var/log/audit/audit.log --process httpd
 ```
 
 **Path Filtering**: Target specific file paths with wildcards
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --path "/var/www/*"
+avc-parser --file /var/log/audit/audit.log --path "/var/www/*"
 ```
 
 **Time Range Filtering**: Analyze specific time windows
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --since yesterday --until today
-python3 parse_avc.py --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
+avc-parser --file /var/log/audit/audit.log --since yesterday --until today
+avc-parser --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
 ```
 
 **SELinux Context Filtering**: Filter by source/target contexts
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --source httpd_t
-python3 parse_avc.py --file /var/log/audit/audit.log --target "*default*"
+avc-parser --file /var/log/audit/audit.log --source httpd_t
+avc-parser --file /var/log/audit/audit.log --target "*default*"
 ```
 
 ### **Sorting Options:**
 
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --sort recent  # Most recent first (default)
-python3 parse_avc.py --file /var/log/audit/audit.log --sort count   # Most frequent first
-python3 parse_avc.py --file /var/log/audit/audit.log --sort chrono  # Chronological order
+avc-parser --file /var/log/audit/audit.log --sort recent  # Most recent first (default)
+avc-parser --file /var/log/audit/audit.log --sort count   # Most frequent first
+avc-parser --file /var/log/audit/audit.log --sort chrono  # Chronological order
 ```
 
 ### **Advanced Options:**
 
 **Interactive Pager**: Navigate large outputs easily
 ```bash
-python3 parse_avc.py --file /var/log/audit/audit.log --pager
+avc-parser --file /var/log/audit/audit.log --pager
 ```
 
 
@@ -382,4 +419,4 @@ Contributions are welcome! Please see our development roadmap and feature decisi
 
 ---
 
-**SELinux AVC Denial Analyzer v1.8.0** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.8.1** | Made for forensic analysts and system administrators
