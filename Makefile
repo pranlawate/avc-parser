@@ -144,16 +144,14 @@ install-wrapper:
 	if [ "$$choice" = "1" ]; then \
 		echo "Installing to /usr/local/bin..."; \
 		echo '#!/bin/bash' | sudo tee /usr/local/bin/avc-parser > /dev/null; \
-		echo 'cd $(shell pwd)' | sudo tee -a /usr/local/bin/avc-parser > /dev/null; \
-		echo 'exec python3 parse_avc.py "$$@"' | sudo tee -a /usr/local/bin/avc-parser > /dev/null; \
+		echo 'exec python3 $(shell pwd)/parse_avc.py "$$@"' | sudo tee -a /usr/local/bin/avc-parser > /dev/null; \
 		sudo chmod +x /usr/local/bin/avc-parser; \
 		echo "✅ Wrapper installed to /usr/local/bin"; \
 	elif [ "$$choice" = "2" ]; then \
 		echo "Installing to ~/bin..."; \
 		mkdir -p ~/bin; \
 		echo '#!/bin/bash' > ~/bin/avc-parser; \
-		echo 'cd $(shell pwd)' >> ~/bin/avc-parser; \
-		echo 'exec python3 parse_avc.py "$$@"' >> ~/bin/avc-parser; \
+		echo 'exec python3 $(shell pwd)/parse_avc.py "$$@"' >> ~/bin/avc-parser; \
 		chmod +x ~/bin/avc-parser; \
 		echo "✅ Wrapper installed to ~/bin"; \
 		if ! echo $$PATH | grep -q "$$HOME/bin"; then \
@@ -171,8 +169,7 @@ install-wrapper-user:
 	@echo "🔧 Installing avc-parser wrapper to ~/bin..."
 	@mkdir -p ~/bin
 	@echo '#!/bin/bash' > ~/bin/avc-parser
-	@echo 'cd $(shell pwd)' >> ~/bin/avc-parser
-	@echo 'exec python3 parse_avc.py "$$@"' >> ~/bin/avc-parser
+	@echo 'exec python3 $(shell pwd)/parse_avc.py "$$@"' >> ~/bin/avc-parser
 	@chmod +x ~/bin/avc-parser
 	@echo "✅ Wrapper installed to ~/bin"
 	@if ! echo $$PATH | grep -q "$$HOME/bin"; then \
