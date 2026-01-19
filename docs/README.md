@@ -263,11 +263,11 @@ avc-parser --file /var/log/audit/audit.log --report brief
    **Without make:**
    ```bash
    # Manual installation to ~/bin (no sudo required)
+   # Note: Run these commands from within the avc-parser directory
    mkdir -p ~/bin
-   cat > ~/bin/avc-parser << 'EOF'
+   cat > ~/bin/avc-parser << EOF
    #!/bin/bash
-   cd /path/to/avc-parser
-   exec python3 parse_avc.py "$@"
+   exec python3 $(pwd)/parse_avc.py "\$@"
    EOF
    chmod +x ~/bin/avc-parser
 
