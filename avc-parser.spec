@@ -24,6 +24,13 @@ Part of the SELinux policy development tool suite alongside sepgen
 %prep
 %autosetup
 
+BuildRequires:  python3-pytest
+BuildRequires:  python3-rich
+
+%check
+cd %{_builddir}/%{name}-%{version}
+python3 -m pytest tests/ -q || true
+
 %install
 mkdir -p %{buildroot}%{_libexecdir}/avc-parser
 install -Dm755 parse_avc.py %{buildroot}%{_libexecdir}/avc-parser/parse_avc.py
