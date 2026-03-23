@@ -41,6 +41,7 @@ exec python3 %{_libexecdir}/avc-parser/parse_avc.py "$@"
 WRAPPER
 chmod 755 %{buildroot}%{_bindir}/avc-parser
 
+install -Dm644 avc-parser.1 %{buildroot}%{_mandir}/man1/avc-parser.1
 install -Dm644 completions/avc-parser.bash \
     %{buildroot}%{_datadir}/bash-completion/completions/avc-parser
 install -Dm644 completions/avc-parser.zsh \
@@ -48,8 +49,10 @@ install -Dm644 completions/avc-parser.zsh \
 
 %files
 %license LICENSE
+%doc README.md
 %{_bindir}/avc-parser
 %{_libexecdir}/avc-parser/
+%{_mandir}/man1/avc-parser.1*
 %{_datadir}/bash-completion/completions/avc-parser
 %{_datadir}/zsh/site-functions/_avc-parser
 

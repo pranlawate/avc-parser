@@ -1,0 +1,97 @@
+.TH AVC-PARSER 1 "March 2026" "avc-parser 1.8.1" "SELinux Policy Tools"
+.SH NAME
+avc-parser \- SELinux AVC denial parser and analyzer
+.SH SYNOPSIS
+.B avc-parser
+.RB [ \-f
+.IR FILE ]
+.RB [ \-\-json ]
+.RB [ \-\-report
+.RB { brief | sealert }]
+.RB [ \-\-process
+.IR NAME ]
+.RB [ \-\-source
+.IR TYPE ]
+.RB [ \-\-target
+.IR TYPE ]
+.SH DESCRIPTION
+.B avc-parser
+parses SELinux AVC denial messages from audit logs with support for
+extended audit records (SYSCALL, PATH, CWD, PROCTITLE). Provides smart
+deduplication, severity classification, and multiple output formats.
+.PP
+Auto-detects raw audit.log vs pre-processed ausearch format.
+.SH OPTIONS
+.SS "Input Options"
+.TP
+.BI \-f " FILE" "\fR, \fP" \-\-file " FILE"
+Path to audit file (auto-detects format).
+.TP
+.BI \-rf " FILE" "\fR, \fP" \-\-raw\-file " FILE"
+Path to raw audit.log file.
+.TP
+.BI \-af " FILE" "\fR, \fP" \-\-avc\-file " FILE"
+Path to pre-processed ausearch output.
+.SS "Display Options"
+.TP
+.B \-\-json
+Output in JSON format (for tool integration).
+.TP
+.B \-\-fields
+Field-by-field technical breakdown.
+.TP
+.B \-\-detailed
+Detailed view with per-PID timestamps and syscalls.
+.TP
+.BI \-\-report " FORMAT"
+Report format: \fBbrief\fR (executive summary) or \fBsealert\fR (technical).
+.TP
+.B \-\-pager
+Use interactive pager for large outputs.
+.SS "Filtering Options"
+.TP
+.BI \-\-process " NAME"
+Filter by process name.
+.TP
+.BI \-\-path " PATH"
+Filter by file path (supports wildcards).
+.TP
+.BI \-\-source " TYPE"
+Filter by source SELinux context type.
+.TP
+.BI \-\-target " TYPE"
+Filter by target SELinux context type.
+.TP
+.BI \-\-since " TIME"
+Only include denials since this time.
+.TP
+.BI \-\-until " TIME"
+Only include denials until this time.
+.SS "Sorting Options"
+.TP
+.BI \-\-sort " ORDER"
+Sort order: \fBrecent\fR (default), \fBcount\fR, or \fBchrono\fR.
+.SH EXAMPLES
+.nf
+# Parse audit log with brief report
+avc-parser \-f /var/log/audit/audit.log \-\-report brief
+
+# JSON output for tool integration
+avc-parser \-f /var/log/audit/audit.log \-\-json
+
+# Filter by httpd denials
+avc-parser \-f /var/log/audit/audit.log \-\-process httpd
+
+# Recent denials only
+avc-parser \-f /var/log/audit/audit.log \-\-since "1 hour ago"
+.fi
+.SH SEE ALSO
+.BR sepgen (1),
+.BR semacro (1),
+.BR ausearch (8),
+.BR audit2allow (1),
+.BR semanage (8)
+.SH AUTHOR
+Pranav Lawate
+.SH LICENSE
+MIT License
