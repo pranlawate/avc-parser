@@ -16,6 +16,10 @@ dependencies = [
 [project.scripts]
 avc-parser = "parse_avc:main"
 
+[tool.setuptools]
+py-modules = ["parse_avc", "test_normalizations"]
+packages = ["config", "detectors", "formatters", "selinux", "utils", "validators"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
