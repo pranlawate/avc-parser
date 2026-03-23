@@ -1,11 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "avc-parser"
 version = "1.8.1"
 description = "SELinux AVC denial parser and analyzer with extended audit record support"
 requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "Pranav Lawate"}]
 dependencies = [
     "rich>=10.0.0",
 ]
+
+[project.scripts]
+avc-parser = "parse_avc:main"
 
 [project.optional-dependencies]
 dev = [
