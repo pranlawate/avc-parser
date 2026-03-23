@@ -1,6 +1,6 @@
 Name:           avc-parser
 Version:        1.8.1
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        SELinux AVC denial parser and analyzer with extended audit record support
 
 License:        MIT
@@ -52,7 +52,7 @@ install -Dm644 completions/avc-parser.zsh \
 %{python3_sitelib}/config/
 %{python3_sitelib}/detectors/
 %{python3_sitelib}/formatters/
-%{python3_sitelib}/selinux/
+%{python3_sitelib}/avc_selinux/
 %{python3_sitelib}/utils/
 %{python3_sitelib}/validators/
 %{python3_sitelib}/avc_parser-%{version}.dist-info/
@@ -61,6 +61,9 @@ install -Dm644 completions/avc-parser.zsh \
 %{_datadir}/zsh/site-functions/_avc-parser
 
 %changelog
+* Sun Mar 23 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-3
+- Rename selinux/ to avc_selinux/ to fix conflict with python3-libselinux
+
 * Sun Mar 23 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-2
 - Switch to pyproject_wheel build (proper Python package)
 - Add %check with pytest

@@ -42,7 +42,7 @@ from formatters import (
     display_stats_summary,
     format_as_json,
 )
-from selinux.context import AvcContext, PermissionSemanticAnalyzer
+from avc_selinux.context import AvcContext, PermissionSemanticAnalyzer
 from utils import (
     context_matches,
     detect_file_format,
@@ -2569,7 +2569,7 @@ def display_consolidated_group(
         # Use the most common resource type for description context
         primary_resource_type = list(resource_types)[0] if len(resource_types) == 1 else None
 
-        from selinux.context import PermissionSemanticAnalyzer
+        from avc_selinux.context import PermissionSemanticAnalyzer
 
         # Get context-aware description if we have a single resource type
         if primary_resource_type and primary_resource_type in ["file", "directory"]:
@@ -2636,7 +2636,7 @@ def display_consolidated_group(
 
     contextual_analysis = ""
     if tclass:
-        from selinux.context import PermissionSemanticAnalyzer
+        from avc_selinux.context import PermissionSemanticAnalyzer
 
         contextual_analysis = PermissionSemanticAnalyzer.get_contextual_analysis(
             first_perm, tclass, scontext, tcontext, process_name
@@ -2760,7 +2760,7 @@ def print_rich_summary(
     """
     from rich.panel import Panel
 
-    from selinux.context import PermissionSemanticAnalyzer
+    from avc_selinux.context import PermissionSemanticAnalyzer
 
     parsed_log = denial_info["log"]
     count = denial_info["count"]
