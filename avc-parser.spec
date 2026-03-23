@@ -5,12 +5,12 @@ Summary:        SELinux AVC denial parser and analyzer with extended audit recor
 
 License:        MIT
 URL:            https://github.com/pranlawate/avc-parser
-Source0:        %{name}-%{version}.tar.gz
+Source0:        https://github.com/pranlawate/%{name}/archive/v%{version}/%{name}-%{version}.tar.gz
 
 BuildArch:      noarch
 Requires:       python3 >= 3.8
 Requires:       python3-rich
-Requires:       policycoreutils
+Recommends:     policycoreutils
 
 %description
 Parses SELinux AVC denial messages from audit logs with extended audit
