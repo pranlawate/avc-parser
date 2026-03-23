@@ -1,6 +1,6 @@
 Name:           avc-parser
 Version:        1.8.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        SELinux AVC denial parser and analyzer with extended audit record support
 
 License:        MIT
@@ -8,6 +8,11 @@ URL:            https://github.com/pranlawate/avc-parser
 Source0:        https://github.com/pranlawate/%{name}/archive/v%{version}/%{name}-%{version}.tar.gz
 
 BuildArch:      noarch
+BuildRequires:  python3-devel
+BuildRequires:  python3-setuptools
+BuildRequires:  python3-wheel
+BuildRequires:  python3-pytest
+BuildRequires:  python3-rich
 Requires:       python3 >= 3.8
 Requires:       python3-rich
 Recommends:     policycoreutils
@@ -24,30 +29,14 @@ Part of the SELinux policy development tool suite alongside sepgen
 %prep
 %autosetup
 
-BuildRequires:  python3-pytest
-BuildRequires:  python3-rich
+%build
+%pyproject_wheel
 
 %check
-cd %{_builddir}/%{name}-%{version}
-python3 -m pytest tests/ -q || true
+%pytest tests/ -q || true
 
 %install
-mkdir -p %{buildroot}%{_libexecdir}/avc-parser
-install -Dm755 parse_avc.py %{buildroot}%{_libexecdir}/avc-parser/parse_avc.py
-
-for dir in config detectors formatters selinux utils validators; do
-    if [ -d "$dir" ]; then
-        cp -r "$dir" %{buildroot}%{_libexecdir}/avc-parser/
-    fi
-done
-
-mkdir -p %{buildroot}%{_bindir}
-cat > %{buildroot}%{_bindir}/avc-parser << 'WRAPPER'
-#!/bin/bash
-exec python3 %{_libexecdir}/avc-parser/parse_avc.py "$@"
-WRAPPER
-chmod 755 %{buildroot}%{_bindir}/avc-parser
-
+%pyproject_install
 install -Dm644 avc-parser.1 %{buildroot}%{_mandir}/man1/avc-parser.1
 install -Dm644 completions/avc-parser.bash \
     %{buildroot}%{_datadir}/bash-completion/completions/avc-parser
@@ -58,12 +47,23 @@ install -Dm644 completions/avc-parser.zsh \
 %license LICENSE
 %doc README.md
 %{_bindir}/avc-parser
-%{_libexecdir}/avc-parser/
+%{python3_sitelib}/parse_avc.py
+%{python3_sitelib}/config/
+%{python3_sitelib}/detectors/
+%{python3_sitelib}/formatters/
+%{python3_sitelib}/selinux/
+%{python3_sitelib}/utils/
+%{python3_sitelib}/validators/
+%{python3_sitelib}/avc_parser-%{version}.dist-info/
 %{_mandir}/man1/avc-parser.1*
 %{_datadir}/bash-completion/completions/avc-parser
 %{_datadir}/zsh/site-functions/_avc-parser
 
 %changelog
+* Sun Mar 23 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-2
+- Switch to pyproject_wheel build (proper Python package)
+- Add %check with pytest
+
 * Sun Mar 22 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-1
 - Initial RPM packaging
 - Extended audit record support (SYSCALL, PATH, CWD, PROCTITLE)
