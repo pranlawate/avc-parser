@@ -10,6 +10,7 @@ Source0:        https://github.com/pranlawate/%{name}/archive/v%{version}/%{name
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
+BuildRequires:  python3-pip
 BuildRequires:  python3-wheel
 BuildRequires:  python3-pytest
 BuildRequires:  python3-rich
@@ -61,7 +62,7 @@ install -Dm644 completions/avc-parser.zsh \
 %{_datadir}/zsh/site-functions/_avc-parser
 
 %changelog
-* Sun Mar 23 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-2
+* Mon Mar 23 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.8.1-2
 - Rename selinux/ to avc_selinux/ to fix conflict with python3-libselinux
 - Switch to pyproject_wheel build (proper Python package)
 - Add %check with pytest, man page, bash/zsh completion
