@@ -1,0 +1,37 @@
+name: Build RPM and attach to Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-rpm:
+    runs-on: ubuntu-latest
+    container: fedora:43
+
+    steps:
+      - name: Install build tools
+        run: dnf install -y rpm-build git
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create source tarball
+        run: |
+          VERSION=$(grep '^Version:' avc-parser.spec | awk '{print $2}')
+          mkdir -p ~/rpmbuild/SOURCES
+          tar czf ~/rpmbuild/SOURCES/avc-parser-${VERSION}.tar.gz \
+              --transform "s,^,avc-parser-${VERSION}/," \
+              --exclude='.git' --exclude='tests' --exclude='__pycache__' \
+              *
+
+      - name: Build RPM
+        run: rpmbuild -ba avc-parser.spec
+
+      - name: Upload RPM to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ~/rpmbuild/RPMS/noarch/avc-parser-*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
