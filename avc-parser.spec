@@ -48,6 +48,7 @@ install -Dm644 completions/avc-parser.zsh \
 %doc README.md
 %{_bindir}/avc-parser
 %{python3_sitelib}/parse_avc.py
+%{python3_sitelib}/__pycache__/parse_avc.*
 %{python3_sitelib}/config/
 %{python3_sitelib}/detectors/
 %{python3_sitelib}/formatters/

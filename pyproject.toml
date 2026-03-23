@@ -17,7 +17,7 @@ dependencies = [
 avc-parser = "parse_avc:main"
 
 [tool.setuptools]
-py-modules = ["parse_avc", "test_normalizations"]
+py-modules = ["parse_avc"]
 packages = ["config", "detectors", "formatters", "selinux", "utils", "validators"]
 
 [project.optional-dependencies]
