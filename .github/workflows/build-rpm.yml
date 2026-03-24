@@ -12,10 +12,13 @@ jobs:
 
     steps:
       - name: Install build tools
-        run: dnf install -y rpm-build git
+        run: dnf install -y rpm-build git dnf-plugins-core
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: dnf builddep -y avc-parser.spec
 
       - name: Create source tarball
         run: |
