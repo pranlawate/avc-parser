@@ -162,5 +162,30 @@ class TestBootImpactAnalyzer(unittest.TestCase):
         self.assertEqual(len(findings), 0)
 
 
+class TestSystemicPatternAnalyzer(unittest.TestCase):
+    def test_detects_systemic_pattern(self):
+        from analyzers.patterns import analyze_systemic_patterns
+        source_types = [
+            "init_t", "kmod_t", "udev_t", "mount_t", "sshd_t",
+            "httpd_t", "postfix_t", "chronyd_t", "avahi_t", "colord_t", "tuned_t",
+        ]
+        denials = [
+            {"count": 10, "log": {"scontext": f"system_u:system_r:{st}:s0-s15:c0.c1023", "tcontext": "system_u:object_r:ld_so_cache_t:s15:c0.c1023", "tclass": "file", "permission": "read"}}
+            for st in source_types
+        ]
+        findings = list(analyze_systemic_patterns(denials))
+        self.assertTrue(len(findings) > 0)
+        self.assertIn("systemic", findings[0].title.lower())
+
+    def test_no_systemic_for_few_sources(self):
+        from analyzers.patterns import analyze_systemic_patterns
+        denials = [
+            {"count": 10, "log": {"scontext": "system_u:system_r:httpd_t:s0", "tcontext": "system_u:object_r:var_t:s0", "tclass": "file", "permission": "read"}},
+            {"count": 5, "log": {"scontext": "system_u:system_r:nginx_t:s0", "tcontext": "system_u:object_r:var_t:s0", "tclass": "file", "permission": "read"}},
+        ]
+        findings = list(analyze_systemic_patterns(denials))
+        self.assertEqual(len(findings), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
