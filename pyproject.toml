@@ -18,7 +18,7 @@ avc-parser = "parse_avc:main"
 
 [tool.setuptools]
 py-modules = ["parse_avc"]
-packages = ["config", "detectors", "formatters", "avc_selinux", "utils", "validators"]
+packages = ["analyzers", "config", "detectors", "formatters", "avc_selinux", "utils", "validators"]
 
 [project.optional-dependencies]
 dev = [
@@ -78,6 +78,7 @@ line-ending = "lf"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
