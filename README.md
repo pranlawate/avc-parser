@@ -13,6 +13,12 @@ sudo dnf copr enable pranlawate/selinux-tools
 sudo dnf install avc-parser
 ```
 
+### From GitHub Release
+
+```bash
+sudo dnf install https://github.com/pranlawate/avc-parser/releases/download/v1.8.1/avc-parser-1.8.1-1.fc43.noarch.rpm
+```
+
 ### From source
 
 ```bash
@@ -52,20 +58,20 @@ avc-parser -f /var/log/audit/audit.log --since yesterday
 
 ## How This Differs from sealert/setroubleshoot
 
-| setroubleshoot/sealert | avc-parser |
-|---|---|
-| Real-time monitoring | Post-incident forensic analysis |
-| Live audit socket | Static file analysis (including sosreport logs) |
-| Policy suggestions | Denial grouping, correlation, and key findings |
-| Daemon-based | Single standalone tool |
+
+| setroubleshoot/sealert | avc-parser                                      |
+| ---------------------- | ----------------------------------------------- |
+| Real-time monitoring   | Post-incident forensic analysis                 |
+| Live audit socket      | Static file analysis (including sosreport logs) |
+| Policy suggestions     | Denial grouping, correlation, and key findings  |
+| Daemon-based           | Single standalone tool                          |
+
 
 Use avc-parser when you need forensic analysis of audit logs from systems you can't access directly, or when setroubleshoot output becomes overwhelming during incident response.
 
 ## Part of the SELinux Tool Suite
 
-avc-parser works alongside [sepgen](https://github.com/pranlawate/sepgen)
-(policy generator) and [semacro](https://github.com/pranlawate/semacro)
-(macro explorer) for a complete SELinux policy development workflow:
+avc-parser works alongside [sepgen](https://github.com/pranlawate/sepgen) (policy generator) and [semacro](https://github.com/pranlawate/semacro) (macro explorer) for a complete SELinux policy development workflow:
 
 ```bash
 sepgen analyze ./src/ --name myapp    # Generate policy from source
@@ -75,6 +81,7 @@ semacro which myapp_t target_t read   # Find the right macro
 ```
 
 Install the complete suite:
+
 ```bash
 sudo dnf copr enable pranlawate/selinux-tools
 sudo dnf install sepgen semacro avc-parser
