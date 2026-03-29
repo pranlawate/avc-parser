@@ -50,6 +50,7 @@ install -Dm644 completions/avc-parser.zsh \
 %{_bindir}/avc-parser
 %{python3_sitelib}/parse_avc.py
 %{python3_sitelib}/__pycache__/parse_avc.*
+%{python3_sitelib}/analyzers/
 %{python3_sitelib}/config/
 %{python3_sitelib}/detectors/
 %{python3_sitelib}/formatters/
@@ -62,7 +63,7 @@ install -Dm644 completions/avc-parser.zsh \
 %{_datadir}/zsh/site-functions/_avc-parser
 
 %changelog
-* Sat Mar 29 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.9.0-1
+* Sun Mar 29 2026 Pranav Lawate <pran.lawate@gmail.com> - 1.9.0-1
 - MLS/MCS security level parsing, analysis, and --mls filter
 - Key findings analyzer engine (labeling, relabeling, boot impact, systemic, recurrence)
 - Unified --format flag replacing --fields, --stats, --report
