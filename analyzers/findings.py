@@ -40,6 +40,7 @@ class Findings:
     def __init__(self):
         self.items: list[Finding] = []
         self.tags: dict[int, list[Finding]] = {}
+        self.total_groups: int = 0
 
     def add(self, finding: Finding):
         self.items.append(finding)

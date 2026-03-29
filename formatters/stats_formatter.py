@@ -186,7 +186,7 @@ def display_stats_summary(
         for finding in findings.items:
             severity_icon = "🔴" if finding.severity.value == "critical" else "🟡"
             console.print(f"  {severity_icon} [{finding.severity.value.upper()}] {finding.title}")
-        counts = findings.remediation_counts(total_groups=len(unique_denials))
+        counts = findings.remediation_counts(total_groups=findings.total_groups)
         console.print()
         console.print("  Remediation: "
                        f"{counts['relabel_fixable']} relabel-fixable, "

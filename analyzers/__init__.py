@@ -19,6 +19,7 @@ def run_all_analyzers(sorted_denials, policy_load_events=None):
     from .recurrence import analyze_recurrence
 
     findings = Findings()
+    findings.total_groups = len(sorted_denials)
 
     for analyzer in [
         analyze_labeling,

@@ -296,7 +296,7 @@ def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_c
             }
             for f in findings.items
         ]
-        counts = findings.remediation_counts(total_groups=len(unique_denials))
+        counts = findings.remediation_counts(total_groups=findings.total_groups)
         json_structure["summary"]["remediation_summary"] = counts
 
     try:
