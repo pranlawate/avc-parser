@@ -56,6 +56,7 @@ from utils import (
     signal_handler,
     sort_denials,
 )
+from analyzers import run_all_analyzers
 from validators import validate_arguments
 
 # Constants for SELinux audit record types
@@ -4031,6 +4032,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     total_events = sum(denial["count"] for denial in unique_denials.values())
     sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
     validation_report = validate_grouping_optimality(unique_denials)
+    findings = run_all_analyzers(sorted_denials, all_policy_loads)
 
     try:
         filtered_denials = filter_denials(
@@ -4076,6 +4078,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             file_info=file_info,
             security_notices={"dontaudit": dontaudit_detected, "permissive": permissive_detected},
             console=console,
+            # findings=findings,  # Task 8: pass findings once display_stats_summary accepts it
         )
         return
 
@@ -4087,6 +4090,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             sig = id(d)
             filtered_unique[sig] = d
         format_as_json(filtered_unique, valid_blocks, generate_sesearch_command)
+        # TODO Task 8: Add findings to JSON output
 
     else:
 
