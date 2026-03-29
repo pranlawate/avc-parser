@@ -3609,30 +3609,36 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     # Display Options
     display_group = parser.add_argument_group("Display Options")
     display_group.add_argument(
-        "--json", action="store_true", help="Output the parsed data in JSON format."
+        "--format",
+        type=str,
+        choices=["rich", "facts", "stats", "json", "brief", "sealert"],
+        default=None,
+        help=(
+            "Output format: 'rich' (default, terminal panels), "
+            "'facts' (field-by-field breakdown), "
+            "'stats' (summary statistics), "
+            "'json' (structured JSON for tool integration), "
+            "'brief' (executive summary), "
+            "'sealert' (technical analysis)."
+        ),
     )
     display_group.add_argument(
-        "--fields",
-        action="store_true",
-        help="Field-by-field technical breakdown for deep-dive analysis.",
+        "--json", action="store_true", help="Shorthand for --format json.",
     )
     display_group.add_argument(
         "--detailed",
         action="store_true",
-        help="Show detailed view with per-PID timestamps, syscalls, and exit codes.",
-    )
-    display_group.add_argument(
-        "--report",
-        nargs="?",
-        const="brief",
-        choices=["brief", "sealert"],
-        help="Professional report format: 'brief' (default) for executive summaries, 'sealert' for technical analysis.",
+        help="Show per-PID timestamps, syscalls, and exit codes (modifier for rich format).",
     )
     display_group.add_argument(
         "--pager",
         action="store_true",
         help="Use interactive pager for large outputs (like 'less' command).",
     )
+    # Deprecated flags (hidden, with deprecation warnings)
+    display_group.add_argument("--fields", action="store_true", help=argparse.SUPPRESS)
+    display_group.add_argument("--report", nargs="?", const="brief", choices=["brief", "sealert"], help=argparse.SUPPRESS)
+    display_group.add_argument("--stats", action="store_true", help=argparse.SUPPRESS)
 
     # Filtering Options
     filter_group = parser.add_argument_group("Filtering Options")
@@ -3695,12 +3701,29 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         action="store_true",
         help="Enable verbose output for debugging and troubleshooting.",
     )
-    advanced_group.add_argument(
-        "--stats",
-        action="store_true",
-        help="Display summary statistics only (quick overview without full output).",
-    )
     args = parser.parse_args()
+
+    # Normalize --format from deprecated flags with deprecation warnings
+    stderr_console = Console(stderr=True)
+    if args.format is None:
+        if args.json:
+            args.format = "json"
+        elif args.fields:
+            stderr_console.print("[yellow]Warning: --fields is deprecated, use --format facts[/yellow]")
+            args.format = "facts"
+        elif args.stats:
+            stderr_console.print("[yellow]Warning: --stats is deprecated, use --format stats[/yellow]")
+            args.format = "stats"
+        elif args.report:
+            fmt = args.report if args.report in ("brief", "sealert") else "brief"
+            stderr_console.print(f"[yellow]Warning: --report is deprecated, use --format {fmt}[/yellow]")
+            args.format = fmt
+        else:
+            args.format = "rich"
+
+    if args.detailed and args.format != "rich":
+        stderr_console.print("[yellow]Warning: --detailed only applies to --format rich, ignoring[/yellow]")
+        args.detailed = False
 
     # Set up signal handler for graceful interruption (Ctrl+C)
     signal.signal(signal.SIGINT, signal_handler)
@@ -3722,7 +3745,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     ausearch_message = ""
 
     # Generate detection message if not in JSON mode
-    if not args.json and args.file:
+    if args.format != "json" and args.file:
         file_path = args.file
         detected_format = detect_file_format(file_path)
         if detected_format == "raw":
@@ -3733,7 +3756,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     if input_type == "raw_file":
         # Determine the correct file path (could be from --file or --raw-file)
         file_path = args.file if args.file else args.raw_file
-        if not args.json:
+        if args.format != "json":
             ausearch_message = f"Raw file input provided. Running ausearch on '{file_path}'..."
         try:
             ausearch_cmd = [
@@ -3791,7 +3814,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             console.print(f"   {str(e)}")
             sys.exit(1)
     else:  # interactive mode
-        if not args.json:
+        if args.format != "json":
             console.print(
                 "📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:"
             )
@@ -3807,7 +3830,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     log_blocks = [block.strip() for block in log_string.split("----") if block.strip()]
     verbose_print(f"Split input into {len(log_blocks)} log blocks", console)
     if not log_blocks:
-        if not args.json:
+        if args.format != "json":
             console.print("Error: No valid log blocks found.", style="bold red")
         sys.exit(1)
 
@@ -3827,7 +3850,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         is_valid, sanitized_block, warnings = validate_log_entry(block)
 
         if not is_valid:
-            if not args.json:
+            if args.format != "json":
                 console.print(
                     f"⚠️  [bold yellow]Warning: Skipping invalid log block {i + 1}[/bold yellow]"
                 )
@@ -3852,7 +3875,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     # Check if we have any valid blocks after validation
     if not valid_blocks:
-        if not args.json:
+        if args.format != "json":
             console.print(
                 "❌ [bold red]Error: No valid log blocks found after validation[/bold red]"
             )
@@ -3864,7 +3887,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     verbose_print(f"Successfully parsed {len(all_avc_denials)} AVC denials from {len(valid_blocks)} valid blocks", console)
 
     # Display validation summary (non-JSON mode only)
-    if validation_warnings and not args.json:
+    if validation_warnings and args.format != "json":
         # Aggregate warnings by type for clearer messaging
         malformed_lines = 0
         empty_blocks = 0
@@ -4005,7 +4028,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     verbose_print(f"Created {len(unique_denials)} unique denial groups from {len(all_avc_denials)} total events", console)
 
     # Handle --stats mode (summary only)
-    if args.stats:
+    if args.format == "stats":
         # Prepare statistics
         total_events = sum(denial["count"] for denial in unique_denials.values())
 
@@ -4039,7 +4062,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         )
         return
 
-    if args.json:
+    if args.format == "json":
         format_as_json(unique_denials, valid_blocks, generate_sesearch_command)
 
     else:
@@ -4183,14 +4206,14 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     console.print()
 
             if filtered_denials:
-                if not args.report:
+                if args.format not in ("brief", "sealert"):
                     console.print(Rule("[dim]Parsed Log Summary[/dim]"))
 
                 # Display detection warnings at the top
                 if dontaudit_detected:
                     indicators_str = ", ".join(found_indicators)
 
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
@@ -4238,7 +4261,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display permissive mode warning if found
                 if permissive_detected:
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
@@ -4281,7 +4304,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     if len(found_custom_patterns) > 3:
                         patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
@@ -4318,7 +4341,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display container issues warning if found
                 if container_issues_detected:
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for --report mode
                         console.print("═" * 79)
                         console.print("🐳  CONTAINER STORAGE DETECTED")
@@ -4451,7 +4474,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 has_mls_denials = any(
                     d.get("log", {}).get("mls_analysis") for d in filtered_denials
                 )
-                if has_mls_denials and not args.report:
+                if has_mls_denials and args.format not in ("brief", "sealert"):
                     from rich.align import Align
                     from rich.console import Group
                     from rich.panel import Panel
@@ -4477,27 +4500,26 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 # Display denials
                 for i, denial_info in enumerate(filtered_denials):
                     if i > 0:
-                        if args.fields:
+                        if args.format == "facts":
                             console.print(Rule(style="dim"))
                         else:
                             console.print()  # Space between denials
 
-                    # Choose display format based on flags
-                    if args.fields:
+                    # Choose display format
+                    if args.format == "facts":
                         print_summary(console, denial_info, i + 1)
-                    elif args.report:
-                        if args.report == "sealert":
-                            display_report_sealert_format(
-                                console,
-                                denial_info,
-                                i + 1,
-                            )
-                        else:  # brief format (default)
-                            display_report_brief_format(
-                                console,
-                                denial_info,
-                                i + 1,
-                            )
+                    elif args.format == "sealert":
+                        display_report_sealert_format(
+                            console,
+                            denial_info,
+                            i + 1,
+                        )
+                    elif args.format == "brief":
+                        display_report_brief_format(
+                            console,
+                            denial_info,
+                            i + 1,
+                        )
                     else:
                         print_rich_summary(
                             console,
@@ -4537,7 +4559,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
         # Use interactive pager for large outputs if requested and running in a terminal
-        if args.pager and sys.stdout.isatty() and not args.json:
+        if args.pager and sys.stdout.isatty() and args.format != "json":
             # Capture output with colors preserved for pager
             import io
 
@@ -4599,7 +4621,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Display detection warnings at the top
                         if dontaudit_detected:
                             indicators_str = ", ".join(found_indicators)
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
@@ -4649,7 +4671,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display permissive mode warning if found
                         if permissive_detected:
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
@@ -4698,7 +4720,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             if len(found_custom_patterns) > 3:
                                 patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
@@ -4739,7 +4761,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display container issues warning if found
                         if container_issues_detected:
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("🐳  CONTAINER STORAGE DETECTED")
@@ -4885,27 +4907,26 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Display denials using pager console
                         for i, denial_info in enumerate(filtered_denials):
                             if i > 0:
-                                if args.fields:
+                                if args.format == "facts":
                                     pager_console.print(Rule(style="dim"))
                                 else:
                                     pager_console.print()  # Space between denials
 
-                            # Choose display format based on flags
-                            if args.fields:
+                            # Choose display format
+                            if args.format == "facts":
                                 print_summary(pager_console, denial_info, i + 1)
-                            elif args.report:
-                                if args.report == "sealert":
-                                    display_report_sealert_format(
-                                        pager_console,
-                                        denial_info,
-                                        i + 1,
-                                    )
-                                else:  # brief format (default)
-                                    display_report_brief_format(
-                                        pager_console,
-                                        denial_info,
-                                        i + 1,
-                                    )
+                            elif args.format == "sealert":
+                                display_report_sealert_format(
+                                    pager_console,
+                                    denial_info,
+                                    i + 1,
+                                )
+                            elif args.format == "brief":
+                                display_report_brief_format(
+                                    pager_console,
+                                    denial_info,
+                                    i + 1,
+                                )
                             else:
                                 print_rich_summary(
                                     pager_console,
