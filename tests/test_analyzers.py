@@ -141,5 +141,26 @@ class TestRelabelingAnalyzer(unittest.TestCase):
         self.assertEqual(len(findings), 0)
 
 
+class TestBootImpactAnalyzer(unittest.TestCase):
+    def test_detects_boot_blocking(self):
+        from analyzers.boot_impact import analyze_boot_impact
+        denials = [
+            {"count": 50, "log": {"scontext": "system_u:system_r:kmod_t:s0-s15:c0.c1023", "tcontext": "system_u:object_r:modules_dep_t:s15:c0.c1023", "tclass": "file", "permission": "read", "permissive": "1"}},
+            {"count": 20, "log": {"scontext": "system_u:system_r:mount_t:s0", "tcontext": "system_u:object_r:fixed_disk_device_t:s15:c0.c1023", "tclass": "blk_file", "permission": "getattr", "permissive": "1"}},
+        ]
+        findings = list(analyze_boot_impact(denials))
+        self.assertTrue(len(findings) > 0)
+        self.assertEqual(findings[0].severity, FindingSeverity.CRITICAL)
+        self.assertIn("boot", findings[0].title.lower())
+
+    def test_no_boot_impact_for_application_denials(self):
+        from analyzers.boot_impact import analyze_boot_impact
+        denials = [
+            {"count": 100, "log": {"scontext": "system_u:system_r:httpd_t:s0", "tcontext": "system_u:object_r:var_t:s0", "tclass": "file", "permission": "read", "permissive": "0"}},
+        ]
+        findings = list(analyze_boot_impact(denials))
+        self.assertEqual(len(findings), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
