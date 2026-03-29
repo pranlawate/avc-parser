@@ -4,7 +4,7 @@
 
 This document demonstrates the tool's capabilities with real examples, organized from basic to advanced usage patterns.
 
-> **📝 Command Format**: Examples use `avc-parser` assuming you've installed the wrapper via `make install-wrapper`. If you haven't, replace `avc-parser` with `avc-parser` in all commands.
+> **📝 Command Format**: All examples use the `avc-parser` command, available after installing via COPR, `pip install -e .`, or `make install-wrapper`. For backward compatibility, `python3 parse_avc.py` also works from the source directory.
 
 > **🎯 New Advanced Filtering**: The tool now includes comprehensive time range and SELinux context filtering for forensic analysis. Jump to [Advanced Filtering Examples](#advanced-time-range-filtering) to see the powerful new capabilities in action.
 

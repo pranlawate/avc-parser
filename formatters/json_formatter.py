@@ -88,13 +88,28 @@ def normalize_json_fields(log_data: dict) -> dict:
                 parts = context_str.split(":")
                 if len(parts) >= 3:
                     context_base = f"{context_field}_components"
+                    mls_level = ":".join(parts[3:]) if len(parts) > 3 else ""
                     normalized[context_base] = {
                         "user": parts[0] if len(parts) > 0 else "",
                         "role": parts[1] if len(parts) > 1 else "",
                         "type": parts[2] if len(parts) > 2 else "",
-                        "level": parts[3] if len(parts) > 3 else "",
+                        "level": mls_level,
                         "full": context_str,
                     }
+                    if mls_level:
+                        try:
+                            from avc_selinux.mls import parse_mls_string
+                            mls_range = parse_mls_string(mls_level)
+                            if mls_range:
+                                normalized[f"{context_field}_mls"] = {
+                                    "raw": mls_level,
+                                    "low_sensitivity": mls_range.low.sensitivity,
+                                    "high_sensitivity": mls_range.high.sensitivity,
+                                    "categories_count": len(mls_range.low.categories),
+                                    "is_range": not mls_range.is_single_level(),
+                                }
+                        except (ImportError, Exception):
+                            pass
                     # Add type extraction for easier filtering
                     if len(parts) > 2:
                         type_key = f"{context_field}_type"
@@ -176,7 +191,7 @@ def normalize_json_fields(log_data: dict) -> dict:
     return normalized
 
 
-def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_command) -> None:
+def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_command, findings=None) -> None:
     """
     Format denial data as structured JSON output for tool integration.
 
@@ -267,6 +282,22 @@ def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_c
             "log_blocks_processed": len(valid_blocks),
         },
     }
+
+    if findings and findings.items:
+        json_structure["findings"] = [
+            {
+                "severity": f.severity.value,
+                "category": f.category.value,
+                "title": f.title,
+                "description": f.description,
+                "investigation_hints": f.investigation_hints,
+                "evidence": f.evidence,
+                "affected_group_count": len(f.affected_groups),
+            }
+            for f in findings.items
+        ]
+        counts = findings.remediation_counts(total_groups=findings.total_groups)
+        json_structure["summary"]["remediation_summary"] = counts
 
     try:
         json_output = json.dumps(json_structure, indent=2, ensure_ascii=False)

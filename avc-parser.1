@@ -5,9 +5,10 @@ avc-parser \- SELinux AVC denial parser and analyzer
 .B avc-parser
 .RB [ \-f
 .IR FILE ]
+.RB [ \-\-format
+.RB { rich | facts | stats | json | brief | sealert }]
 .RB [ \-\-json ]
-.RB [ \-\-report
-.RB { brief | sealert }]
+.RB [ \-\-mls ]
 .RB [ \-\-process
 .IR NAME ]
 .RB [ \-\-source
@@ -17,8 +18,9 @@ avc-parser \- SELinux AVC denial parser and analyzer
 .SH DESCRIPTION
 .B avc-parser
 parses SELinux AVC denial messages from audit logs with support for
-extended audit records (SYSCALL, PATH, CWD, PROCTITLE). Provides smart
-deduplication, severity classification, and multiple output formats.
+extended audit records (SYSCALL, PATH, CWD, PROCTITLE, EXECVE, SOCKADDR).
+Provides smart deduplication, MLS/MCS security level analysis, key findings
+detection, and multiple output formats.
 .PP
 Auto-detects raw audit.log vs pre-processed ausearch format.
 .SH OPTIONS
@@ -34,53 +36,70 @@ Path to raw audit.log file.
 Path to pre-processed ausearch output.
 .SS "Display Options"
 .TP
-.B \-\-json
-Output in JSON format (for tool integration).
+.BI \-\-format " FORMAT"
+Output format: \fBrich\fR (default, terminal panels), \fBfacts\fR (field-by-field),
+\fBstats\fR (summary statistics), \fBjson\fR (structured JSON),
+\fBbrief\fR (executive summary), \fBsealert\fR (technical analysis).
 .TP
-.B \-\-fields
-Field-by-field technical breakdown.
+.B \-\-json
+Shorthand for \fB\-\-format json\fR.
 .TP
 .B \-\-detailed
-Detailed view with per-PID timestamps and syscalls.
-.TP
-.BI \-\-report " FORMAT"
-Report format: \fBbrief\fR (executive summary) or \fBsealert\fR (technical).
+Show per-PID timestamps, syscalls, and exit codes (modifier for rich format).
 .TP
 .B \-\-pager
 Use interactive pager for large outputs.
 .SS "Filtering Options"
+.PP
+Filters support comma-separated values for OR matching (e.g., \fB\-\-source init_t,kmod_t\fR).
 .TP
 .BI \-\-process " NAME"
-Filter by process name.
+Filter by process name. Supports comma-separated values.
 .TP
 .BI \-\-path " PATH"
 Filter by file path (supports wildcards).
 .TP
 .BI \-\-source " TYPE"
-Filter by source SELinux context type.
+Filter by source SELinux context type. Supports comma-separated values.
 .TP
 .BI \-\-target " TYPE"
-Filter by target SELinux context type.
+Filter by target SELinux context type. Supports comma-separated values.
 .TP
 .BI \-\-since " TIME"
 Only include denials since this time.
 .TP
 .BI \-\-until " TIME"
 Only include denials until this time.
+.TP
+.B \-\-mls
+Show only denials with MLS/MCS security level mismatches.
 .SS "Sorting Options"
 .TP
 .BI \-\-sort " ORDER"
 Sort order: \fBrecent\fR (default), \fBcount\fR, or \fBchrono\fR.
+.SS "Advanced Options"
+.TP
+.B \-\-legacy\-signatures
+Use legacy 4-tuple signatures for deduplication (for regression comparison).
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose debug output to stderr.
 .SH EXAMPLES
 .nf
 # Parse audit log with brief report
-avc-parser \-f /var/log/audit/audit.log \-\-report brief
+avc-parser \-f /var/log/audit/audit.log \-\-format brief
 
 # JSON output for tool integration
 avc-parser \-f /var/log/audit/audit.log \-\-json
 
-# Filter by httpd denials
-avc-parser \-f /var/log/audit/audit.log \-\-process httpd
+# Filter by multiple source types
+avc-parser \-f /var/log/audit/audit.log \-\-source init_t,kmod_t,mount_t
+
+# MLS-related denials only
+avc-parser \-f /var/log/audit/audit.log \-\-mls
+
+# Statistics overview
+avc-parser \-f /var/log/audit/audit.log \-\-format stats
 
 # Recent denials only
 avc-parser \-f /var/log/audit/audit.log \-\-since "1 hour ago"

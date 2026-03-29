@@ -19,3 +19,6 @@ htmlcov/
 docs/diagrams/*.svg
 docs/diagrams/*.png
 docs/diagrams/*.gv
+
+# Superpowers working docs (specs, plans)
+docs/superpowers/

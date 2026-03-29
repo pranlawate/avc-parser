@@ -56,6 +56,7 @@ from utils import (
     signal_handler,
     sort_denials,
 )
+from analyzers import run_all_analyzers
 from validators import validate_arguments
 
 # Constants for SELinux audit record types
@@ -69,8 +70,9 @@ SUPPORTED_AVC_TYPES = (
     "1400",
     "1107",
 )
-SUPPORTED_POLICY_TYPES = ("MAC_POLICY_LOAD", "1403")
-ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES
+SUPPORTED_POLICY_TYPES = ("MAC_POLICY_LOAD", "MAC_STATUS", "1403", "1404")
+SUPPORTED_CONTEXT_TYPES = ("EXECVE",)
+ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES + SUPPORTED_CONTEXT_TYPES
 SELINUX_ERROR_TYPES = ("SELINUX_ERR", "USER_SELINUX_ERR")
 
 
@@ -596,6 +598,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
         },
         "PROCTITLE": {"proctitle": r"proctitle=(.+)"},  # Process command line
         "SOCKADDR": {"saddr": r"saddr=([a-fA-F0-9]+)"},  # Socket address info (hexadecimal format)
+        "EXECVE": {"execve_argc": r"argc=(\d+)", "execve_args": r"(a\d+=.+)"},  # Full command argv
     }
 
     # Process non-AVC lines for shared context using enhanced parsing
@@ -633,6 +636,12 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                         path_record[key] = value.strip()
             if path_record.get("name"):
                 path_records.append(path_record)
+        elif log_type == "EXECVE":
+            # Reassemble argv from a0="cmd" a1="arg1" ... into a readable command line
+            arg_matches = re.findall(r'a\d+=(?:"([^"]*)"|(\S+))', line)
+            if arg_matches:
+                args_list = [(m[0] if m[0] else m[1]) for m in arg_matches]
+                shared_context["execve_cmdline"] = " ".join(args_list)
         elif log_type in patterns:
             for key, pattern in patterns[log_type].items():
                 field_match = re.search(pattern, line)
@@ -1177,6 +1186,16 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                     avc_data["dest_port"]
                 )
 
+            # Add MLS analysis when source and target have different levels
+            if source_context and target_context:
+                from avc_selinux.mls import analyze_mls_relationship
+
+                s_range = getattr(source_context, "mls_range", None)
+                t_range = getattr(target_context, "mls_range", None)
+                mls_analysis = analyze_mls_relationship(s_range, t_range)
+                if mls_analysis:
+                    avc_data["mls_analysis"] = mls_analysis
+
         return avc_data
 
     except Exception:  # pylint: disable=broad-exception-caught
@@ -1292,6 +1311,67 @@ def parse_mac_policy_load_events(log_block: str) -> list:
             policy_events.append(event)
 
     return policy_events
+
+
+def parse_mac_status_events(log_block: str) -> list:
+    """
+    Parse MAC_STATUS events from audit log.
+
+    MAC_STATUS events indicate SELinux mode transitions (enforcing/permissive/disabled).
+    These are informational events shown alongside MAC_POLICY_LOAD.
+
+    Args:
+        log_block (str): Multi-line audit log block
+
+    Returns:
+        list: List of status event dictionaries
+    """
+    status_events = []
+
+    for line in log_block.strip().split("\n"):
+        if not re.search(r"type=(MAC_STATUS|1404)", line):
+            continue
+
+        event = {}
+
+        enforcing_match = re.search(r"enforcing=(\d+)", line)
+        old_enforcing_match = re.search(r"old_enforcing=(\d+)", line)
+        enabled_match = re.search(r"(?<![_-])enabled=(\d+)", line)
+        old_enabled_match = re.search(r"old-enabled=(\d+)", line)
+        auid_match = re.search(r"auid=(\d+)", line)
+
+        if enforcing_match:
+            event["enforcing"] = int(enforcing_match.group(1))
+            mode = "enforcing" if event["enforcing"] else "permissive"
+            event["mode"] = mode
+        if old_enforcing_match:
+            event["old_enforcing"] = int(old_enforcing_match.group(1))
+            old_mode = "enforcing" if event["old_enforcing"] else "permissive"
+            event["old_mode"] = old_mode
+        if enabled_match:
+            event["enabled"] = int(enabled_match.group(1))
+        if old_enabled_match:
+            event["old_enabled"] = int(old_enabled_match.group(1))
+        if auid_match:
+            auid = auid_match.group(1)
+            event["auid"] = auid
+            event["auid_display"] = "unset" if auid == "4294967295" else auid
+
+        # Extract timestamp
+        ts_match = re.search(r"audit\((\d+\.\d+):(\d+)\)", line)
+        if ts_match:
+            try:
+                timestamp = float(ts_match.group(1))
+                dt_obj = datetime.fromtimestamp(timestamp)
+                event["datetime_obj"] = dt_obj
+                event["datetime_str"] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, OSError):
+                pass
+
+        if event:
+            status_events.append(event)
+
+    return status_events
 
 
 def build_correlation_event(parsed_log: dict, permission: str) -> dict:
@@ -1846,20 +1926,17 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
             permission_category,
         )
     else:
-        # Other objects: use simpler grouping
-        # TODO: FIX - MLS over-separation for capability/system classes
-        # Problem: Full tcontext includes MLS (s0 vs s0-s0:c0.c1023) causing separate groups
-        # Example: unix_chkpwd with different MCS categories creates 2 groups for same fix
-        #   - PID 4320:  tcontext=system_u:system_r:chkpwd_t:s0
-        #   - PID 3999:  tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023
-        #   Both need: sesearch -A -s chkpwd_t -t chkpwd_t -c capability -p dac_override
-        # Fix approach: For capability/capability2 classes, use only tcontext.type (not full context)
-        #   signature = (process_category, tcontext.type, object_group, permission_category)
-        # Validation function detects this: efficiency < 100% (multiple groups, same sesearch)
-        # See: Interview discussion about balancing precision vs usability
+        # For capability/system classes, MLS differences don't affect remediation.
+        # sesearch uses only the type component, so grouping on full context
+        # over-splits when MLS varies (e.g., chkpwd_t:s0 vs chkpwd_t:s0-s0:c0.c1023).
+        mls_independent_classes = {"capability", "capability2", "process", "system"}
+        if tclass in mls_independent_classes and tcontext and hasattr(tcontext, "type"):
+            target_key = tcontext.type
+        else:
+            target_key = context_to_str(tcontext)
         signature = (
             process_category,
-            context_to_str(tcontext),
+            target_key,
             object_group,
             permission_category,
         )
@@ -1929,10 +2006,13 @@ def filter_denials(
         parsed_log = denial_info.get("log", {})
         include_denial = True
 
-        # Process filtering
+        # Process filtering (supports comma-separated values for OR matching)
         if process_filter:
             comm = parsed_log.get("comm", "").lower()
-            if process_filter.lower() not in comm:
+            if "," in process_filter:
+                if not any(p.strip().lower() in comm for p in process_filter.split(",")):
+                    include_denial = False
+            elif process_filter.lower() not in comm:
                 include_denial = False
 
         # Path filtering
@@ -2642,10 +2722,13 @@ def display_consolidated_group(
             first_perm, tclass, scontext, tcontext, process_name
         )
 
-    if contextual_analysis or proctitle:
+    mls_analysis = parsed_log.get("mls_analysis")
+    if contextual_analysis or proctitle or mls_analysis:
         console.print("  └─ Process Context:")
         if contextual_analysis:
             console.print(f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]")
+        if mls_analysis:
+            console.print(f"     ├─ MLS: [bright_red]{mls_analysis}[/bright_red]")
         if proctitle and proctitle != process_name:
             console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
 
@@ -2744,6 +2827,7 @@ def print_rich_summary(
     denial_info: dict,
     denial_num: int,
     detailed: bool = False,
+    findings=None,
 ):
     """
     Print a Rich-formatted summary with correlation events display.
@@ -2800,6 +2884,25 @@ def print_rich_summary(
     if has_container:
         container_indicator = " • [bright_cyan]🐳 container[/bright_cyan]"
         header_bionic += container_indicator
+
+    # Check for MLS level mismatch and add indicator
+    mls_analysis = parsed_log.get("mls_analysis")
+    if mls_analysis:
+        mls_indicator = " • [bright_red]🔒 MLS mismatch[/bright_red]"
+        header_bionic += mls_indicator
+
+    if findings:
+        from analyzers.findings import FindingCategory
+        denial_idx = denial_num - 1
+        for tag in findings.tags.get(denial_idx, []):
+            if tag.category in (FindingCategory.LABELING, FindingCategory.RELABELING):
+                header_bionic += " • [bright_green]🏷️ relabel-fixable[/bright_green]"
+            elif tag.category == FindingCategory.BOOT_IMPACT:
+                header_bionic += " • [bright_red]⛔ boot-blocking[/bright_red]"
+            elif tag.category == FindingCategory.SYSTEMIC:
+                header_bionic += " • [bright_yellow]🔁 systemic[/bright_yellow]"
+            elif tag.category == FindingCategory.RECURRENCE:
+                header_bionic += " • [bright_yellow]📈 recurring[/bright_yellow]"
 
     console.print(Rule(header_bionic, style="cyan"))
 
@@ -3524,30 +3627,36 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     # Display Options
     display_group = parser.add_argument_group("Display Options")
     display_group.add_argument(
-        "--json", action="store_true", help="Output the parsed data in JSON format."
+        "--format",
+        type=str,
+        choices=["rich", "facts", "stats", "json", "brief", "sealert"],
+        default=None,
+        help=(
+            "Output format: 'rich' (default, terminal panels), "
+            "'facts' (field-by-field breakdown), "
+            "'stats' (summary statistics), "
+            "'json' (structured JSON for tool integration), "
+            "'brief' (executive summary), "
+            "'sealert' (technical analysis)."
+        ),
     )
     display_group.add_argument(
-        "--fields",
-        action="store_true",
-        help="Field-by-field technical breakdown for deep-dive analysis.",
+        "--json", action="store_true", help="Shorthand for --format json.",
     )
     display_group.add_argument(
         "--detailed",
         action="store_true",
-        help="Show detailed view with per-PID timestamps, syscalls, and exit codes.",
-    )
-    display_group.add_argument(
-        "--report",
-        nargs="?",
-        const="brief",
-        choices=["brief", "sealert"],
-        help="Professional report format: 'brief' (default) for executive summaries, 'sealert' for technical analysis.",
+        help="Show per-PID timestamps, syscalls, and exit codes (modifier for rich format).",
     )
     display_group.add_argument(
         "--pager",
         action="store_true",
         help="Use interactive pager for large outputs (like 'less' command).",
     )
+    # Deprecated flags (hidden, with deprecation warnings)
+    display_group.add_argument("--fields", action="store_true", help=argparse.SUPPRESS)
+    display_group.add_argument("--report", nargs="?", const="brief", choices=["brief", "sealert"], help=argparse.SUPPRESS)
+    display_group.add_argument("--stats", action="store_true", help=argparse.SUPPRESS)
 
     # Filtering Options
     filter_group = parser.add_argument_group("Filtering Options")
@@ -3581,6 +3690,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         type=str,
         help="Only include denials until this time (e.g., 'today', '2025-01-15 14:30').",
     )
+    filter_group.add_argument(
+        "--mls",
+        action="store_true",
+        help="Show only denials with MLS/MCS security level mismatches between source and target.",
+    )
 
     # Sorting Options
     sort_group = parser.add_argument_group("Sorting Options")
@@ -3605,12 +3719,29 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         action="store_true",
         help="Enable verbose output for debugging and troubleshooting.",
     )
-    advanced_group.add_argument(
-        "--stats",
-        action="store_true",
-        help="Display summary statistics only (quick overview without full output).",
-    )
     args = parser.parse_args()
+
+    # Normalize --format from deprecated flags with deprecation warnings
+    stderr_console = Console(stderr=True)
+    if args.format is None:
+        if args.json:
+            args.format = "json"
+        elif args.fields:
+            stderr_console.print("[yellow]Warning: --fields is deprecated, use --format facts[/yellow]")
+            args.format = "facts"
+        elif args.stats:
+            stderr_console.print("[yellow]Warning: --stats is deprecated, use --format stats[/yellow]")
+            args.format = "stats"
+        elif args.report:
+            fmt = args.report if args.report in ("brief", "sealert") else "brief"
+            stderr_console.print(f"[yellow]Warning: --report is deprecated, use --format {fmt}[/yellow]")
+            args.format = fmt
+        else:
+            args.format = "rich"
+
+    if args.detailed and args.format != "rich":
+        stderr_console.print("[yellow]Warning: --detailed only applies to --format rich, ignoring[/yellow]")
+        args.detailed = False
 
     # Set up signal handler for graceful interruption (Ctrl+C)
     signal.signal(signal.SIGINT, signal_handler)
@@ -3632,7 +3763,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     ausearch_message = ""
 
     # Generate detection message if not in JSON mode
-    if not args.json and args.file:
+    if args.format != "json" and args.file:
         file_path = args.file
         detected_format = detect_file_format(file_path)
         if detected_format == "raw":
@@ -3643,7 +3774,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     if input_type == "raw_file":
         # Determine the correct file path (could be from --file or --raw-file)
         file_path = args.file if args.file else args.raw_file
-        if not args.json:
+        if args.format != "json":
             ausearch_message = f"Raw file input provided. Running ausearch on '{file_path}'..."
         try:
             ausearch_cmd = [
@@ -3701,7 +3832,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             console.print(f"   {str(e)}")
             sys.exit(1)
     else:  # interactive mode
-        if not args.json:
+        if args.format != "json":
             console.print(
                 "📋 Please paste your SELinux AVC denial log below and press [bold yellow]Ctrl+D[/bold yellow] when done:"
             )
@@ -3717,7 +3848,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     log_blocks = [block.strip() for block in log_string.split("----") if block.strip()]
     verbose_print(f"Split input into {len(log_blocks)} log blocks", console)
     if not log_blocks:
-        if not args.json:
+        if args.format != "json":
             console.print("Error: No valid log blocks found.", style="bold red")
         sys.exit(1)
 
@@ -3737,7 +3868,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         is_valid, sanitized_block, warnings = validate_log_entry(block)
 
         if not is_valid:
-            if not args.json:
+            if args.format != "json":
                 console.print(
                     f"⚠️  [bold yellow]Warning: Skipping invalid log block {i + 1}[/bold yellow]"
                 )
@@ -3754,13 +3885,15 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         all_unparsed_types.update(unparsed)
         all_avc_denials.extend(avc_denials)
 
-        # Parse MAC_POLICY_LOAD events (informational)
+        # Parse MAC_POLICY_LOAD and MAC_STATUS events (informational)
         policy_loads = parse_mac_policy_load_events(sanitized_block)
         all_policy_loads.extend(policy_loads)
+        status_events = parse_mac_status_events(sanitized_block)
+        all_policy_loads.extend(status_events)
 
     # Check if we have any valid blocks after validation
     if not valid_blocks:
-        if not args.json:
+        if args.format != "json":
             console.print(
                 "❌ [bold red]Error: No valid log blocks found after validation[/bold red]"
             )
@@ -3772,7 +3905,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     verbose_print(f"Successfully parsed {len(all_avc_denials)} AVC denials from {len(valid_blocks)} valid blocks", console)
 
     # Display validation summary (non-JSON mode only)
-    if validation_warnings and not args.json:
+    if validation_warnings and args.format != "json":
         # Aggregate warnings by type for clearer messaging
         malformed_lines = 0
         empty_blocks = 0
@@ -3912,73 +4045,77 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     verbose_print(f"Created {len(unique_denials)} unique denial groups from {len(all_avc_denials)} total events", console)
 
-    # Handle --stats mode (summary only)
-    if args.stats:
-        # Prepare statistics
-        total_events = sum(denial["count"] for denial in unique_denials.values())
+    # ── SORT AND FILTER (runs before ALL formatters) ──
+    total_events = sum(denial["count"] for denial in unique_denials.values())
+    sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
+    validation_report = validate_grouping_optimality(unique_denials)
+    findings = run_all_analyzers(sorted_denials, all_policy_loads)
 
-        # Detect security notices
-        all_denials_list = list(unique_denials.values())
-        dontaudit_detected, _ = detect_dontaudit_disabled(all_denials_list)
-        permissive_detected, _, _ = detect_permissive_mode(all_denials_list)
+    # Inject actual filename into investigation hints
+    file_path = args.file or args.raw_file or args.avc_file or "<file>"
+    for finding in findings.items:
+        finding.investigation_hints = [
+            hint.replace("<file>", file_path) for hint in finding.investigation_hints
+        ]
 
-        # Prepare file info
+    try:
+        filtered_denials = filter_denials(
+            sorted_denials,
+            args.process,
+            args.path,
+            args.since,
+            args.until,
+            args.source,
+            args.target,
+        )
+
+        if args.mls:
+            filtered_denials = [
+                d for d in filtered_denials if d.get("log", {}).get("mls_analysis")
+            ]
+
+        if any([args.process, args.path, args.since, args.until, args.source, args.target, args.mls]):
+            filtered_count = len(filtered_denials)
+            total_count = len(sorted_denials)
+            filtered_out = total_count - filtered_count
+            verbose_print(f"Filtering: {filtered_out} denials filtered out, {filtered_count} remaining", console)
+    except ValueError as e:
+        console.print(f"[red]Error in filtering: {e}[/red]")
+        return
+
+    # ── FORMAT DISPATCH (all formatters receive filtered_denials) ──
+
+    if args.format == "stats":
+        dontaudit_detected, _ = detect_dontaudit_disabled(sorted_denials)
+        permissive_detected, _, _ = detect_permissive_mode(sorted_denials)
+
         file_info = None
         if args.file:
             import os
             file_size_kb = os.path.getsize(args.file) / 1024 if os.path.exists(args.file) else None
-            file_info = {
-                "name": args.file,
-                "size_kb": file_size_kb,
-            }
-
-        security_notices = {
-            "dontaudit": dontaudit_detected,
-            "permissive": permissive_detected,
-        }
+            file_info = {"name": args.file, "size_kb": file_size_kb}
 
         display_stats_summary(
-            list(unique_denials.values()),
+            filtered_denials,
             total_events,
             len(valid_blocks),
             file_info=file_info,
-            security_notices=security_notices,
+            security_notices={"dontaudit": dontaudit_detected, "permissive": permissive_detected},
             console=console,
+            findings=findings,
         )
         return
 
-    if args.json:
-        format_as_json(unique_denials, valid_blocks, generate_sesearch_command)
+    if args.format == "json":
+        # Build a dict from filtered_denials for format_as_json
+        filtered_unique = {}
+        for d in filtered_denials:
+            log = d.get("log", {})
+            sig = id(d)
+            filtered_unique[sig] = d
+        format_as_json(filtered_unique, valid_blocks, generate_sesearch_command, findings=findings)
 
     else:
-        # Non JSON default output
-        total_events = sum(denial["count"] for denial in unique_denials.values())
-
-        # Apply sorting based on user preference
-        sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
-
-        # Validate grouping optimality (analyze sesearch command uniqueness)
-        validation_report = validate_grouping_optimality(unique_denials)
-
-        # Apply filtering if specified
-        try:
-            filtered_denials = filter_denials(
-                sorted_denials,
-                args.process,
-                args.path,
-                args.since,
-                args.until,
-                args.source,
-                args.target,
-            )
-            if any([args.process, args.path, args.since, args.until, args.source, args.target]):
-                filtered_count = len(filtered_denials)
-                total_count = len(sorted_denials)
-                filtered_out = total_count - filtered_count
-                verbose_print(f"Filtering: {filtered_out} denials filtered out, {filtered_count} remaining", console)
-        except ValueError as e:
-            console.print(f"[red]Error in filtering: {e}[/red]")
-            return
 
         # Check for detection warnings (on full results before filtering for complete context)
         dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
@@ -4033,7 +4170,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 )
 
             # Display filtering info if applicable
-            if args.process or args.path or args.since or args.until or args.source or args.target:
+            if args.process or args.path or args.since or args.until or args.source or args.target or args.mls:
                 filter_msg = []
                 if args.process:
                     filter_msg.append(f"process='{args.process}'")
@@ -4047,6 +4184,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     filter_msg.append(f"source='{args.source}'")
                 if args.target:
                     filter_msg.append(f"target='{args.target}'")
+                if args.mls:
+                    filter_msg.append("mls")
                 filter_str = ", ".join(filter_msg)
                 console.print(f"Applied filters: {filter_str}")
                 console.print(
@@ -4083,14 +4222,14 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     console.print()
 
             if filtered_denials:
-                if not args.report:
+                if args.format not in ("brief", "sealert"):
                     console.print(Rule("[dim]Parsed Log Summary[/dim]"))
 
                 # Display detection warnings at the top
                 if dontaudit_detected:
                     indicators_str = ", ".join(found_indicators)
 
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
@@ -4138,7 +4277,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display permissive mode warning if found
                 if permissive_detected:
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
@@ -4181,7 +4320,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     if len(found_custom_patterns) > 3:
                         patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for report mode
                         console.print("═" * 79)
                         console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
@@ -4218,7 +4357,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                 # Display container issues warning if found
                 if container_issues_detected:
-                    if args.report:
+                    if args.format in ("brief", "sealert"):
                         # Simple text format for --report mode
                         console.print("═" * 79)
                         console.print("🐳  CONTAINER STORAGE DETECTED")
@@ -4347,36 +4486,96 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         console.print(Align.center(container_panel, width=panel_width))
                         console.print()
 
+                # Display MLS primer if any denial has MLS level differences
+                has_mls_denials = any(
+                    d.get("log", {}).get("mls_analysis") for d in filtered_denials
+                )
+                if has_mls_denials and args.format not in ("brief", "sealert"):
+                    from rich.align import Align
+                    from rich.console import Group
+                    from rich.panel import Panel
+                    from avc_selinux.mls import get_mls_primer
+
+                    primer_lines = [
+                        Align.center("[bold bright_red]🔒  MLS SECURITY LEVELS DETECTED[/bold bright_red]"),
+                        Align.center(""),
+                    ]
+                    for line in get_mls_primer().strip().split("\n"):
+                        primer_lines.append(Align.center(f"[dim]{line}[/dim]"))
+
+                    mls_panel = Panel(
+                        Group(*primer_lines),
+                        title="[bold red]MLS/MCS Guide[/bold red]",
+                        border_style="bright_red",
+                        padding=(1, 4),
+                    )
+                    panel_width = min(max(int(console.width * 0.7), 70), 130)
+                    console.print(Align.center(mls_panel, width=panel_width))
+                    console.print()
+
+                # Display key findings banners for CRITICAL/WARNING findings
+                if findings and findings.items and args.format not in ("brief", "sealert"):
+                    from rich.align import Align
+                    from rich.console import Group
+                    from rich.panel import Panel
+                    from analyzers.findings import FindingSeverity
+
+                    for finding in findings.items:
+                        if finding.severity in (FindingSeverity.CRITICAL, FindingSeverity.WARNING):
+                            border = "red" if finding.severity == FindingSeverity.CRITICAL else "yellow"
+                            sev_label = finding.severity.value.upper()
+                            sev_color = "bold red" if finding.severity == FindingSeverity.CRITICAL else "bold yellow"
+                            banner_lines = [
+                                Align.center(f"[{sev_color}]{sev_label}: {finding.title}[/{sev_color}]"),
+                                Align.center(""),
+                                Align.center(f"[dim]{finding.description}[/dim]"),
+                            ]
+                            if finding.investigation_hints:
+                                banner_lines.append(Align.center(""))
+                                for hint in finding.investigation_hints:
+                                    banner_lines.append(Align.center(f"[dim]💡 {hint}[/dim]"))
+
+                            finding_panel = Panel(
+                                Group(*banner_lines),
+                                title=f"[{sev_color}]Key Finding[/{sev_color}]",
+                                border_style=border,
+                                padding=(1, 4),
+                            )
+                            panel_width = min(max(int(console.width * 0.6), 60), 120)
+                            console.print(Align.center(finding_panel, width=panel_width))
+                            console.print()
+
                 # Display denials
                 for i, denial_info in enumerate(filtered_denials):
                     if i > 0:
-                        if args.fields:
+                        if args.format == "facts":
                             console.print(Rule(style="dim"))
                         else:
                             console.print()  # Space between denials
 
-                    # Choose display format based on flags
-                    if args.fields:
+                    # Choose display format
+                    if args.format == "facts":
                         print_summary(console, denial_info, i + 1)
-                    elif args.report:
-                        if args.report == "sealert":
-                            display_report_sealert_format(
-                                console,
-                                denial_info,
-                                i + 1,
-                            )
-                        else:  # brief format (default)
-                            display_report_brief_format(
-                                console,
-                                denial_info,
-                                i + 1,
-                            )
+                    elif args.format == "sealert":
+                        display_report_sealert_format(
+                            console,
+                            denial_info,
+                            i + 1,
+                            findings_tags=findings.tags.get(i, []) if findings else None,
+                        )
+                    elif args.format == "brief":
+                        display_report_brief_format(
+                            console,
+                            denial_info,
+                            i + 1,
+                        )
                     else:
                         print_rich_summary(
                             console,
                             denial_info,
                             i + 1,
                             detailed=args.detailed,
+                            findings=findings,
                         )
 
             # Display MAC_POLICY_LOAD events summary if any (outside if filtered_denials block)
@@ -4410,7 +4609,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 console.print(f"  {', '.join(sorted(list(all_unparsed_types)))}")
 
         # Use interactive pager for large outputs if requested and running in a terminal
-        if args.pager and sys.stdout.isatty() and not args.json:
+        if args.pager and sys.stdout.isatty() and args.format != "json":
             # Capture output with colors preserved for pager
             import io
 
@@ -4472,7 +4671,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         # Display detection warnings at the top
                         if dontaudit_detected:
                             indicators_str = ", ".join(found_indicators)
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("⚠️  SECURITY NOTICE: DONTAUDIT RULES DISABLED")
@@ -4522,7 +4721,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display permissive mode warning if found
                         if permissive_detected:
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("🛡️  MODE NOTICE: PERMISSIVE MODE DETECTED")
@@ -4571,7 +4770,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             if len(found_custom_patterns) > 3:
                                 patterns_str += f" (+{len(found_custom_patterns) - 3} more)"
 
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("📁  PATH NOTICE: CUSTOM PATHS DETECTED")
@@ -4612,7 +4811,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
                         # Display container issues warning if found
                         if container_issues_detected:
-                            if args.report:
+                            if args.format in ("brief", "sealert"):
                                 # Simple text format for --report mode
                                 pager_console.print("═" * 79)
                                 pager_console.print("🐳  CONTAINER STORAGE DETECTED")
@@ -4755,36 +4954,69 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 )
                                 pager_console.print()
 
+                        # Display key findings banners (pager)
+                        if findings and findings.items and args.format not in ("brief", "sealert"):
+                            from rich.align import Align
+                            from rich.console import Group
+                            from rich.panel import Panel
+                            from analyzers.findings import FindingSeverity
+
+                            for finding in findings.items:
+                                if finding.severity in (FindingSeverity.CRITICAL, FindingSeverity.WARNING):
+                                    border = "red" if finding.severity == FindingSeverity.CRITICAL else "yellow"
+                                    sev_label = finding.severity.value.upper()
+                                    sev_color = "bold red" if finding.severity == FindingSeverity.CRITICAL else "bold yellow"
+                                    banner_lines = [
+                                        Align.center(f"[{sev_color}]{sev_label}: {finding.title}[/{sev_color}]"),
+                                        Align.center(""),
+                                        Align.center(f"[dim]{finding.description}[/dim]"),
+                                    ]
+                                    if finding.investigation_hints:
+                                        banner_lines.append(Align.center(""))
+                                        for hint in finding.investigation_hints:
+                                            banner_lines.append(Align.center(f"[dim]💡 {hint}[/dim]"))
+
+                                    finding_panel = Panel(
+                                        Group(*banner_lines),
+                                        title=f"[{sev_color}]Key Finding[/{sev_color}]",
+                                        border_style=border,
+                                        padding=(1, 4),
+                                    )
+                                    panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                                    pager_console.print(Align.center(finding_panel, width=panel_width))
+                                    pager_console.print()
+
                         # Display denials using pager console
                         for i, denial_info in enumerate(filtered_denials):
                             if i > 0:
-                                if args.fields:
+                                if args.format == "facts":
                                     pager_console.print(Rule(style="dim"))
                                 else:
                                     pager_console.print()  # Space between denials
 
-                            # Choose display format based on flags
-                            if args.fields:
+                            # Choose display format
+                            if args.format == "facts":
                                 print_summary(pager_console, denial_info, i + 1)
-                            elif args.report:
-                                if args.report == "sealert":
-                                    display_report_sealert_format(
-                                        pager_console,
-                                        denial_info,
-                                        i + 1,
-                                    )
-                                else:  # brief format (default)
-                                    display_report_brief_format(
-                                        pager_console,
-                                        denial_info,
-                                        i + 1,
-                                    )
+                            elif args.format == "sealert":
+                                display_report_sealert_format(
+                                    pager_console,
+                                    denial_info,
+                                    i + 1,
+                                    findings_tags=findings.tags.get(i, []) if findings else None,
+                                )
+                            elif args.format == "brief":
+                                display_report_brief_format(
+                                    pager_console,
+                                    denial_info,
+                                    i + 1,
+                                )
                             else:
                                 print_rich_summary(
                                     pager_console,
                                     denial_info,
                                     i + 1,
                                     detailed=args.detailed,
+                                    findings=findings,
                                 )
 
                         # Final summary

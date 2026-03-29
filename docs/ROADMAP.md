@@ -20,7 +20,7 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
 - Performance validation post-modularization
 
 ### **Phase 7: Comprehensive Test Coverage (COMPLETED - 2025-09-26)**
-- Test suite expansion: 107 → 169 tests (through multiple phases)
+- Test suite expansion: 107 → 249 tests (through multiple phases)
 - Regression prevention framework with automated validation
 - Display layer, malformed log, and integration testing
 
@@ -48,12 +48,12 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
   - ✅ Step 5: formatters/report_formatter.py (report display formatting)
   - ✅ Step 6: detectors/anomaly_detector.py (anomaly detection)
 - **Benefits Achieved**: Clean modular architecture, zero regressions, enhanced maintainability
-- **Quality Assurance**: All 169 tests passing, comprehensive validation across all log types
+- **Quality Assurance**: All 174 tests passing, comprehensive validation across all log types
 
 **Phase 9B: Developer Experience & Tooling** (✅ COMPLETED)
 - **Objective**: Complete high-value organizational improvements and developer experience enhancements
 - **Completed Improvements**:
-  - ✅ Move context.py to selinux/ package (logical organization)
+  - ✅ Move context.py to avc_selinux/ package (logical organization)
   - ✅ Create examples/ with executable integration scripts (5 scripts: basic, SIEM, batch, security, performance)
   - ✅ Enhance scripts/ with development utilities (4 utilities: test runner, log validator, test data generator, profiler)
   - ✅ Enhanced documentation with Quick Start guide and clear architecture
@@ -118,7 +118,7 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
   - ✅ MAC_POLICY_LOAD support (policy reload tracking)
   - ✅ Specialized display for error types (context, transition, target class)
   - ✅ Policy reload events shown separately from denials
-- **Testing**: All 169 tests passing with new record types
+- **Testing**: All 174 tests passing with new record types
 - **Impact**: Comprehensive SELinux audit log analysis beyond basic AVC denials
 
 **Phase 11E: Code Quality & Development Tooling** (✅ COMPLETED)
@@ -131,7 +131,7 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
   - ✅ Pytest framework configuration with test discovery and markers
   - ✅ Coverage reporting setup (19.15% baseline established)
   - ✅ .gitignore updated for coverage artifacts
-- **Quality Metrics**: All 169 tests passing, ruff clean, 10.00/10 pylint rating
+- **Quality Metrics**: All 174 tests passing, ruff clean, 10.00/10 pylint rating
 - **Benefits**: Professional development workflow with automated quality checks
 
 **Phase 12: CI/CD Pipeline & Performance Testing** (🔄 NEXT PRIORITY)
@@ -160,8 +160,8 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
 ## 📊 **Success Metrics**
 
 **Current Status v1.8.1**: Production-ready forensic analysis tool with setroubleshoot-based optimizations (smart path normalization, exit code translation, sophisticated PATH record matching), Phase 11 enhancements, and convenient wrapper installation system for easy CLI access
-- **Architecture**: Clean modular design (6 modules: core + config, validators, formatters, selinux, detectors, utils)
-- **Testing**: 169 comprehensive tests with regression prevention (100% pass rate maintained)
+- **Architecture**: Clean modular design (6 modules: core + config, validators, formatters, avc_selinux, detectors, utils)
+- **Testing**: 249 comprehensive tests with regression prevention (100% pass rate maintained)
 - **Quality**: 10.00/10 pylint rating, ruff-formatted code, 19% coverage baseline established
 - **Development Tooling**: Modern workflow with ruff, pytest, and coverage reporting (Phase 11E ✅)
 - **Features**: Extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD) (Phase 11D ✅)

@@ -26,10 +26,12 @@ def context_matches(context: str, pattern: str) -> bool:
     """
     Check if a SELinux context matches a pattern with wildcard support.
 
+    Supports comma-separated patterns for OR matching:
+    'init_t,kmod_t,mount_t' matches if ANY value matches.
+
     Args:
         context (str): The SELinux context to check (e.g., 'system_u:system_r:httpd_t:s0')
-        pattern (str): The pattern to match against (supports * wildcards)
-                      Can match full context or individual components
+        pattern (str): The pattern to match against (supports * wildcards and comma-separated OR)
 
     Returns:
         bool: True if context matches pattern
@@ -39,31 +41,33 @@ def context_matches(context: str, pattern: str) -> bool:
         True
         >>> context_matches('system_u:system_r:httpd_t:s0', '*httpd*')
         True
-        >>> context_matches('unconfined_u:object_r:default_t:s0', '*default*')
+        >>> context_matches('system_u:system_r:init_t:s0', 'init_t,kmod_t,mount_t')
         True
     """
     if not context or not pattern:
         return False
 
-    context = context.strip()
-    pattern = pattern.strip()
+    if "," in pattern:
+        return any(_single_context_matches(context, p.strip()) for p in pattern.split(","))
+    return _single_context_matches(context, pattern)
 
-    # Case-insensitive matching for better user experience
-    context_lower = context.lower()
-    pattern_lower = pattern.lower()
 
-    # Direct substring match (for simple cases like 'httpd_t')
+def _single_context_matches(context: str, pattern: str) -> bool:
+    """Match a single pattern against a context."""
+    if not pattern:
+        return False
+
+    context_lower = context.strip().lower()
+    pattern_lower = pattern.strip().lower()
+
     if pattern_lower in context_lower:
         return True
 
-    # Wildcard pattern matching on full context
     if fnmatch.fnmatch(context_lower, pattern_lower):
         return True
 
-    # If pattern doesn't contain colons, try matching against individual context components
     if ":" not in pattern:
-        context_parts = context_lower.split(":")
-        for part in context_parts:
+        for part in context_lower.split(":"):
             if fnmatch.fnmatch(part, pattern_lower):
                 return True
 

@@ -14,7 +14,7 @@ make install-wrapper  # Optional: Install wrapper for easy access
 # === BASIC USAGE ===
 # Analyze audit logs (auto-detects format)
 avc-parser --file /var/log/audit/audit.log
-# Or without wrapper: python3 parse_avc.py --file /var/log/audit/audit.log
+# Backward compatible: python3 parse_avc.py --file /var/log/audit/audit.log
 
 # === DISPLAY MODES ===
 # Enhanced detailed analysis with per-PID breakdowns
@@ -130,7 +130,7 @@ avc-parser --file /var/log/audit/audit.log --pager
 
 📊 **Development Plans**: See [ROADMAP.md](ROADMAP.md) for future plans and [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) for implementation details.
 
-🎯 **Current Status (v1.8.1)**: Production-ready with setroubleshoot-based optimizations (smart path normalization, exit code translation), clean modular architecture, modern development tooling, extended audit record support, enhanced forensic analysis capabilities, and convenient wrapper installation system. Python 3.9+ compatible. Next phase: CI/CD automation and performance benchmarking.
+🎯 **Current Status (v1.8.1)**: Production-ready with setroubleshoot-based optimizations (smart path normalization, exit code translation), clean modular architecture, modern development tooling, extended audit record support, enhanced forensic analysis capabilities, and convenient wrapper installation system. Python 3.8+ compatible. Next phase: CI/CD automation and performance benchmarking.
 
 ## 🏗️ Architecture
 
@@ -160,7 +160,7 @@ avc-parser/
 │   ├── selinux_utils.py     # SELinux command generation
 │   ├── legacy.py            # Legacy display and helper functions
 │   └── __init__.py
-├── selinux/                 # SELinux analysis and context parsing
+├── avc_selinux/             # SELinux analysis and context parsing
 │   ├── context.py          # AvcContext class and semantic analysis
 │   └── __init__.py
 ├── docs/                    # Documentation
@@ -179,13 +179,22 @@ avc-parser/
 │   └── README.md           # Examples guide
 ├── scripts/                 # Development and utility scripts
 │   ├── run_tests.py        # Test runner script
+│   ├── syntax_check.py     # Syntax validation utility
 │   ├── validate_logs.py    # Log file validation utility
 │   ├── generate_test_data.py # Synthetic test data generator
 │   ├── profile_performance.py # Performance profiling tool
 │   └── README.md           # Scripts documentation
-├── tests/                   # Comprehensive test suite (169 tests)
+├── analyzers/               # Key findings analysis engine
+│   ├── findings.py          # Finding data model and severity levels
+│   ├── labeling.py          # Unlabeled files and MLS inconsistency detection
+│   ├── relabeling.py        # Relabeling tool failure detection
+│   ├── boot_impact.py       # Boot-blocking denial detection
+│   ├── patterns.py          # Systemic pattern detection
+│   ├── recurrence.py        # Denial recurrence across policy reloads
+│   └── __init__.py
+├── tests/                   # Comprehensive test suite (249 tests)
 │   ├── test_*.py           # Feature-specific test modules
-│   └── testAVC/, testRAW/  # Sample audit logs and test fixtures
+│   └── testAVC/            # Sample audit logs and test fixtures
 └── pyproject.toml          # Modern Python project configuration
     ├── Project metadata and dependencies
     ├── Development tooling (ruff, pytest, coverage)
@@ -193,8 +202,8 @@ avc-parser/
 ```
 
 **Architecture Benefits**:
-- **Clean Modular Design**: Logical separation into 6 modules (config, validators, formatters, utils, detectors, selinux)
-- **Comprehensive Test Suite**: 169 tests covering core parsing, validation, and integration workflows (100% pass rate)
+- **Clean Modular Design**: Logical separation into 6 modules (config, validators, formatters, utils, detectors, avc_selinux)
+- **Comprehensive Test Suite**: 249 tests covering core parsing, MLS, analyzers, validation, and integration workflows (100% pass rate)
 - **Enhanced Maintainability**: Clear separation of concerns with focused modules
 - **Modern Development Tooling**: Ruff linting/formatting, pytest framework, coverage reporting
 - **Developer Experience**: Comprehensive examples, utilities, and development tools
@@ -221,7 +230,7 @@ avc-parser --file /var/log/audit/audit.log --json
 avc-parser --file /var/log/audit/audit.log --report brief
 ```
 
-**Note:** Replace `avc-parser` with `python3 parse_avc.py` if you didn't install the wrapper.
+**Note:** `avc-parser` is available after installing via COPR, `pip install -e .`, or `make install-wrapper`. For backward compatibility, `python3 parse_avc.py` also works from the source directory.
 
 📖 **For comprehensive usage examples, see [EXAMPLES.md](EXAMPLES.md)**
 
@@ -277,16 +286,10 @@ avc-parser --file /var/log/audit/audit.log --report brief
 
 ## 🚀 Usage
 
-**Note:** If you installed the wrapper, replace `python3 parse_avc.py` with `avc-parser` in all commands below.
-
 ### **Recommended: Auto-Detection** ✨
 Single flag automatically detects file format (raw audit.log vs pre-processed):
 ```bash
-# With wrapper
 avc-parser --file /var/log/audit/audit.log
-
-# Without wrapper
-python3 parse_avc.py --file /var/log/audit/audit.log
 ```
 
 ### **Alternative Methods:**
@@ -392,7 +395,7 @@ avc-parser --file /var/log/audit/audit.log --pager
 - JSON export with structured output
 
 **Quality Assurance**: ✅ Complete
-- 169 comprehensive tests with regression prevention
+- 249 comprehensive tests with regression prevention
 - Modern development tooling (ruff, pytest, coverage)
 - Modular architecture for maintainability
 - Cross-platform compatibility

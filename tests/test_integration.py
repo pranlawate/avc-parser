@@ -846,7 +846,7 @@ type=AVC msg=audit(1694170523.456:123): avc:  denied  { noatsecure } for  pid=12
         self.assertIn("SELinux Unique Denial Group", result_sealert.stdout, "Sealert should have technical style")
 
     def test_report_help_shows_format_options(self):
-        """Test that help output shows the new report format options."""
+        """Test that help output shows the --format flag with all options."""
         result = subprocess.run(
             [sys.executable, "parse_avc.py", "--help"],
             capture_output=True,
@@ -855,8 +855,11 @@ type=AVC msg=audit(1694170523.456:123): avc:  denied  { noatsecure } for  pid=12
         )
 
         self.assertEqual(result.returncode, 0)
-        self.assertIn("brief,sealert", result.stdout, "Help should show brief and sealert options")
-        self.assertIn("executive summaries", result.stdout, "Help should describe brief format")
+        self.assertIn("--format", result.stdout, "Help should show --format flag")
+        self.assertIn("rich", result.stdout, "Help should list rich format")
+        self.assertIn("facts", result.stdout, "Help should list facts format")
+        self.assertIn("sealert", result.stdout, "Help should list sealert format")
+        self.assertIn("executive summary", result.stdout, "Help should describe brief format")
         self.assertIn("technical analysis", result.stdout, "Help should describe sealert format")
 
     def test_mixed_permissive_mode_detection(self):

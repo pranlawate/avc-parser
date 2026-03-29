@@ -9,11 +9,14 @@ from rich.console import Console
 
 from utils import human_time_ago, generate_sesearch_command
 
+_mls_primer_shown = False
+
 
 def display_report_sealert_format(
     console: Console,
     denial_info: dict,
     denial_num: int,
+    findings_tags=None,
 ):
     """
     Display denial information in sealert-inspired technical report format.
@@ -291,6 +294,34 @@ def display_report_sealert_format(
         console.print()
         console.print("Contextual Analysis:")
         console.print(f"  {contextual_analysis}")
+
+    if findings_tags:
+        console.print()
+        console.print("Key Findings:")
+        for tag in findings_tags:
+            severity_label = tag.severity.value.upper()
+            console.print(f"  [{severity_label}] {tag.title}")
+            if tag.investigation_hints:
+                for hint in tag.investigation_hints:
+                    console.print(f"    - {hint}")
+
+    # MLS Analysis (when source and target have different security levels)
+    mls_analysis = parsed_log.get("mls_analysis", "")
+    if mls_analysis:
+        global _mls_primer_shown
+        if not _mls_primer_shown:
+            try:
+                from avc_selinux.mls import get_mls_primer
+                console.print()
+                console.print("=" * 80)
+                console.print(get_mls_primer())
+                console.print("=" * 80)
+                _mls_primer_shown = True
+            except ImportError:
+                pass
+        console.print()
+        console.print("MLS Security Level Analysis:")
+        console.print(f"  {mls_analysis}")
 
     console.print()
 

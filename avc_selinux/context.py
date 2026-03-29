@@ -5,13 +5,16 @@ This module provides classes for parsing SELinux security contexts and
 performing semantic analysis of permissions and object classes.
 """
 
+from .mls import MlsRange, parse_mls_string, analyze_mls_relationship
+
 
 class AvcContext:
     """
     Enhanced SELinux context parsing class based on setroubleshoot's proven approach.
 
-    Parses SELinux security contexts (user:role:type:mls) into structured components
-    for enhanced analysis and correlation tracking.
+    Parses SELinux security contexts (user:role:type[:mls]) into structured components
+    for enhanced analysis and correlation tracking. The MLS field is optional:
+    3-field contexts (user:role:type) are valid on non-MLS or targeted-policy systems.
     """
 
     def __init__(self, context_string: str):
@@ -25,6 +28,7 @@ class AvcContext:
         self.role = None
         self.type = None
         self.mls = None
+        self.mls_range: MlsRange | None = None
 
         if isinstance(context_string, str) and context_string:
             fields = context_string.split(":")
@@ -33,25 +37,23 @@ class AvcContext:
                 self.role = fields[1]
                 self.type = fields[2]
                 if len(fields) > 3:
-                    # Handle MLS labels that may contain colons (e.g., s0:c0.c1023)
                     self.mls = ":".join(fields[3:])
-                else:
-                    # TODO: FIX - Don't hardcode "s0" as default MLS level
-                    # Problem: This assumes MLS field when it may not be present
-                    # Better: Use None to indicate missing MLS, or validate at parse time
-                    # See: Interview prep discussion about data integrity
-                    # Fix approach: self.mls = None (explicit missing) or raise warning
-                    self.mls = "s0"
+                    self.mls_range = parse_mls_string(self.mls)
 
     def __str__(self) -> str:
-        """Return the full context string."""
-        if all([self.user, self.role, self.type, self.mls]):
-            return f"{self.user}:{self.role}:{self.type}:{self.mls}"
+        """Return the full context string, faithfully reproducing the original format."""
+        if all([self.user, self.role, self.type]):
+            if self.mls:
+                return f"{self.user}:{self.role}:{self.type}:{self.mls}"
+            return f"{self.user}:{self.role}:{self.type}"
         return ""
 
     def __repr__(self) -> str:
         """Return a detailed representation."""
-        return f"AvcContext(user='{self.user}', role='{self.role}', type='{self.type}', mls='{self.mls}')"
+        return (
+            f"AvcContext(user='{self.user}', role='{self.role}', "
+            f"type='{self.type}', mls={self.mls!r})"
+        )
 
     def __eq__(self, other) -> bool:
         """Compare two AvcContext objects for equality."""
@@ -69,8 +71,14 @@ class AvcContext:
         return not self.__eq__(other)
 
     def is_valid(self) -> bool:
-        """Check if the context has all required fields."""
-        return all([self.user, self.role, self.type, self.mls])
+        """Check if the context has the required fields (user, role, type). MLS is optional."""
+        return all([self.user, self.role, self.type])
+
+    def get_mls_description(self) -> str | None:
+        """Human-readable description of the MLS level, or None if no MLS."""
+        if self.mls_range:
+            return self.mls_range.get_description()
+        return None
 
     def get_type_description(self) -> str:
         """

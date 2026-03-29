@@ -241,7 +241,7 @@ class TestValidationEdgeCases(unittest.TestCase):
             "",    # Empty string
             "single_field",  # Single field
             "user:role",     # Missing type and MLS
-            "user:role:type",  # Missing MLS (should get default s0)
+            "user:role:type",  # Missing MLS (mls will be None, context still valid)
             "user:role:type:very:complex:mls:label:with:many:colons",  # Complex MLS
             "system_u:system_r:type_with_very_long_name_that_goes_on_and_on_t:s0",  # Long type name
         ]
