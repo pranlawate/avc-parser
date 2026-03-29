@@ -1,11 +1,8 @@
 # avc-parser
 
-SELinux AVC denial parser and analyzer with extended audit record support.
+SELinux AVC denial parser and analyzer with MLS/MCS security level analysis, intelligent deduplication, key findings detection, and multiple output formats.
 
-Parses AVC denial messages from `/var/log/audit/audit.log` with full
-support for extended audit records (SYSCALL, PATH, CWD, PROCTITLE).
-Provides smart deduplication, severity classification, and multiple
-output formats.
+Parses AVC denial messages from `/var/log/audit/audit.log` with full support for extended audit records (SYSCALL, PATH, CWD, PROCTITLE, EXECVE, SOCKADDR). Transforms thousands of raw denials into actionable groups with automatic detection of labeling issues, boot-blocking denials, and relabeling failures.
 
 ## Installation
 
@@ -14,14 +11,6 @@ output formats.
 ```bash
 sudo dnf copr enable pranlawate/selinux-tools
 sudo dnf install avc-parser
-```
-
-Installs `/usr/bin/avc-parser` with bash/zsh tab completion.
-
-### From GitHub Release
-
-```bash
-sudo dnf install https://github.com/pranlawate/avc-parser/releases/download/v1.8.1/avc-parser-1.8.1-1.fc43.noarch.rpm
 ```
 
 ### From source
@@ -38,21 +27,39 @@ pip install -e .
 # Parse audit log (auto-detects format)
 avc-parser -f /var/log/audit/audit.log
 
-# Brief report format
-avc-parser -f /var/log/audit/audit.log --format brief
+# Output formats
+avc-parser -f /var/log/audit/audit.log --format brief     # Executive summary
+avc-parser -f /var/log/audit/audit.log --format sealert   # Technical analysis
+avc-parser -f /var/log/audit/audit.log --format stats     # Quick overview
+avc-parser -f /var/log/audit/audit.log --json              # JSON for automation
 
-# JSON output (for tool integration)
-avc-parser -f /var/log/audit/audit.log --json
-
-# Filter by process
+# Filtering
 avc-parser -f /var/log/audit/audit.log --process httpd
-
-# Filter by source context
-avc-parser -f /var/log/audit/audit.log --source httpd_t
-
-# MLS-related denials only
-avc-parser -f /var/log/audit/audit.log --mls
+avc-parser -f /var/log/audit/audit.log --source init_t,kmod_t,mount_t
+avc-parser -f /var/log/audit/audit.log --mls               # MLS-related only
+avc-parser -f /var/log/audit/audit.log --since yesterday
 ```
+
+## Key Features
+
+- **Smart Deduplication**: Groups denials by remediation pattern. 10,000 raw denials become 20 actionable groups.
+- **MLS/MCS Analysis**: Parses security levels, detects sensitivity mismatches, explains Bell-LaPadula rules (No Read Up, No Write Down), distinguishes clearance from effective level.
+- **Key Findings Engine**: Automatically detects labeling breakdowns (unlabeled_t), relabeling tool failures, boot-blocking denials, systemic patterns, and denial recurrence across reboots.
+- **Remediation Classification**: Each denial group classified as relabel-fixable, broken labeling source, or policy issue.
+- **Multiple Formats**: Rich terminal UI, field-by-field facts, executive brief, technical sealert, statistics, and normalized JSON.
+- **Flexible Filtering**: By process, path, source/target context, time range, MLS mismatches. Comma-separated values for OR matching.
+- **Policy Investigation**: Auto-generated `sesearch` commands for each denial group.
+
+## How This Differs from sealert/setroubleshoot
+
+| setroubleshoot/sealert | avc-parser |
+|---|---|
+| Real-time monitoring | Post-incident forensic analysis |
+| Live audit socket | Static file analysis (including sosreport logs) |
+| Policy suggestions | Denial grouping, correlation, and key findings |
+| Daemon-based | Single standalone tool |
+
+Use avc-parser when you need forensic analysis of audit logs from systems you can't access directly, or when setroubleshoot output becomes overwhelming during incident response.
 
 ## Part of the SELinux Tool Suite
 
@@ -77,8 +84,17 @@ sudo dnf install sepgen semacro avc-parser
 
 - [Examples & Usage Patterns](docs/EXAMPLES.md)
 - [CLI Reference](docs/CLI_REFERENCE.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Deduplication Algorithm](docs/DEDUPLICATION_ALGORITHM.md)
 - [Changelog](docs/CHANGELOG.md)
+- [Feature Decisions & Backlog](docs/FEATURE_DECISIONS.md)
+
+## Contributing
+
+- Bug Reports: Open an issue with reproduction steps and audit log samples
+- Feature Requests: Check [Feature Decisions](docs/FEATURE_DECISIONS.md) for scope alignment
+- Pull Requests: Follow existing code style and include tests
+- Development: Use `make help` for available development commands
 
 ## License
 

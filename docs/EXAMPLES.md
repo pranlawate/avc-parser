@@ -14,7 +14,7 @@ This document demonstrates the tool's capabilities with real examples, organized
 
 ### Simple File Analysis
 ```bash
-$ avc-parser --file testAVC/file_context_AVC.log
+$ avc-parser -f testAVC/file_context_AVC.log
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/file_context_AVC.log directly
 
@@ -39,7 +39,7 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 
 ### Multiple Events Analysis (PID Count Feature Demo)
 ```bash
-$ avc-parser --file testAVC/test_sorting.log
+$ avc-parser -f testAVC/test_sorting.log
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/test_sorting.log directly
 
@@ -69,7 +69,7 @@ Analysis Complete: Processed 4 log blocks and found 2 unique denials.
 
 ### Network Denial Analysis
 ```bash
-$ avc-parser --file testAVC/network_AVC.log
+$ avc-parser -f testAVC/network_AVC.log
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/network_AVC.log directly
 
@@ -97,7 +97,7 @@ Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 
 ### Process-Specific Analysis
 ```bash
-$ avc-parser --file testAVC/dontaudit_AVC.log --process unix_chkpwd
+$ avc-parser -f testAVC/dontaudit_AVC.log --process unix_chkpwd
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/dontaudit_AVC.log directly
 
@@ -139,7 +139,7 @@ Analysis Complete: Processed 167 log blocks and found 6 unique denials. Displaye
 
 ### Path-Based Filtering with Wildcards
 ```bash
-$ avc-parser --file testAVC/test_sorting.log --path "/var/www/*"
+$ avc-parser -f testAVC/test_sorting.log --path "/var/www/*"
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/test_sorting.log directly
 
@@ -153,7 +153,7 @@ Showing 2 of 2 unique denials after filtering.
 
 ### Count-Based Sorting (Most Frequent First)
 ```bash
-$ avc-parser --file testAVC/test_sorting.log --sort count
+$ avc-parser -f testAVC/test_sorting.log --sort count
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/test_sorting.log directly
 
@@ -169,17 +169,17 @@ Found 4 AVC events. Displaying 2 unique denials...
 ### Advanced Time Range Filtering
 ```bash
 # Filter by relative time
-$ avc-parser --file /var/log/audit/audit.log --since yesterday
+$ avc-parser -f /var/log/audit/audit.log --since yesterday
 Applied filters: since='yesterday'
 Showing 15 of 45 unique denials after filtering.
 
 # Filter by specific date range
-$ avc-parser --file /var/log/audit/audit.log --since "2025-01-15" --until "2025-01-16"
+$ avc-parser -f /var/log/audit/audit.log --since "2025-01-15" --until "2025-01-16"
 Applied filters: since='2025-01-15', until='2025-01-16'
 Showing 8 of 45 unique denials after filtering.
 
 # Filter by recent activity
-$ avc-parser --file /var/log/audit/audit.log --since "2 hours ago"
+$ avc-parser -f /var/log/audit/audit.log --since "2 hours ago"
 Applied filters: since='2 hours ago'
 Showing 3 of 45 unique denials after filtering.
 ```
@@ -187,17 +187,17 @@ Showing 3 of 45 unique denials after filtering.
 ### SELinux Context Filtering
 ```bash
 # Filter by source context type
-$ avc-parser --file /var/log/audit/audit.log --source httpd_t
+$ avc-parser -f /var/log/audit/audit.log --source httpd_t
 Applied filters: source='httpd_t'
 Showing 12 of 45 unique denials after filtering.
 
 # Filter by target context with wildcards
-$ avc-parser --file /var/log/audit/audit.log --target "*default*"
+$ avc-parser -f /var/log/audit/audit.log --target "*default*"
 Applied filters: target='*default*'
 Showing 8 of 45 unique denials after filtering.
 
 # Filter by both source and target contexts
-$ avc-parser --file /var/log/audit/audit.log --source "*unconfined*" --target "var_lib_t"
+$ avc-parser -f /var/log/audit/audit.log --source "*unconfined*" --target "var_lib_t"
 Applied filters: source='*unconfined*', target='var_lib_t'
 Showing 3 of 45 unique denials after filtering.
 ```
@@ -205,12 +205,12 @@ Showing 3 of 45 unique denials after filtering.
 ### Combined Advanced Filtering
 ```bash
 # Comprehensive incident analysis
-$ avc-parser --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
+$ avc-parser -f /var/log/audit/audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
 Applied filters: process='httpd', path='/var/www/*', since='yesterday', source='httpd_t'
 Showing 5 of 45 unique denials after filtering.
 
 # Security investigation with time boundaries
-$ avc-parser --file /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --target "*sensitive*" --sort chrono
+$ avc-parser -f /var/log/audit/audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --target "*sensitive*" --sort chrono
 Applied filters: since='2025-01-15 09:00', until='2025-01-15 17:00', target='*sensitive*'
 Showing 2 of 45 unique denials after filtering.
 ```
@@ -247,7 +247,7 @@ This provides more precise and user-friendly analysis output compared to generic
 
 ### Enhanced Detailed View (`--detailed`)
 ```bash
-$ avc-parser --file testAVC/test_multiple_pids.log --detailed
+$ avc-parser -f testAVC/test_multiple_pids.log --detailed
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/test_multiple_pids.log directly
 
@@ -283,9 +283,9 @@ Security Context Details:
 Analysis Complete: Processed 1 log blocks and found 1 unique denials.
 ```
 
-### Field-by-Field Display (`--fields`)
+### Field-by-Field Display (`--format facts`)
 ```bash
-$ avc-parser --file testAVC/file_context_AVC.log --fields
+$ avc-parser -f testAVC/file_context_AVC.log --format facts
 🔍 Auto-detected: Pre-processed format
 
 Found 1 AVC events. Displaying 1 unique denials...
@@ -320,7 +320,7 @@ Clean, standardized JSON output with normalized field formats perfect for integr
 
 ### Structured Data Export
 ```bash
-$ avc-parser --file testAVC/file_context_AVC.log --json
+$ avc-parser -f testAVC/file_context_AVC.log --json
 {
   "unique_denials": [
     {
@@ -369,7 +369,7 @@ $ avc-parser --file testAVC/file_context_AVC.log --json
 
 ### Enhanced Audit Mode Detection
 ```bash
-$ avc-parser --file testAVC/dontaudit_AVC.log
+$ avc-parser -f testAVC/dontaudit_AVC.log
 🔍 Auto-detected: Pre-processed format
    Will parse the file testAVC/dontaudit_AVC.log directly
 
@@ -391,7 +391,7 @@ Found 169 AVC events. Displaying 6 unique denials...
 
 ### Large-Scale Deduplication
 ```bash
-$ avc-parser --raw-file /var/log/audit/audit.log --sort count --fields
+$ avc-parser --raw-file /var/log/audit/audit.log --sort count --format facts
 Raw file input provided. Running ausearch on '/var/log/audit/audit.log'...
 
 Found 152 AVC events. Displaying 8 unique denials...
@@ -415,55 +415,55 @@ Found 152 AVC events. Displaying 8 unique denials...
 ### Incident Response Workflow
 ```bash
 # 1. Quick overview with recent-first sorting (default)
-avc-parser --file /var/log/audit/audit.log
+avc-parser -f /var/log/audit/audit.log
 
 # 2. Focus on recent activity (last 24 hours)
-avc-parser --file /var/log/audit/audit.log --since yesterday --sort count
+avc-parser -f /var/log/audit/audit.log --since yesterday --sort count
 
 # 3. Focus on problematic service with time constraints
-avc-parser --file /var/log/audit/audit.log --process httpd --since "2 hours ago" --sort count
+avc-parser -f /var/log/audit/audit.log --process httpd --since "2 hours ago" --sort count
 
 # 4. Investigate specific paths and contexts
-avc-parser --file /var/log/audit/audit.log --process httpd --path "/var/www/*" --source httpd_t --detailed
+avc-parser -f /var/log/audit/audit.log --process httpd --path "/var/www/*" --source httpd_t --detailed
 
 # 5. Export findings for documentation
-avc-parser --file /var/log/audit/audit.log --process httpd --since yesterday --json > incident_analysis.json
+avc-parser -f /var/log/audit/audit.log --process httpd --since yesterday --json > incident_analysis.json
 ```
 
 ### Advanced Security Investigation
 ```bash
 # 1. Identify unusual source contexts
-avc-parser --file /var/log/audit/audit.log --source "*unconfined*" --since "1 week ago" --sort count
+avc-parser -f /var/log/audit/audit.log --source "*unconfined*" --since "1 week ago" --sort count
 
 # 2. Monitor sensitive target contexts
-avc-parser --file /var/log/audit/audit.log --target "*shadow*" --since yesterday
-avc-parser --file /var/log/audit/audit.log --target "*passwd*" --since yesterday
+avc-parser -f /var/log/audit/audit.log --target "*shadow*" --since yesterday
+avc-parser -f /var/log/audit/audit.log --target "*passwd*" --since yesterday
 
 # 3. Time-bounded security analysis
-avc-parser --file /var/log/audit/audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --sort chrono
+avc-parser -f /var/log/audit/audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --sort chrono
 
 # 4. Cross-reference process and context anomalies
-avc-parser --file /var/log/audit/audit.log --process "*" --source "*unconfined*" --since "3 days ago" --detailed
+avc-parser -f /var/log/audit/audit.log --process "*" --source "*unconfined*" --since "3 days ago" --detailed
 ```
 
 ### Timeline Analysis
 ```bash
 # Chronological analysis for attack progression
-avc-parser --file /var/log/audit/audit.log --sort chrono --detailed
+avc-parser -f /var/log/audit/audit.log --sort chrono --detailed
 
 # Recent activity focus
-avc-parser --file /var/log/audit/audit.log --sort recent
+avc-parser -f /var/log/audit/audit.log --sort recent
 
 # Detailed individual event analysis (disable grouping)
-avc-parser --file /var/log/audit/audit.log --detailed
+avc-parser -f /var/log/audit/audit.log --detailed
 ```
 
 ## 🛠️ **Debugging and Troubleshooting**
 
-### Quick Summary with --stats
+### Quick Summary with --format stats
 Get an instant overview without viewing full details:
 ```bash
-$ avc-parser --file testAVC/tpm-enforcing.log --stats
+$ avc-parser -f testAVC/tpm-enforcing.log --format stats
 
 📊 SELinux AVC Log Summary
 ═══════════════════════════════════════════════════════════════════════════════
@@ -487,9 +487,9 @@ Security Notices:
   ⚠️  DONTAUDIT RULES DISABLED (enhanced audit mode)
 
 💡 Next Steps:
-  • View all denials:     avc-parser --file testAVC/tpm-enforcing.log
-  • Focus on sudo:        avc-parser --file testAVC/tpm-enforcing.log --process sudo
-  • Export to JSON:       avc-parser --file testAVC/tpm-enforcing.log --json
+  • View all denials:     avc-parser -f testAVC/tpm-enforcing.log
+  • Focus on sudo:        avc-parser -f testAVC/tpm-enforcing.log --process sudo
+  • Export to JSON:       avc-parser -f testAVC/tpm-enforcing.log --json
 ```
 
 **Use Case**: Triage logs quickly to decide if deep analysis is needed.
@@ -497,7 +497,7 @@ Security Notices:
 ### Verbose Debugging with --verbose
 Troubleshoot unexpected results with debug output:
 ```bash
-$ avc-parser --file testAVC/file_context_AVC.log --verbose
+$ avc-parser -f testAVC/file_context_AVC.log --verbose
 
 → Debug: Split input into 1 log blocks
 → Debug: Parsing 1 log blocks
@@ -514,7 +514,7 @@ Found 1 AVC events. Displaying 1 unique denials...
 
 ### Combining Verbose with Filtering
 ```bash
-$ avc-parser --file testAVC/tpm-enforcing.log --verbose --process systemd-crypten
+$ avc-parser -f testAVC/tpm-enforcing.log --verbose --process systemd-crypten
 
 → Debug: Split input into 620 log blocks
 → Debug: Parsing 620 log blocks
@@ -529,7 +529,7 @@ $ avc-parser --file testAVC/tpm-enforcing.log --verbose --process systemd-crypte
 ### Empty Filter Results (Enhanced Guidance)
 When filters don't match anything, you get helpful suggestions:
 ```bash
-$ avc-parser --file testAVC/tpm-enforcing.log --process nonexistent
+$ avc-parser -f testAVC/tpm-enforcing.log --process nonexistent
 
 Found 877 AVC events. Displaying 202 unique denials...
 Applied filters: process='nonexistent'
@@ -543,9 +543,9 @@ You filtered for:
 But found 0 matches out of 202 total denials.
 
 💡 Suggestions:
-  • Remove filters to see all denials: avc-parser --file testAVC/tpm-enforcing.log
+  • Remove filters to see all denials: avc-parser -f testAVC/tpm-enforcing.log
   • Check available process names:
-    avc-parser --file testAVC/tpm-enforcing.log | grep 'PID'
+    avc-parser -f testAVC/tpm-enforcing.log | grep 'PID'
   • Try wildcard patterns:
     --process '*nonex*'
 ```
@@ -557,28 +557,28 @@ But found 0 matches out of 202 total denials.
 ### Performance Optimization
 - **Large Files**: For audit.log files >100MB, consider using `ausearch` to pre-filter by time range
 - **Memory Usage**: Use `--json` output for processing large datasets programmatically
-- **Large Outputs**: Use pipe redirection for easier navigation: `avc-parser --file audit.log | less`
+- **Large Outputs**: Use pipe redirection for easier navigation: `avc-parser -f audit.log | less`
 
 ### Pipe Operations (✅ Fixed in v1.3.0)
 ```bash
 # View first few lines of output
-avc-parser --file audit.log | head -10
+avc-parser -f audit.log | head -10
 
 # Page through large outputs
-avc-parser --file audit.log | less
+avc-parser -f audit.log | less
 
 # Filter output for specific content
-avc-parser --file audit.log | grep "httpd"
+avc-parser -f audit.log | grep "httpd"
 
 # Count total lines of output
-avc-parser --file audit.log | wc -l
+avc-parser -f audit.log | wc -l
 
 # Extract just PID information
-avc-parser --file audit.log | grep "PID"
+avc-parser -f audit.log | grep "PID"
 ```
 
 ### Best Practices
-- **Incident Analysis**: Start with Rich format for overview, use `--fields` for detailed investigation
+- **Incident Analysis**: Start with Rich format for overview, use `--format facts` for detailed investigation
 - **Automation**: Use `--json` output for integration with SIEM tools or custom scripts
 - **Time Ranges**: Use `ausearch -ts` to filter logs by time before analysis
 - **Process Targeting**: Use `--process <name>` to focus on specific services during investigation
@@ -586,6 +586,32 @@ avc-parser --file audit.log | grep "PID"
 - **Priority Analysis**: Use `--sort count` to identify most frequent denials first
 - **Timeline Investigation**: Use `--sort chrono` for chronological attack progression analysis
 - **Enhanced Audit Detection**: Look for dontaudit warnings indicating enhanced audit mode
+
+## MLS/MCS Security Level Analysis
+
+### View MLS-Related Denials Only
+```bash
+# Show only denials with MLS level mismatches
+avc-parser -f /var/log/audit/audit.log --mls
+
+# Combine MLS filter with source type
+avc-parser -f /var/log/audit/audit.log --mls --source init_t,kmod_t
+
+# MLS denials in JSON for automation
+avc-parser -f /var/log/audit/audit.log --mls --json
+```
+
+### Comma-Separated Filters
+```bash
+# Filter by multiple source types (OR matching)
+avc-parser -f /var/log/audit/audit.log --source init_t,kmod_t,mount_t
+
+# Filter by multiple processes
+avc-parser -f /var/log/audit/audit.log --process httpd,nginx
+
+# Combine multiple filter types
+avc-parser -f /var/log/audit/audit.log --source semanage_t --target semanage_store_t
+```
 
 ---
 

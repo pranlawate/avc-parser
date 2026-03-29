@@ -5,6 +5,39 @@ All notable changes to the SELinux AVC Denial Analyzer project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-03-29
+
+### Added
+- **MLS/MCS Security Level Parsing**: Full parsing of MLS sensitivity levels, MCS categories, and ranges (s0, s0:c0.c1023, s0-s15:c0.c1023). Based on libsepol data structures.
+- **MLS-Aware Analysis**: Detects sensitivity mismatches, explains Bell-LaPadula rules (No Read Up, No Write Down), and distinguishes clearance range from effective level.
+- **`--mls` Filter**: Show only denials with MLS/MCS level mismatches between source and target.
+- **Key Findings Analyzer Engine**: New `analyzers/` package with 5 analyzers:
+  - Labeling: detects widespread unlabeled_t files and MLS labeling inconsistency
+  - Relabeling: detects when relabeling tools (genhomedircon, setfiles) are denied
+  - Boot Impact: flags denials that would prevent boot in enforcing mode
+  - Systemic Patterns: identifies when many processes share one root cause
+  - Recurrence: tracks denial persistence across policy reloads
+- **Remediation Classification**: Automatic categorization as relabel-fixable, broken labeling source, or policy issue.
+- **`--format` Flag**: Unified output format selection replacing --fields, --stats, --report. Options: rich, facts, stats, json, brief, sealert. Deprecated flags show warnings.
+- **Comma-Separated Filters**: --source, --target, --process accept comma-separated values for OR matching (e.g., --source init_t,kmod_t,mount_t).
+- **EXECVE Record Support**: Full command-line argv extraction from EXECVE audit records.
+- **MAC_STATUS Record Support**: SELinux mode transition tracking (enforcing/permissive changes).
+
+### Changed
+- **Enhanced --stats**: Now shows target types, object classes, MLS/MCS section, and key findings summary.
+- **MLS Educational Primer**: Automatic display of MLS/MCS explanation when level mismatches detected.
+- **Filters Before Formatters**: All filters now run before all output formats, fixing --mls with --format json/stats.
+- **Interactive Architecture Course**: avc-parser-course.html with 6 modules, animations, and quizzes.
+
+### Fixed
+- **AvcContext MLS default**: No longer defaults missing MLS to "s0" (uses None for data fidelity)
+- **JSON formatter**: No longer truncates complex MLS labels (s0-s0:c0.c1023)
+- **Signature grouping**: Over-splitting fixed for capability/process/system classes on MLS differences
+- **Remediation counts**: Now use full denial total instead of filtered count
+
+### Testing
+- 249 tests (75 new: 55 MLS + 20 analyzers), 0 regressions
+
 ## [1.8.1] - 2026-01-19
 
 ### Added

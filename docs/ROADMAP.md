@@ -74,7 +74,7 @@ Core parsing, validation, correlation, semantic analysis, and JSON normalization
 - **Objective**: Comprehensive documentation and user guides
 - **Completed Documentation**:
   - ✅ Comprehensive user guides and examples (docs/EXAMPLES.md)
-  - ✅ Developer documentation and architecture overview (docs/README.md)
+  - ✅ Developer documentation and architecture overview (docs/ARCHITECTURE.md)
   - ✅ CLI reference and troubleshooting guides (docs/CLI_REFERENCE.md)
   - ✅ Executable integration examples (examples/ directory)
   - ✅ Development utilities documentation (scripts/README.md)

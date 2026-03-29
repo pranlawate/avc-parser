@@ -19,40 +19,36 @@ This document provides comprehensive reference information for using the SELinux
 | `-rf, --raw-file` | Path to a raw audit.log file |
 | `-af, --avc-file` | Path to a pre-processed AVC file |
 
-### Display Mode Options (Mutually Exclusive)
-| Mode | Description | Compatible Modifiers |
-|------|-------------|----------------------|
-| **Default Rich** | Professional terminal display with panels and colors | `--detailed`, `--pager` |
-| `--report [brief\|sealert]` | Professional text formats: `brief` (executive summaries), `sealert` (technical analysis) | `--pager` |
-| `--fields` | Field-by-field technical breakdown for deep-dive analysis | `--pager` |
-| `--json` | Machine-readable structured output | Works with all filtering options |
+### Display Options
+| Option | Description |
+|--------|-------------|
+| `--format FORMAT` | Output format. Choices: `rich` (default, terminal panels and colors), `facts` (field-by-field technical breakdown), `stats` (summary statistics only), `json` (machine-readable structured output), `brief` (executive summary text), `sealert` (technical analysis text). Works with all filtering options. |
+| `--json` | Shorthand for `--format json`. |
+| `--detailed` | Modifier for rich format: expanded correlation events, per-PID detail, and context. |
+| `--pager` | Interactive pager for large outputs (like the `less` command). Compatible with all formats. |
 
-**Precedence Order**: `--json` > `--fields` > `--report [format]` > Default Rich
-
-### Display Modifiers (Work with Compatible Modes)
-| Modifier | Description | Compatible With |
-|----------|-------------|-----------------|
-| `--detailed` | Enhanced view with expanded correlation events and context | Default Rich mode only |
-| `--pager` | Interactive pager for large outputs (like 'less' command) | All display modes |
+**Format selection**: If you omit `--format` and `--json`, the default is `rich`. `--json` without `--format` selects JSON. If you set `--format` explicitly, that value is used even if `--json` is also present.
 
 ### Filtering & Sorting Options
 | Option | Description |
 |--------|-------------|
-| `--process` | Filter denials by process name (e.g., `--process httpd`) |
+| `--process` | Filter denials by process name (e.g., `--process httpd`). Comma-separated values match any listed name (OR), e.g. `--process httpd,nginx`. |
 | `--path` | Filter denials by file path with wildcards (e.g., `--path '/var/www/*'`) |
 | `--since` | Only include denials since this time (e.g., `--since yesterday`, `--since '2025-01-15'`) |
 | `--until` | Only include denials until this time (e.g., `--until today`, `--until '2025-01-15 14:30'`) |
-| `--source` | Filter by source context pattern (e.g., `--source httpd_t`, `--source '*unconfined*'`) |
-| `--target` | Filter by target context pattern (e.g., `--target default_t`, `--target '*var_lib*'`) |
+| `--source` | Filter by source context pattern (e.g., `--source httpd_t`, `--source '*unconfined*'`). Comma-separated patterns match if any pattern matches (OR), e.g. `--source init_t,kmod_t,mount_t`. |
+| `--target` | Filter by target context pattern (e.g., `--target default_t`, `--target '*var_lib*'`). Comma-separated values work like `--source`. |
+| `--mls` | Show only denials with MLS/MCS security level mismatches between source and target contexts. |
 | `--sort` | Sort order: `recent` (default), `count`, or `chrono` |
+
+### MLS/MCS analysis
+The analyzer evaluates MLS/MCS ranges on contexts when present and can surface level mismatches in rich and related output. Use `--mls` to restrict the view to denials where source and target security levels do not align, which helps isolate multilevel and compartment issues in MLS or strict MCS environments.
 
 ### Advanced Options
 | Option | Description |
 |--------|-------------|
 | `--legacy-signatures` | Use legacy signature logic for regression testing (disables smart deduplication) |
 | `-v, --verbose` | Enable verbose output for debugging and troubleshooting |
-| `--stats` | Display summary statistics only (quick overview without full output) |
-| `--pager` | Use interactive pager for large outputs (like 'less' command) - only works in terminal environments |
 | `-h, --help` | Show help message |
 
 ## 🔧 **Command Usage Examples**
@@ -60,122 +56,128 @@ This document provides comprehensive reference information for using the SELinux
 ### Basic Usage
 ```bash
 # Auto-detect file format
-avc-parser --file /var/log/audit/audit.log
+avc-parser -f /var/log/audit/audit.log
 
 # Specify file type explicitly
 avc-parser --raw-file /var/log/audit/audit.log
 avc-parser --avc-file avc_denials.log
 ```
 
-### Display Mode Examples
+### Display format examples
 ```bash
 # Default Rich format (professional terminal display)
-avc-parser --file audit.log
+avc-parser -f audit.log
 
 # Enhanced detailed view (Rich + more correlation details)
-avc-parser --file audit.log --detailed
+avc-parser -f audit.log --detailed
 
-# Professional report formats
-avc-parser --file audit.log --report        # Brief format (executive summaries)
-avc-parser --file audit.log --report brief  # Brief format (explicit)
-avc-parser --file audit.log --report sealert # Technical analysis format
+# Professional report-style text formats
+avc-parser -f audit.log --format brief    # Executive summaries
+avc-parser -f audit.log --format sealert  # Technical analysis format
 
 # Field-by-field format (technical deep-dive)
-avc-parser --file audit.log --fields
+avc-parser -f audit.log --format facts
+
+# Summary statistics only (quick overview)
+avc-parser -f audit.log --format stats
 
 # JSON output (automation/integration)
-avc-parser --file audit.log --json
+avc-parser -f audit.log --json
+# equivalent: avc-parser -f audit.log --format json
 ```
 
-### Display Modifier Examples
+### Display modifier examples
 ```bash
 # Rich mode with detailed view
-avc-parser --file audit.log --detailed
+avc-parser -f audit.log --detailed
 
-# Interactive pager (works with all modes)
-avc-parser --file audit.log --pager
-avc-parser --file audit.log --report --pager         # Brief + pager
-avc-parser --file audit.log --report sealert --pager # Sealert + pager
-avc-parser --file audit.log --fields --pager
+# Interactive pager (works with all formats)
+avc-parser -f audit.log --pager
+avc-parser -f audit.log --format brief --pager
+avc-parser -f audit.log --format sealert --pager
+avc-parser -f audit.log --format facts --pager
 ```
 
-### Argument Combination Rules
+### Argument combination rules
 ```bash
 # Valid Rich mode combinations
-avc-parser --file audit.log --detailed --pager
+avc-parser -f audit.log --detailed --pager
 
-# Standalone modes (no meaningful modifiers except --pager)
-avc-parser --file audit.log --report brief --pager
-avc-parser --file audit.log --report sealert --pager
-avc-parser --file audit.log --fields --pager
+# Other formats with pager (no --detailed effect unless format is rich)
+avc-parser -f audit.log --format brief --pager
+avc-parser -f audit.log --format sealert --pager
+avc-parser -f audit.log --format facts --pager
 
 # JSON with filtering (works with any filter combination)
-avc-parser --file audit.log --json --process httpd --since yesterday
+avc-parser -f audit.log --json --process httpd --since yesterday
 
-# Precedence examples (higher precedence wins, modifiers ignored)
-avc-parser --file audit.log --report sealert --fields  # Uses --fields
-avc-parser --file audit.log --json --detailed          # Uses --json
+# Explicit --format wins over modifiers that only apply to rich
+avc-parser -f audit.log --format sealert --detailed  # Sealert; --detailed ignored
+avc-parser -f audit.log --json --detailed            # JSON; --detailed ignored
 ```
 
 ### Filtering Options
 ```bash
 # Filter by process name
-avc-parser --file audit.log --process httpd
+avc-parser -f audit.log --process httpd
 
 # Filter by file path with wildcards
-avc-parser --file audit.log --path "/var/www/*"
+avc-parser -f audit.log --path "/var/www/*"
 
 # Filter by time range
-avc-parser --file audit.log --since yesterday
-avc-parser --file audit.log --since "2025-01-15" --until "2025-01-16"
-avc-parser --file audit.log --since "2 hours ago"
+avc-parser -f audit.log --since yesterday
+avc-parser -f audit.log --since "2025-01-15" --until "2025-01-16"
+avc-parser -f audit.log --since "2 hours ago"
 
 # Filter by SELinux context
-avc-parser --file audit.log --source httpd_t
-avc-parser --file audit.log --target "*default*"
-avc-parser --file audit.log --source "*unconfined*" --target "var_lib_t"
+avc-parser -f audit.log --source httpd_t
+avc-parser -f audit.log --target "*default*"
+avc-parser -f audit.log --source "*unconfined*" --target "var_lib_t"
+
+# MLS/MCS level mismatches only
+avc-parser -f audit.log --mls
 
 # Combine multiple filters
-avc-parser --file audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t
+avc-parser -f audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t
 ```
 
 ### Sorting Options
 ```bash
 # Sort by most recent (default)
-avc-parser --file audit.log --sort recent
+avc-parser -f audit.log --sort recent
 
 # Sort by event count (most frequent first)
-avc-parser --file audit.log --sort count
+avc-parser -f audit.log --sort count
 
 # Sort chronologically (oldest first)
-avc-parser --file audit.log --sort chrono
+avc-parser -f audit.log --sort chrono
 ```
 
 ### Advanced Options
 ```bash
 # Get quick summary statistics
-avc-parser --file audit.log --stats
+avc-parser -f audit.log --format stats
 
 # Enable verbose debugging output
-avc-parser --file audit.log --verbose
+avc-parser -f audit.log --verbose
 
 # Combine verbose with filtering for troubleshooting
-avc-parser --file audit.log --verbose --process httpd
+avc-parser -f audit.log --verbose --process httpd
 
 # Use interactive pager for large outputs
-avc-parser --file audit.log --pager
+avc-parser -f audit.log --pager
 
 # Combine pager with detailed view for comprehensive analysis
-avc-parser --file audit.log --pager --detailed
+avc-parser -f audit.log --pager --detailed
 
 # Use pager with filtering for focused review
-avc-parser --file audit.log --pager --process httpd --since yesterday
+avc-parser -f audit.log --pager --process httpd --since yesterday
 
 # Use legacy signature logic for testing
-avc-parser --file audit.log --legacy-signatures
+avc-parser -f audit.log --legacy-signatures
 
 # Complex analysis workflow
-avc-parser --file audit.log --process httpd --sort count --detailed --json > analysis.json
+avc-parser -f audit.log --process httpd --sort count --detailed --json > analysis.json
 ```
 
 ## 🎯 **Advanced Filtering Examples**
@@ -183,37 +185,43 @@ avc-parser --file audit.log --process httpd --sort count --detailed --json > ana
 ### Time Range Filtering
 ```bash
 # Recent activity analysis
-avc-parser --file audit.log --since yesterday --sort count
+avc-parser -f audit.log --since yesterday --sort count
 
 # Specific incident timeframe
-avc-parser --file audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
+avc-parser -f audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00"
 
 # Relative time specifications
-avc-parser --file audit.log --since "2 hours ago" --detailed
+avc-parser -f audit.log --since "2 hours ago" --detailed
 ```
 
 ### SELinux Context Filtering
 ```bash
 # Source context analysis
-avc-parser --file audit.log --source httpd_t --since yesterday
+avc-parser -f audit.log --source httpd_t --since yesterday
 
 # Target context with wildcards
-avc-parser --file audit.log --target "*default*" --sort count
+avc-parser -f audit.log --target "*default*" --sort count
 
 # Combined context filtering
-avc-parser --file audit.log --source "*unconfined*" --target "var_lib_t"
+avc-parser -f audit.log --source "*unconfined*" --target "var_lib_t"
+
+# Multiple source types (OR): init_t, kmod_t, or mount_t
+avc-parser -f audit.log --source init_t,kmod_t,mount_t
+
+# MLS/MCS level mismatches only
+avc-parser -f audit.log --mls --sort count
 ```
 
 ### Multi-Criteria Forensic Analysis
 ```bash
 # Comprehensive incident investigation
-avc-parser --file audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
+avc-parser -f audit.log --process httpd --path "/var/www/*" --since yesterday --source httpd_t --sort count
 
 # Security anomaly detection
-avc-parser --file audit.log --source "*unconfined*" --since "1 week ago" --detailed
+avc-parser -f audit.log --source "*unconfined*" --since "1 week ago" --detailed
 
 # Time-bounded context analysis
-avc-parser --file audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --target "*shadow*" --sort chrono
+avc-parser -f audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00" --target "*shadow*" --sort chrono
 ```
 
 ## 📊 **Parsed Data Fields**
@@ -280,6 +288,7 @@ avc-parser --file audit.log --since "2025-01-15 08:00" --until "2025-01-15 18:00
 ### Context Pattern Matching (--source, --target)
 - **Direct Match**: `httpd_t` matches any context containing `httpd_t`
 - **Wildcard Patterns**: `*unconfined*` matches contexts containing "unconfined"
+- **Comma-separated OR**: Multiple patterns separated by commas match if any pattern matches (e.g. `--source init_t,kmod_t,mount_t`)
 - **Component Matching**: Pattern without colons matches individual context components
 - **Case Insensitive**: All matching is case-insensitive for better usability
 - **Examples**:
@@ -298,15 +307,15 @@ This ensures meaningful process names appear in analysis instead of "unknown" va
 ### Timezone Limitations
 - **Current Limitation**: The tool uses system timezone for timestamp interpretation
 - **ausearch Integration**: Timezone environment variables (TZ=) are not currently passed to ausearch subprocess
-- **Workaround**: Run the tool in the desired timezone environment: `TZ="Asia/Kolkata" avc-parser --file audit.log`
+- **Workaround**: Run the tool in the desired timezone environment: `TZ="Asia/Kolkata" avc-parser -f audit.log`
 - **Planned Enhancement**: Native timezone support in Phase 4B-3
 
 ## 🛠️ **Debugging and Troubleshooting**
 
-### Quick Summary with --stats
+### Quick summary with `--format stats`
 Get an instant overview of a log file without viewing full details:
 ```bash
-avc-parser --file audit.log --stats
+avc-parser -f audit.log --format stats
 ```
 
 Output includes:
@@ -322,7 +331,7 @@ Output includes:
 ### Verbose Debugging with --verbose
 Enable debug output to troubleshoot unexpected results:
 ```bash
-avc-parser --file audit.log --verbose
+avc-parser -f audit.log --verbose
 ```
 
 Verbose output shows:
@@ -344,8 +353,8 @@ You filtered for:
 But found 0 matches out of 202 total denials.
 
 💡 Suggestions:
-  • Remove filters to see all denials: avc-parser --file audit.log
-  • Check available process names: avc-parser --file audit.log | grep 'PID'
+  • Remove filters to see all denials: avc-parser -f audit.log
+  • Check available process names: avc-parser -f audit.log | grep 'PID'
   • Try wildcard patterns: --process '*nonex*'
 ```
 
@@ -359,7 +368,7 @@ But found 0 matches out of 202 total denials.
   denied 'read' to file /var/www/html/config.php [Enforcing] ✗ BLOCKED
 ```
 
-### Fields Format Display
+### Facts format display (`--format facts`)
 ```
 Timestamp: 2024-09-05 02:18:01
 Process Name: httpd (Web server process)
@@ -493,7 +502,7 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 - **Memory Usage**: Use `--json` output for processing large datasets programmatically
 - **Large Outputs**: Use pipe redirection for easier navigation:
   ```bash
-  avc-parser --file audit.log | less
+  avc-parser -f audit.log | less
   ```
 
 ### Common Issues & Solutions
@@ -503,11 +512,11 @@ Target Context: unconfined_u:object_r:default_t:s0 (Default file context)
 **Solution**:
 ```bash
 # Ensure read access (may require sudo)
-sudo avc-parser --file /var/log/audit/audit.log
+sudo avc-parser -f /var/log/audit/audit.log
 
 # Or copy file to accessible location
 sudo cp /var/log/audit/audit.log ~/audit.log
-avc-parser --file ~/audit.log
+avc-parser -f ~/audit.log
 ```
 
 #### Missing ausearch Command
@@ -539,10 +548,10 @@ sudo tail /var/log/audit/audit.log
 **Usage**:
 ```bash
 # All standard pipe operations work seamlessly
-avc-parser --file audit.log | head -10
-avc-parser --file audit.log | less
-avc-parser --file audit.log | grep "httpd"
-avc-parser --file audit.log | wc -l
+avc-parser -f audit.log | head -10
+avc-parser -f audit.log | less
+avc-parser -f audit.log | grep "httpd"
+avc-parser -f audit.log | wc -l
 ```
 
 ### Best Practices
@@ -550,63 +559,63 @@ avc-parser --file audit.log | wc -l
 #### Incident Analysis Workflow
 1. **Quick Overview**: Start with default Rich format
    ```bash
-   avc-parser --file audit.log
+   avc-parser -f audit.log
    ```
 
 2. **Identify Patterns**: Use count sorting to find frequent denials
    ```bash
-   avc-parser --file audit.log --sort count
+   avc-parser -f audit.log --sort count
    ```
 
 3. **Focus Investigation**: Filter by problematic service with time bounds
    ```bash
-   avc-parser --file audit.log --process httpd --since yesterday --sort count
+   avc-parser -f audit.log --process httpd --since yesterday --sort count
    ```
 
 4. **Context Analysis**: Filter by SELinux contexts for targeted investigation
    ```bash
-   avc-parser --file audit.log --source httpd_t --target "*default*" --detailed
+   avc-parser -f audit.log --source httpd_t --target "*default*" --detailed
    ```
 
 5. **Time-Bounded Analysis**: Investigate specific incident timeframes
    ```bash
-   avc-parser --file audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --sort chrono
+   avc-parser -f audit.log --since "2025-01-15 09:00" --until "2025-01-15 17:00" --sort chrono
    ```
 
 6. **Documentation**: Export findings with complete filter context
    ```bash
-   avc-parser --file audit.log --process httpd --since yesterday --json > incident_analysis.json
+   avc-parser -f audit.log --process httpd --since yesterday --json > incident_analysis.json
    ```
 
 #### Automation & Integration
 - **SIEM Integration**: Use `--json` output for structured data
 - **Monitoring Scripts**: Combine with `ausearch` for recent activity
-- **Reporting**: Use `--fields` format for detailed reports
+- **Reporting**: Use `--format facts` for detailed field-by-field reports
 
 #### Time-Based Analysis
 ```bash
 # Create filtered audit log for specific time period
 ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts today > today_avc.log
-avc-parser --file today_avc.log
+avc-parser -f today_avc.log
 
 # Analyze recent activity (last hour)
 ausearch -m AVC,USER_AVC,FANOTIFY,SELINUX_ERR,USER_SELINUX_ERR,MAC_POLICY_LOAD -ts recent > recent_avc.log
-avc-parser --file recent_avc.log --sort recent
+avc-parser -f recent_avc.log --sort recent
 ```
 
 #### Path Pattern Analysis
 ```bash
 # Web server file access patterns
-avc-parser --file audit.log --path "/var/www/*"
+avc-parser -f audit.log --path "/var/www/*"
 
 # System configuration access
-avc-parser --file audit.log --path "/etc/*"
+avc-parser -f audit.log --path "/etc/*"
 
 # User home directory access
-avc-parser --file audit.log --path "/home/*"
+avc-parser -f audit.log --path "/home/*"
 
 # Container or temporary file access
-avc-parser --file audit.log --path "/tmp/*" --path "/var/lib/containers/*"
+avc-parser -f audit.log --path "/tmp/*" --path "/var/lib/containers/*"
 ```
 
 #### Priority Analysis Strategies
