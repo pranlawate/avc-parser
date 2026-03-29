@@ -2824,6 +2824,7 @@ def print_rich_summary(
     denial_info: dict,
     denial_num: int,
     detailed: bool = False,
+    findings=None,
 ):
     """
     Print a Rich-formatted summary with correlation events display.
@@ -2886,6 +2887,19 @@ def print_rich_summary(
     if mls_analysis:
         mls_indicator = " • [bright_red]🔒 MLS mismatch[/bright_red]"
         header_bionic += mls_indicator
+
+    if findings:
+        from analyzers.findings import FindingCategory
+        denial_idx = denial_num - 1
+        for tag in findings.tags.get(denial_idx, []):
+            if tag.category in (FindingCategory.LABELING, FindingCategory.RELABELING):
+                header_bionic += " • [bright_green]🏷️ relabel-fixable[/bright_green]"
+            elif tag.category == FindingCategory.BOOT_IMPACT:
+                header_bionic += " • [bright_red]⛔ boot-blocking[/bright_red]"
+            elif tag.category == FindingCategory.SYSTEMIC:
+                header_bionic += " • [bright_yellow]🔁 systemic[/bright_yellow]"
+            elif tag.category == FindingCategory.RECURRENCE:
+                header_bionic += " • [bright_yellow]📈 recurring[/bright_yellow]"
 
     console.print(Rule(header_bionic, style="cyan"))
 
@@ -4078,7 +4092,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             file_info=file_info,
             security_notices={"dontaudit": dontaudit_detected, "permissive": permissive_detected},
             console=console,
-            # findings=findings,  # Task 8: pass findings once display_stats_summary accepts it
+            findings=findings,
         )
         return
 
@@ -4089,8 +4103,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             log = d.get("log", {})
             sig = id(d)
             filtered_unique[sig] = d
-        format_as_json(filtered_unique, valid_blocks, generate_sesearch_command)
-        # TODO Task 8: Add findings to JSON output
+        format_as_json(filtered_unique, valid_blocks, generate_sesearch_command, findings=findings)
 
     else:
 
@@ -4490,6 +4503,38 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     console.print(Align.center(mls_panel, width=panel_width))
                     console.print()
 
+                # Display key findings banners for CRITICAL/WARNING findings
+                if findings and findings.items and args.format not in ("brief", "sealert"):
+                    from rich.align import Align
+                    from rich.console import Group
+                    from rich.panel import Panel
+                    from analyzers.findings import FindingSeverity
+
+                    for finding in findings.items:
+                        if finding.severity in (FindingSeverity.CRITICAL, FindingSeverity.WARNING):
+                            border = "red" if finding.severity == FindingSeverity.CRITICAL else "yellow"
+                            sev_label = finding.severity.value.upper()
+                            sev_color = "bold red" if finding.severity == FindingSeverity.CRITICAL else "bold yellow"
+                            banner_lines = [
+                                Align.center(f"[{sev_color}]{sev_label}: {finding.title}[/{sev_color}]"),
+                                Align.center(""),
+                                Align.center(f"[dim]{finding.description}[/dim]"),
+                            ]
+                            if finding.investigation_hints:
+                                banner_lines.append(Align.center(""))
+                                for hint in finding.investigation_hints:
+                                    banner_lines.append(Align.center(f"[dim]💡 {hint}[/dim]"))
+
+                            finding_panel = Panel(
+                                Group(*banner_lines),
+                                title=f"[{sev_color}]Key Finding[/{sev_color}]",
+                                border_style=border,
+                                padding=(1, 4),
+                            )
+                            panel_width = min(max(int(console.width * 0.6), 60), 120)
+                            console.print(Align.center(finding_panel, width=panel_width))
+                            console.print()
+
                 # Display denials
                 for i, denial_info in enumerate(filtered_denials):
                     if i > 0:
@@ -4506,6 +4551,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             console,
                             denial_info,
                             i + 1,
+                            findings_tags=findings.tags.get(i, []) if findings else None,
                         )
                     elif args.format == "brief":
                         display_report_brief_format(
@@ -4519,6 +4565,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                             denial_info,
                             i + 1,
                             detailed=args.detailed,
+                            findings=findings,
                         )
 
             # Display MAC_POLICY_LOAD events summary if any (outside if filtered_denials block)
@@ -4897,6 +4944,38 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                 )
                                 pager_console.print()
 
+                        # Display key findings banners (pager)
+                        if findings and findings.items and args.format not in ("brief", "sealert"):
+                            from rich.align import Align
+                            from rich.console import Group
+                            from rich.panel import Panel
+                            from analyzers.findings import FindingSeverity
+
+                            for finding in findings.items:
+                                if finding.severity in (FindingSeverity.CRITICAL, FindingSeverity.WARNING):
+                                    border = "red" if finding.severity == FindingSeverity.CRITICAL else "yellow"
+                                    sev_label = finding.severity.value.upper()
+                                    sev_color = "bold red" if finding.severity == FindingSeverity.CRITICAL else "bold yellow"
+                                    banner_lines = [
+                                        Align.center(f"[{sev_color}]{sev_label}: {finding.title}[/{sev_color}]"),
+                                        Align.center(""),
+                                        Align.center(f"[dim]{finding.description}[/dim]"),
+                                    ]
+                                    if finding.investigation_hints:
+                                        banner_lines.append(Align.center(""))
+                                        for hint in finding.investigation_hints:
+                                            banner_lines.append(Align.center(f"[dim]💡 {hint}[/dim]"))
+
+                                    finding_panel = Panel(
+                                        Group(*banner_lines),
+                                        title=f"[{sev_color}]Key Finding[/{sev_color}]",
+                                        border_style=border,
+                                        padding=(1, 4),
+                                    )
+                                    panel_width = min(max(int(pager_console.width * 0.6), 60), 120)
+                                    pager_console.print(Align.center(finding_panel, width=panel_width))
+                                    pager_console.print()
+
                         # Display denials using pager console
                         for i, denial_info in enumerate(filtered_denials):
                             if i > 0:
@@ -4913,6 +4992,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     pager_console,
                                     denial_info,
                                     i + 1,
+                                    findings_tags=findings.tags.get(i, []) if findings else None,
                                 )
                             elif args.format == "brief":
                                 display_report_brief_format(
@@ -4926,6 +5006,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                                     denial_info,
                                     i + 1,
                                     detailed=args.detailed,
+                                    findings=findings,
                                 )
 
                         # Final summary

@@ -191,7 +191,7 @@ def normalize_json_fields(log_data: dict) -> dict:
     return normalized
 
 
-def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_command) -> None:
+def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_command, findings=None) -> None:
     """
     Format denial data as structured JSON output for tool integration.
 
@@ -282,6 +282,22 @@ def format_as_json(unique_denials: Dict, valid_blocks: List, generate_sesearch_c
             "log_blocks_processed": len(valid_blocks),
         },
     }
+
+    if findings and findings.items:
+        json_structure["findings"] = [
+            {
+                "severity": f.severity.value,
+                "category": f.category.value,
+                "title": f.title,
+                "description": f.description,
+                "investigation_hints": f.investigation_hints,
+                "evidence": f.evidence,
+                "affected_group_count": len(f.affected_groups),
+            }
+            for f in findings.items
+        ]
+        counts = findings.remediation_counts(total_groups=len(unique_denials))
+        json_structure["summary"]["remediation_summary"] = counts
 
     try:
         json_output = json.dumps(json_structure, indent=2, ensure_ascii=False)

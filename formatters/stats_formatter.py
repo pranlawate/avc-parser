@@ -15,6 +15,7 @@ def display_stats_summary(
     file_info: dict = None,
     security_notices: dict = None,
     console=None,
+    findings=None,
 ):
     """
     Display concise statistics summary for quick log overview.
@@ -178,6 +179,19 @@ def display_stats_summary(
             console.print("  ⚠️  DONTAUDIT RULES DISABLED (enhanced audit mode)")
         if security_notices.get("permissive"):
             console.print("  ⚠️  PERMISSIVE MODE DENIALS DETECTED")
+
+    if findings and findings.items:
+        console.print()
+        console.print("Key Findings:")
+        for finding in findings.items:
+            severity_icon = "🔴" if finding.severity.value == "critical" else "🟡"
+            console.print(f"  {severity_icon} [{finding.severity.value.upper()}] {finding.title}")
+        counts = findings.remediation_counts(total_groups=len(unique_denials))
+        console.print()
+        console.print("  Remediation: "
+                       f"{counts['relabel_fixable']} relabel-fixable, "
+                       f"{counts['broken_source']} broken source, "
+                       f"{counts['policy_issue']} policy issues")
 
     console.print()
     console.print("💡 [bold]Next Steps:[/bold]")

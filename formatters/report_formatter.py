@@ -16,6 +16,7 @@ def display_report_sealert_format(
     console: Console,
     denial_info: dict,
     denial_num: int,
+    findings_tags=None,
 ):
     """
     Display denial information in sealert-inspired technical report format.
@@ -293,6 +294,16 @@ def display_report_sealert_format(
         console.print()
         console.print("Contextual Analysis:")
         console.print(f"  {contextual_analysis}")
+
+    if findings_tags:
+        console.print()
+        console.print("Key Findings:")
+        for tag in findings_tags:
+            severity_label = tag.severity.value.upper()
+            console.print(f"  [{severity_label}] {tag.title}")
+            if tag.investigation_hints:
+                for hint in tag.investigation_hints:
+                    console.print(f"    - {hint}")
 
     # MLS Analysis (when source and target have different security levels)
     mls_analysis = parsed_log.get("mls_analysis", "")
