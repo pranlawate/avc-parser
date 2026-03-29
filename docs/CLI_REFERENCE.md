@@ -1,12 +1,12 @@
 # SELinux AVC Denial Analyzer - CLI Reference
 
-**Version 1.8.1** | Complete command-line reference, data fields, and troubleshooting guide with Extended Audit Record Support, Context-Aware Analysis, Smart Path Normalization, Exit Code Translation, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
+**Version 1.9.0** | Complete command-line reference, data fields, and troubleshooting guide with Extended Audit Record Support, Context-Aware Analysis, Smart Path Normalization, Exit Code Translation, Two-Tier Professional Report System, and SELinux Policy Investigation Integration
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
 > **📝 Command Format**: All examples use the `avc-parser` command, available after installing via COPR, `pip install -e .`, or `make install-wrapper`. For backward compatibility, `python3 parse_avc.py` also works from the source directory.
 
-> **🎯 Production Ready v1.8.1**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.8+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), comprehensive testing (249 tests), MLS/MCS security level analysis, and key findings detection.
+> **🎯 Production Ready v1.9.0**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.8+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), comprehensive testing (249 tests), MLS/MCS security level analysis, and key findings detection.
 
 > **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 
@@ -641,4 +641,4 @@ Look for these indicators in the output:
 
 ---
 
-**SELinux AVC Denial Analyzer v1.8.1** | Made for forensic analysts and system administrators
+**SELinux AVC Denial Analyzer v1.9.0** | Made for forensic analysts and system administrators
