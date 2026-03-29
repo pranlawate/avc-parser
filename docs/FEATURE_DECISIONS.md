@@ -1634,6 +1634,48 @@ avc-parser/
 
 ---
 
+## Future Features (Backlog)
+
+Prioritized list of planned enhancements, captured from the MLS implementation session (2026-03-29).
+
+### High Priority
+
+**1. Policy-Aware Analysis (`--policy <file>`)**
+Accept a compiled SELinux policy file and run `sesearch` against it for each denial group. Definitively classifies denials as TE-only, MLS-only, or both. Eliminates guesswork: "TE: ALLOWED (allow domain base_file_type:dir search), MLS: DENIED (s0 does not dominate s15)." Works with policy files from sosreports for offline analysis.
+
+**2. MLS Analysis Precision**
+Update MLS messages to distinguish log facts from standard convention inferences. Explicitly state: "Process effective level: s0 (from range low). TE status: unknown without policy file."
+
+**3. MCS vs MLS Auto-Detection**
+Detect whether the system uses targeted/MCS (only s0 sensitivity) or full MLS (multiple sensitivities). Adjust primer terminology and analysis accordingly.
+
+### Medium Priority
+
+**4. MCStrans Translation**
+Read `/etc/selinux/<type>/setrans.conf` to translate raw MLS labels to human names (e.g., `s0:c0.c1023` to `SystemHigh`). Optional `--setrans-conf <path>` for cross-system analysis.
+
+**5. sosreport Input**
+Accept a sosreport tarball path, auto-find `audit.log` and `policy/policy.NN` inside. Combined with `--policy`, enables complete offline forensic analysis from a single sosreport.
+
+**6. Doc Updates**
+CLI_REFERENCE and EXAMPLES need `--format`, `--mls`, comma-separated filter documentation. Interactive course needs updating to reflect MLS, analyzers, and `--format` changes.
+
+### Lower Priority
+
+**7. `--ignore-mls` Flag**
+Strip MLS from smart signature generation entirely. Useful for targeted-policy systems where MLS is always s0 and just adds deduplication noise.
+
+**8. Watch Mode**
+Real-time monitoring of audit log (`tail -f` style) with live deduplication. Useful for testing policy changes during `sepgen refine` workflows.
+
+**9. Structured Exit Codes**
+Different exit codes: 0 = no denials, 1 = denials found, 2 = critical boot-blocking denials. Enables scripting and CI/CD integration.
+
+**10. Website / Educational Platform**
+Static site hosting interactive courses for avc-parser, sepgen, and semacro. Courses already generated as self-contained HTML files. Revenue model: donations/sponsors with optional premium course tracks.
+
+---
+
 ## Decision Process
 
 All feature decisions should follow this process:
