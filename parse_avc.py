@@ -4027,79 +4027,68 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
 
     verbose_print(f"Created {len(unique_denials)} unique denial groups from {len(all_avc_denials)} total events", console)
 
-    # Handle --stats mode (summary only)
+    # ── SORT AND FILTER (runs before ALL formatters) ──
+    total_events = sum(denial["count"] for denial in unique_denials.values())
+    sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
+    validation_report = validate_grouping_optimality(unique_denials)
+
+    try:
+        filtered_denials = filter_denials(
+            sorted_denials,
+            args.process,
+            args.path,
+            args.since,
+            args.until,
+            args.source,
+            args.target,
+        )
+
+        if args.mls:
+            filtered_denials = [
+                d for d in filtered_denials if d.get("log", {}).get("mls_analysis")
+            ]
+
+        if any([args.process, args.path, args.since, args.until, args.source, args.target, args.mls]):
+            filtered_count = len(filtered_denials)
+            total_count = len(sorted_denials)
+            filtered_out = total_count - filtered_count
+            verbose_print(f"Filtering: {filtered_out} denials filtered out, {filtered_count} remaining", console)
+    except ValueError as e:
+        console.print(f"[red]Error in filtering: {e}[/red]")
+        return
+
+    # ── FORMAT DISPATCH (all formatters receive filtered_denials) ──
+
     if args.format == "stats":
-        # Prepare statistics
-        total_events = sum(denial["count"] for denial in unique_denials.values())
+        dontaudit_detected, _ = detect_dontaudit_disabled(sorted_denials)
+        permissive_detected, _, _ = detect_permissive_mode(sorted_denials)
 
-        # Detect security notices
-        all_denials_list = list(unique_denials.values())
-        dontaudit_detected, _ = detect_dontaudit_disabled(all_denials_list)
-        permissive_detected, _, _ = detect_permissive_mode(all_denials_list)
-
-        # Prepare file info
         file_info = None
         if args.file:
             import os
             file_size_kb = os.path.getsize(args.file) / 1024 if os.path.exists(args.file) else None
-            file_info = {
-                "name": args.file,
-                "size_kb": file_size_kb,
-            }
-
-        security_notices = {
-            "dontaudit": dontaudit_detected,
-            "permissive": permissive_detected,
-        }
+            file_info = {"name": args.file, "size_kb": file_size_kb}
 
         display_stats_summary(
-            list(unique_denials.values()),
+            filtered_denials,
             total_events,
             len(valid_blocks),
             file_info=file_info,
-            security_notices=security_notices,
+            security_notices={"dontaudit": dontaudit_detected, "permissive": permissive_detected},
             console=console,
         )
         return
 
     if args.format == "json":
-        format_as_json(unique_denials, valid_blocks, generate_sesearch_command)
+        # Build a dict from filtered_denials for format_as_json
+        filtered_unique = {}
+        for d in filtered_denials:
+            log = d.get("log", {})
+            sig = id(d)
+            filtered_unique[sig] = d
+        format_as_json(filtered_unique, valid_blocks, generate_sesearch_command)
 
     else:
-        # Non JSON default output
-        total_events = sum(denial["count"] for denial in unique_denials.values())
-
-        # Apply sorting based on user preference
-        sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
-
-        # Validate grouping optimality (analyze sesearch command uniqueness)
-        validation_report = validate_grouping_optimality(unique_denials)
-
-        # Apply filtering if specified
-        try:
-            filtered_denials = filter_denials(
-                sorted_denials,
-                args.process,
-                args.path,
-                args.since,
-                args.until,
-                args.source,
-                args.target,
-            )
-
-            if args.mls:
-                filtered_denials = [
-                    d for d in filtered_denials if d.get("log", {}).get("mls_analysis")
-                ]
-
-            if any([args.process, args.path, args.since, args.until, args.source, args.target, args.mls]):
-                filtered_count = len(filtered_denials)
-                total_count = len(sorted_denials)
-                filtered_out = total_count - filtered_count
-                verbose_print(f"Filtering: {filtered_out} denials filtered out, {filtered_count} remaining", console)
-        except ValueError as e:
-            console.print(f"[red]Error in filtering: {e}[/red]")
-            return
 
         # Check for detection warnings (on full results before filtering for complete context)
         dontaudit_detected, found_indicators = detect_dontaudit_disabled(sorted_denials)
