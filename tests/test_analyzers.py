@@ -65,5 +65,81 @@ class TestFindingDataModel(unittest.TestCase):
         self.assertEqual(counts["policy_issue"], 6)
 
 
+class TestLabelingAnalyzer(unittest.TestCase):
+    def _make_denial(self, tcontext_type, tcontext_mls="s0", count=1, permissive="0"):
+        return {
+            "count": count,
+            "log": {
+                "tcontext": f"system_u:object_r:{tcontext_type}:{tcontext_mls}",
+                "scontext": "system_u:system_r:init_t:s0-s15:c0.c1023",
+                "tclass": "file",
+                "permissive": permissive,
+            },
+        }
+
+    def test_detects_unlabeled_t(self):
+        from analyzers.labeling import analyze_labeling
+        denials = [self._make_denial("unlabeled_t", count=20) for _ in range(5)]
+        findings = list(analyze_labeling(denials))
+        self.assertTrue(any("unlabeled" in f.title.lower() for f in findings))
+
+    def test_no_finding_for_normal_types(self):
+        from analyzers.labeling import analyze_labeling
+        denials = [self._make_denial("httpd_sys_content_t") for _ in range(5)]
+        findings = list(analyze_labeling(denials))
+        labeling_findings = [f for f in findings if "unlabeled" in f.title.lower()]
+        self.assertEqual(len(labeling_findings), 0)
+
+    def test_detects_mls_inconsistency(self):
+        from analyzers.labeling import analyze_labeling
+        system_types = ["etc_t", "lib_t", "bin_t", "ld_so_cache_t", "modules_dep_t", "modules_conf_t"]
+        denials = [self._make_denial(t, tcontext_mls="s15:c0.c1023", count=10) for t in system_types]
+        findings = list(analyze_labeling(denials))
+        mls_findings = [f for f in findings if "MLS" in f.title or "level" in f.title.lower()]
+        self.assertTrue(len(mls_findings) > 0)
+
+    def test_unlabeled_threshold_below(self):
+        from analyzers.labeling import analyze_labeling
+        denials = [self._make_denial("unlabeled_t", count=1) for _ in range(2)]
+        findings = list(analyze_labeling(denials))
+        unlabeled = [f for f in findings if "unlabeled" in f.title.lower()]
+        self.assertEqual(len(unlabeled), 0)
+
+
+class TestRelabelingAnalyzer(unittest.TestCase):
+    def test_detects_relabeling_denied(self):
+        from analyzers.relabeling import analyze_relabeling
+        denials = [{
+            "count": 600,
+            "log": {
+                "scontext": "root:sysadm_r:semanage_t:s0-s15:c0.c1023",
+                "tcontext": "system_u:object_r:semanage_store_t:s0",
+                "tclass": "file",
+                "permission": "relabelfrom",
+                "comm": "genhomedircon",
+            },
+            "permissions": {"relabelfrom"},
+        }]
+        findings = list(analyze_relabeling(denials))
+        self.assertTrue(len(findings) > 0)
+        self.assertEqual(findings[0].severity, FindingSeverity.CRITICAL)
+
+    def test_no_finding_for_normal_denials(self):
+        from analyzers.relabeling import analyze_relabeling
+        denials = [{
+            "count": 10,
+            "log": {
+                "scontext": "system_u:system_r:httpd_t:s0",
+                "tcontext": "system_u:object_r:var_t:s0",
+                "tclass": "file",
+                "permission": "read",
+                "comm": "httpd",
+            },
+            "permissions": {"read"},
+        }]
+        findings = list(analyze_relabeling(denials))
+        self.assertEqual(len(findings), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
