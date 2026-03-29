@@ -1,4 +1,6 @@
 import unittest
+from datetime import datetime
+
 from analyzers.findings import Finding, Findings, FindingSeverity, FindingCategory
 
 
@@ -185,6 +187,40 @@ class TestSystemicPatternAnalyzer(unittest.TestCase):
         ]
         findings = list(analyze_systemic_patterns(denials))
         self.assertEqual(len(findings), 0)
+
+
+class TestRecurrenceAnalyzer(unittest.TestCase):
+    def test_detects_category_recurrence(self):
+        from analyzers.recurrence import analyze_recurrence
+        denials = [
+            {"count": 5, "log": {"tcontext": "system_u:object_r:unlabeled_t:s0", "tclass": "file"}, "first_seen_obj": datetime(2026, 3, 26, 10, 0), "last_seen_obj": datetime(2026, 3, 26, 10, 30)},
+            {"count": 3, "log": {"tcontext": "system_u:object_r:unlabeled_t:s0", "tclass": "file"}, "first_seen_obj": datetime(2026, 3, 26, 12, 0), "last_seen_obj": datetime(2026, 3, 26, 12, 30)},
+        ]
+        policy_events = [
+            {"datetime_obj": datetime(2026, 3, 26, 11, 0)},
+        ]
+        findings = list(analyze_recurrence(denials, policy_events))
+        recurrence = [f for f in findings if f.category.value == "recurrence"]
+        self.assertTrue(len(recurrence) > 0)
+
+    def test_no_recurrence_without_policy_reload(self):
+        from analyzers.recurrence import analyze_recurrence
+        denials = [
+            {"count": 5, "log": {"tcontext": "system_u:object_r:unlabeled_t:s0"}, "first_seen_obj": datetime(2026, 3, 26, 10, 0), "last_seen_obj": datetime(2026, 3, 26, 10, 30)},
+        ]
+        findings = list(analyze_recurrence(denials, []))
+        self.assertEqual(len(findings), 0)
+
+    def test_no_recurrence_when_denials_decrease(self):
+        from analyzers.recurrence import analyze_recurrence
+        denials = [
+            {"count": 50, "log": {"tcontext": "system_u:object_r:unlabeled_t:s0", "tclass": "file"}, "first_seen_obj": datetime(2026, 3, 26, 10, 0), "last_seen_obj": datetime(2026, 3, 26, 10, 30)},
+            {"count": 2, "log": {"tcontext": "system_u:object_r:unlabeled_t:s0", "tclass": "file"}, "first_seen_obj": datetime(2026, 3, 26, 12, 0), "last_seen_obj": datetime(2026, 3, 26, 12, 5)},
+        ]
+        policy_events = [{"datetime_obj": datetime(2026, 3, 26, 11, 0)}]
+        findings = list(analyze_recurrence(denials, policy_events))
+        recurrence = [f for f in findings if f.category.value == "recurrence"]
+        self.assertEqual(len(recurrence), 0)
 
 
 if __name__ == "__main__":
