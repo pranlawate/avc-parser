@@ -11,7 +11,7 @@ help:
 	@echo "  quick-check      - Ultra-fast quality check (< 1 second)"
 	@echo "  format           - Format code (ruff)"
 	@echo "  lint             - Full quality analysis"
-	@echo "  test             - Run test suite (pytest, 169 tests)"
+	@echo "  test             - Run test suite (pytest, 174 tests)"
 	@echo "  test-cov         - Run tests with coverage report"
 	@echo "  security         - Security analysis (bandit + safety)"
 	@echo ""
@@ -58,7 +58,7 @@ syntax:
 lint:
 	@echo "🔍 Full quality analysis..."
 	@echo "→ Comprehensive ruff analysis:"
-	@ruff check parse_avc.py selinux/context.py utils.py | head -15 || true
+	@ruff check parse_avc.py avc_selinux/context.py utils/ | head -15 || true
 	@echo "→ Dead code detection:"
 	@vulture parse_avc.py --min-confidence 90 | head -5 || true
 	@echo "→ Modern Python suggestions:"
@@ -98,7 +98,7 @@ deps-graph:
 test:
 	@echo "🧪 Running test suite (pytest - config: pyproject.toml)..."
 	@pytest
-	@echo "✅ All 169 tests passed"
+	@echo "✅ All 174 tests passed"
 
 # Test with coverage reporting (Phase 11E)
 test-cov:
@@ -202,7 +202,7 @@ all: format quick-check test-cov
 # WINNERS (adopted): ruff (formatting + linting + imports), pytest (testing), pytest-cov (coverage)
 # CONFIGURATION: Centralized in pyproject.toml (modern Python standard)
 # REPLACED: unittest → pytest (better discovery, markers, strict config)
-# METRICS: 169 tests, 10.00/10 pylint, 19.15% coverage baseline
+# METRICS: 174 tests, 10.00/10 pylint, 19.15% coverage baseline
 # REJECTED: pydantic/click (add user dependencies), mypy (deferred)
 #
 # Manual alternatives for specialized needs:
@@ -211,11 +211,11 @@ all: format quick-check test-cov
 # 	@echo "🔍 Running complexity analysis..."
 # 	@radon cc parse_avc.py --show-complexity --average
 # 	@echo "📊 Modularized files complexity:"
-# 	@radon cc selinux/context.py utils.py --average
+# 	@radon cc avc_selinux/context.py utils/ --average
 #
 # Temporary workaround for radon complexity analysis:
 radon-check-local:
 	@echo "🔍 Running complexity analysis with local radon fix..."
 	@cd ../radon && python -m radon cc ../avc-parser/parse_avc.py --show-complexity --average
 	@echo "📊 Modularized files complexity:"
-	@cd ../radon && python -m radon cc ../avc-parser/selinux/context.py ../avc-parser/utils.py --average
+	@cd ../radon && python -m radon cc ../avc-parser/avc_selinux/context.py ../avc-parser/utils/ --average

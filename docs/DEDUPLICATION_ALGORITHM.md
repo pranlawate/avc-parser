@@ -409,9 +409,10 @@ Potential improvements to the algorithm:
 
 ## References
 
-- Source code: `parse_avc.py` (lines 1792-1857: `generate_smart_signature()`)
+- Source code: `parse_avc.py` (lines 1792-1867: `generate_smart_signature()`)
 - Helper functions: Lines 1375-1724
 - Validation: Lines 1726-1790 (`validate_grouping_optimality()`)
+- Filtering: Lines 1870+ (`filter_denials()`)
 - Tests: `tests/test_core_parsing.py`
 
 ## Author

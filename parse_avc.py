@@ -69,8 +69,9 @@ SUPPORTED_AVC_TYPES = (
     "1400",
     "1107",
 )
-SUPPORTED_POLICY_TYPES = ("MAC_POLICY_LOAD", "1403")
-ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES
+SUPPORTED_POLICY_TYPES = ("MAC_POLICY_LOAD", "MAC_STATUS", "1403", "1404")
+SUPPORTED_CONTEXT_TYPES = ("EXECVE",)
+ALL_SUPPORTED_TYPES = SUPPORTED_AVC_TYPES + SUPPORTED_POLICY_TYPES + SUPPORTED_CONTEXT_TYPES
 SELINUX_ERROR_TYPES = ("SELINUX_ERR", "USER_SELINUX_ERR")
 
 
@@ -596,6 +597,7 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
         },
         "PROCTITLE": {"proctitle": r"proctitle=(.+)"},  # Process command line
         "SOCKADDR": {"saddr": r"saddr=([a-fA-F0-9]+)"},  # Socket address info (hexadecimal format)
+        "EXECVE": {"execve_argc": r"argc=(\d+)", "execve_args": r"(a\d+=.+)"},  # Full command argv
     }
 
     # Process non-AVC lines for shared context using enhanced parsing
@@ -633,6 +635,12 @@ def extract_shared_context_from_non_avc_records(log_block: str) -> tuple[dict, s
                         path_record[key] = value.strip()
             if path_record.get("name"):
                 path_records.append(path_record)
+        elif log_type == "EXECVE":
+            # Reassemble argv from a0="cmd" a1="arg1" ... into a readable command line
+            arg_matches = re.findall(r'a\d+=(?:"([^"]*)"|(\S+))', line)
+            if arg_matches:
+                args_list = [(m[0] if m[0] else m[1]) for m in arg_matches]
+                shared_context["execve_cmdline"] = " ".join(args_list)
         elif log_type in patterns:
             for key, pattern in patterns[log_type].items():
                 field_match = re.search(pattern, line)
@@ -1177,6 +1185,16 @@ def process_individual_avc_record(line: str, shared_context: dict) -> dict:
                     avc_data["dest_port"]
                 )
 
+            # Add MLS analysis when source and target have different levels
+            if source_context and target_context:
+                from avc_selinux.mls import analyze_mls_relationship
+
+                s_range = getattr(source_context, "mls_range", None)
+                t_range = getattr(target_context, "mls_range", None)
+                mls_analysis = analyze_mls_relationship(s_range, t_range)
+                if mls_analysis:
+                    avc_data["mls_analysis"] = mls_analysis
+
         return avc_data
 
     except Exception:  # pylint: disable=broad-exception-caught
@@ -1292,6 +1310,67 @@ def parse_mac_policy_load_events(log_block: str) -> list:
             policy_events.append(event)
 
     return policy_events
+
+
+def parse_mac_status_events(log_block: str) -> list:
+    """
+    Parse MAC_STATUS events from audit log.
+
+    MAC_STATUS events indicate SELinux mode transitions (enforcing/permissive/disabled).
+    These are informational events shown alongside MAC_POLICY_LOAD.
+
+    Args:
+        log_block (str): Multi-line audit log block
+
+    Returns:
+        list: List of status event dictionaries
+    """
+    status_events = []
+
+    for line in log_block.strip().split("\n"):
+        if not re.search(r"type=(MAC_STATUS|1404)", line):
+            continue
+
+        event = {}
+
+        enforcing_match = re.search(r"enforcing=(\d+)", line)
+        old_enforcing_match = re.search(r"old_enforcing=(\d+)", line)
+        enabled_match = re.search(r"(?<![_-])enabled=(\d+)", line)
+        old_enabled_match = re.search(r"old-enabled=(\d+)", line)
+        auid_match = re.search(r"auid=(\d+)", line)
+
+        if enforcing_match:
+            event["enforcing"] = int(enforcing_match.group(1))
+            mode = "enforcing" if event["enforcing"] else "permissive"
+            event["mode"] = mode
+        if old_enforcing_match:
+            event["old_enforcing"] = int(old_enforcing_match.group(1))
+            old_mode = "enforcing" if event["old_enforcing"] else "permissive"
+            event["old_mode"] = old_mode
+        if enabled_match:
+            event["enabled"] = int(enabled_match.group(1))
+        if old_enabled_match:
+            event["old_enabled"] = int(old_enabled_match.group(1))
+        if auid_match:
+            auid = auid_match.group(1)
+            event["auid"] = auid
+            event["auid_display"] = "unset" if auid == "4294967295" else auid
+
+        # Extract timestamp
+        ts_match = re.search(r"audit\((\d+\.\d+):(\d+)\)", line)
+        if ts_match:
+            try:
+                timestamp = float(ts_match.group(1))
+                dt_obj = datetime.fromtimestamp(timestamp)
+                event["datetime_obj"] = dt_obj
+                event["datetime_str"] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, OSError):
+                pass
+
+        if event:
+            status_events.append(event)
+
+    return status_events
 
 
 def build_correlation_event(parsed_log: dict, permission: str) -> dict:
@@ -1846,20 +1925,17 @@ def generate_smart_signature(parsed_log: dict, legacy_mode: bool = False) -> tup
             permission_category,
         )
     else:
-        # Other objects: use simpler grouping
-        # TODO: FIX - MLS over-separation for capability/system classes
-        # Problem: Full tcontext includes MLS (s0 vs s0-s0:c0.c1023) causing separate groups
-        # Example: unix_chkpwd with different MCS categories creates 2 groups for same fix
-        #   - PID 4320:  tcontext=system_u:system_r:chkpwd_t:s0
-        #   - PID 3999:  tcontext=system_u:system_r:chkpwd_t:s0-s0:c0.c1023
-        #   Both need: sesearch -A -s chkpwd_t -t chkpwd_t -c capability -p dac_override
-        # Fix approach: For capability/capability2 classes, use only tcontext.type (not full context)
-        #   signature = (process_category, tcontext.type, object_group, permission_category)
-        # Validation function detects this: efficiency < 100% (multiple groups, same sesearch)
-        # See: Interview discussion about balancing precision vs usability
+        # For capability/system classes, MLS differences don't affect remediation.
+        # sesearch uses only the type component, so grouping on full context
+        # over-splits when MLS varies (e.g., chkpwd_t:s0 vs chkpwd_t:s0-s0:c0.c1023).
+        mls_independent_classes = {"capability", "capability2", "process", "system"}
+        if tclass in mls_independent_classes and tcontext and hasattr(tcontext, "type"):
+            target_key = tcontext.type
+        else:
+            target_key = context_to_str(tcontext)
         signature = (
             process_category,
-            context_to_str(tcontext),
+            target_key,
             object_group,
             permission_category,
         )
@@ -2642,10 +2718,13 @@ def display_consolidated_group(
             first_perm, tclass, scontext, tcontext, process_name
         )
 
-    if contextual_analysis or proctitle:
+    mls_analysis = parsed_log.get("mls_analysis")
+    if contextual_analysis or proctitle or mls_analysis:
         console.print("  └─ Process Context:")
         if contextual_analysis:
             console.print(f"     ├─ Analysis: [yellow]{contextual_analysis}[/yellow]")
+        if mls_analysis:
+            console.print(f"     ├─ MLS: [bright_red]{mls_analysis}[/bright_red]")
         if proctitle and proctitle != process_name:
             console.print(f"     └─ Process Title: [dim]{proctitle}[/dim]")
 
@@ -2800,6 +2879,12 @@ def print_rich_summary(
     if has_container:
         container_indicator = " • [bright_cyan]🐳 container[/bright_cyan]"
         header_bionic += container_indicator
+
+    # Check for MLS level mismatch and add indicator
+    mls_analysis = parsed_log.get("mls_analysis")
+    if mls_analysis:
+        mls_indicator = " • [bright_red]🔒 MLS mismatch[/bright_red]"
+        header_bionic += mls_indicator
 
     console.print(Rule(header_bionic, style="cyan"))
 
@@ -3581,6 +3666,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         type=str,
         help="Only include denials until this time (e.g., 'today', '2025-01-15 14:30').",
     )
+    filter_group.add_argument(
+        "--mls",
+        action="store_true",
+        help="Show only denials with MLS/MCS security level mismatches between source and target.",
+    )
 
     # Sorting Options
     sort_group = parser.add_argument_group("Sorting Options")
@@ -3754,9 +3844,11 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         all_unparsed_types.update(unparsed)
         all_avc_denials.extend(avc_denials)
 
-        # Parse MAC_POLICY_LOAD events (informational)
+        # Parse MAC_POLICY_LOAD and MAC_STATUS events (informational)
         policy_loads = parse_mac_policy_load_events(sanitized_block)
         all_policy_loads.extend(policy_loads)
+        status_events = parse_mac_status_events(sanitized_block)
+        all_policy_loads.extend(status_events)
 
     # Check if we have any valid blocks after validation
     if not valid_blocks:
@@ -3971,7 +4063,13 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 args.source,
                 args.target,
             )
-            if any([args.process, args.path, args.since, args.until, args.source, args.target]):
+
+            if args.mls:
+                filtered_denials = [
+                    d for d in filtered_denials if d.get("log", {}).get("mls_analysis")
+                ]
+
+            if any([args.process, args.path, args.since, args.until, args.source, args.target, args.mls]):
                 filtered_count = len(filtered_denials)
                 total_count = len(sorted_denials)
                 filtered_out = total_count - filtered_count
@@ -4033,7 +4131,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 )
 
             # Display filtering info if applicable
-            if args.process or args.path or args.since or args.until or args.source or args.target:
+            if args.process or args.path or args.since or args.until or args.source or args.target or args.mls:
                 filter_msg = []
                 if args.process:
                     filter_msg.append(f"process='{args.process}'")
@@ -4047,6 +4145,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                     filter_msg.append(f"source='{args.source}'")
                 if args.target:
                     filter_msg.append(f"target='{args.target}'")
+                if args.mls:
+                    filter_msg.append("mls")
                 filter_str = ", ".join(filter_msg)
                 console.print(f"Applied filters: {filter_str}")
                 console.print(
@@ -4346,6 +4446,33 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                         panel_width = min(max(int(console.width * 0.6), 60), 120)
                         console.print(Align.center(container_panel, width=panel_width))
                         console.print()
+
+                # Display MLS primer if any denial has MLS level differences
+                has_mls_denials = any(
+                    d.get("log", {}).get("mls_analysis") for d in filtered_denials
+                )
+                if has_mls_denials and not args.report:
+                    from rich.align import Align
+                    from rich.console import Group
+                    from rich.panel import Panel
+                    from avc_selinux.mls import get_mls_primer
+
+                    primer_lines = [
+                        Align.center("[bold bright_red]🔒  MLS SECURITY LEVELS DETECTED[/bold bright_red]"),
+                        Align.center(""),
+                    ]
+                    for line in get_mls_primer().strip().split("\n"):
+                        primer_lines.append(Align.center(f"[dim]{line}[/dim]"))
+
+                    mls_panel = Panel(
+                        Group(*primer_lines),
+                        title="[bold red]MLS/MCS Guide[/bold red]",
+                        border_style="bright_red",
+                        padding=(1, 4),
+                    )
+                    panel_width = min(max(int(console.width * 0.7), 70), 130)
+                    console.print(Align.center(mls_panel, width=panel_width))
+                    console.print()
 
                 # Display denials
                 for i, denial_info in enumerate(filtered_denials):

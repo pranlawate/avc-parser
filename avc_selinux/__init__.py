@@ -9,5 +9,6 @@ type analysis, and semantic understanding of SELinux security policies.
 """
 
 from .context import AvcContext
+from .mls import MlsLevel, MlsRange, parse_mls_string, analyze_mls_relationship
 
-__all__ = ["AvcContext"]
+__all__ = ["AvcContext", "MlsLevel", "MlsRange", "parse_mls_string", "analyze_mls_relationship"]

@@ -4,9 +4,9 @@
 
 This document provides comprehensive reference information for using the SELinux AVC Denial Analyzer from the command line.
 
-> **📝 Command Format**: Examples use `avc-parser` assuming you've installed the wrapper via `make install-wrapper`. If you haven't, replace `avc-parser` with `avc-parser` in all commands.
+> **📝 Command Format**: All examples use the `avc-parser` command, available after installing via COPR, `pip install -e .`, or `make install-wrapper`. For backward compatibility, `python3 parse_avc.py` also works from the source directory.
 
-> **🎯 Production Ready v1.8.1**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.9+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (169 tests).
+> **🎯 Production Ready v1.8.1**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.8+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (174 tests).
 
 > **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 

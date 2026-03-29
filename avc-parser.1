@@ -71,6 +71,16 @@ Only include denials until this time.
 .TP
 .BI \-\-sort " ORDER"
 Sort order: \fBrecent\fR (default), \fBcount\fR, or \fBchrono\fR.
+.SS "Advanced Options"
+.TP
+.B \-\-legacy\-signatures
+Use legacy 4-tuple signatures for deduplication (for regression comparison).
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose debug output to stderr.
+.TP
+.B \-\-stats
+Show aggregate statistics summary instead of individual denials.
 .SH EXAMPLES
 .nf
 # Parse audit log with brief report
