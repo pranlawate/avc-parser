@@ -1,3 +1,7 @@
+import json
+import os
+import subprocess
+import sys
 import unittest
 from datetime import datetime
 
@@ -221,6 +225,69 @@ class TestRecurrenceAnalyzer(unittest.TestCase):
         findings = list(analyze_recurrence(denials, policy_events))
         recurrence = [f for f in findings if f.category.value == "recurrence"]
         self.assertEqual(len(recurrence), 0)
+
+
+class TestFindingsIntegration(unittest.TestCase):
+    """Integration tests using real audit logs."""
+
+    def _run_avc_parser(self, *args):
+        """Run avc-parser and return stdout."""
+        cmd = [sys.executable, "parse_avc.py"] + list(args)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+        )
+        return result
+
+    def test_mls_audit_log_produces_findings_json(self):
+        """Test that mls-audit.log produces findings in JSON output."""
+        log_path = "testRAW/mls-audit.log"
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), log_path)):
+            self.skipTest("testRAW/mls-audit.log not available")
+        result = self._run_avc_parser("--file", log_path, "--format", "json")
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        self.assertIn("findings", data)
+        self.assertTrue(len(data["findings"]) > 0, "Should produce at least one finding")
+
+    def test_audit_mls_log_produces_findings_stats(self):
+        """Test that audit_mls.log produces findings in stats output."""
+        log_path = "testRAW/audit_mls.log"
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), log_path)):
+            self.skipTest("testRAW/audit_mls.log not available")
+        result = self._run_avc_parser("--file", log_path, "--format", "stats")
+        self.assertIn("Key Findings", result.stdout)
+
+    def test_findings_json_structure(self):
+        """Test that JSON findings have the expected structure."""
+        log_path = "testRAW/mls-audit.log"
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), log_path)):
+            self.skipTest("testRAW/mls-audit.log not available")
+        result = self._run_avc_parser("--file", log_path, "--format", "json")
+        data = json.loads(result.stdout)
+        for finding in data["findings"]:
+            self.assertIn("severity", finding)
+            self.assertIn("category", finding)
+            self.assertIn("title", finding)
+            self.assertIn("description", finding)
+            self.assertIn("investigation_hints", finding)
+            self.assertIn(finding["severity"], ["critical", "warning", "info"])
+
+    def test_remediation_summary_in_json(self):
+        """Test that JSON output includes remediation summary."""
+        log_path = "testRAW/mls-audit.log"
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), log_path)):
+            self.skipTest("testRAW/mls-audit.log not available")
+        result = self._run_avc_parser("--file", log_path, "--format", "json")
+        data = json.loads(result.stdout)
+        summary = data.get("summary", {})
+        self.assertIn("remediation_summary", summary)
+        rem = summary["remediation_summary"]
+        self.assertIn("relabel_fixable", rem)
+        self.assertIn("broken_source", rem)
+        self.assertIn("policy_issue", rem)
 
 
 if __name__ == "__main__":
