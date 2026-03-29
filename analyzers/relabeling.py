@@ -40,9 +40,9 @@ def analyze_relabeling(denials: list) -> list[Finding]:
             ),
             affected_groups=affected,
             investigation_hints=[
+                f"View relabeling denials: avc-parser -f <file> --process {','.join(sorted(tools))}",
                 "Run: rpm -V selinux-policy-mls (check for corrupted policy files)",
                 "Run: fixfiles -v check (look for 'context is invalid' errors)",
-                "Verify semanage_store_t files are accessible: ls -Z /var/lib/selinux/",
             ],
             evidence={"tools": sorted(tools), "total_events": total_events},
         )]

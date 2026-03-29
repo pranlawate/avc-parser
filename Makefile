@@ -11,7 +11,7 @@ help:
 	@echo "  quick-check      - Ultra-fast quality check (< 1 second)"
 	@echo "  format           - Format code (ruff)"
 	@echo "  lint             - Full quality analysis"
-	@echo "  test             - Run test suite (pytest, 174 tests)"
+	@echo "  test             - Run test suite (pytest, 249 tests)"
 	@echo "  test-cov         - Run tests with coverage report"
 	@echo "  security         - Security analysis (bandit + safety)"
 	@echo ""
@@ -98,7 +98,7 @@ deps-graph:
 test:
 	@echo "🧪 Running test suite (pytest - config: pyproject.toml)..."
 	@pytest
-	@echo "✅ All 174 tests passed"
+	@echo "✅ All 249 tests passed"
 
 # Test with coverage reporting (Phase 11E)
 test-cov:
@@ -202,7 +202,7 @@ all: format quick-check test-cov
 # WINNERS (adopted): ruff (formatting + linting + imports), pytest (testing), pytest-cov (coverage)
 # CONFIGURATION: Centralized in pyproject.toml (modern Python standard)
 # REPLACED: unittest → pytest (better discovery, markers, strict config)
-# METRICS: 174 tests, 10.00/10 pylint, 19.15% coverage baseline
+# METRICS: 249 tests, 10.00/10 pylint, 19.15% coverage baseline
 # REJECTED: pydantic/click (add user dependencies), mypy (deferred)
 #
 # Manual alternatives for specialized needs:

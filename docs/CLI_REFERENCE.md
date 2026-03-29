@@ -6,7 +6,7 @@ This document provides comprehensive reference information for using the SELinux
 
 > **📝 Command Format**: All examples use the `avc-parser` command, available after installing via COPR, `pip install -e .`, or `make install-wrapper`. For backward compatibility, `python3 parse_avc.py` also works from the source directory.
 
-> **🎯 Production Ready v1.8.1**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.8+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), and comprehensive testing (174 tests).
+> **🎯 Production Ready v1.8.1**: Setroubleshoot-based optimizations with smart path normalization (security-aware), exit code translation, sophisticated PATH record matching, and Python 3.8+ compatibility. Built on Phase 11 foundation with extended audit record support (FANOTIFY, SELINUX_ERR, MAC_POLICY_LOAD), context-aware permission descriptions, enhanced detailed view, modern development tooling (ruff, pytest, coverage), comprehensive testing (249 tests), MLS/MCS security level analysis, and key findings detection.
 
 > **🔧 Advanced Filtering**: The tool includes powerful time range and SELinux context filtering capabilities for sophisticated forensic analysis. See the [Advanced Filtering Examples](#advanced-filtering-examples) section for detailed usage patterns.
 

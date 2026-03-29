@@ -2006,10 +2006,13 @@ def filter_denials(
         parsed_log = denial_info.get("log", {})
         include_denial = True
 
-        # Process filtering
+        # Process filtering (supports comma-separated values for OR matching)
         if process_filter:
             comm = parsed_log.get("comm", "").lower()
-            if process_filter.lower() not in comm:
+            if "," in process_filter:
+                if not any(p.strip().lower() in comm for p in process_filter.split(",")):
+                    include_denial = False
+            elif process_filter.lower() not in comm:
                 include_denial = False
 
         # Path filtering
@@ -4047,6 +4050,13 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     sorted_denials = sort_denials(list(unique_denials.values()), args.sort)
     validation_report = validate_grouping_optimality(unique_denials)
     findings = run_all_analyzers(sorted_denials, all_policy_loads)
+
+    # Inject actual filename into investigation hints
+    file_path = args.file or args.raw_file or args.avc_file or "<file>"
+    for finding in findings.items:
+        finding.investigation_hints = [
+            hint.replace("<file>", file_path) for hint in finding.investigation_hints
+        ]
 
     try:
         filtered_denials = filter_denials(

@@ -36,19 +36,22 @@ pip install -e .
 
 ```bash
 # Parse audit log (auto-detects format)
-avc-parser --file /var/log/audit/audit.log
+avc-parser -f /var/log/audit/audit.log
 
 # Brief report format
-avc-parser --file /var/log/audit/audit.log --report brief
+avc-parser -f /var/log/audit/audit.log --format brief
 
 # JSON output (for tool integration)
-avc-parser --file /var/log/audit/audit.log --json
+avc-parser -f /var/log/audit/audit.log --json
 
 # Filter by process
-avc-parser --file /var/log/audit/audit.log --process httpd
+avc-parser -f /var/log/audit/audit.log --process httpd
 
 # Filter by source context
-avc-parser --file /var/log/audit/audit.log --source httpd_t
+avc-parser -f /var/log/audit/audit.log --source httpd_t
+
+# MLS-related denials only
+avc-parser -f /var/log/audit/audit.log --mls
 ```
 
 ## Part of the SELinux Tool Suite

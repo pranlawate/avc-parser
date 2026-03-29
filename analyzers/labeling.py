@@ -43,9 +43,9 @@ def _check_unlabeled(denials, findings):
             ),
             affected_groups=unlabeled_groups,
             investigation_hints=[
+                "View unlabeled denials: avc-parser -f <file> --target unlabeled_t",
                 "Run: fixfiles -v check",
                 "Run: rpm -V selinux-policy-*",
-                "Run: restorecon -Rv / (to relabel all files)",
             ],
             evidence={"unlabeled_groups": len(unlabeled_groups), "unlabeled_events": unlabeled_events},
         ))

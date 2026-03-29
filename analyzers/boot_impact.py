@@ -49,7 +49,7 @@ def analyze_boot_impact(denials: list) -> list[Finding]:
             affected_groups=affected,
             investigation_hints=[
                 "Do NOT switch to enforcing mode until these denials are resolved",
-                "Run: ausearch -m AVC -ts recent -i | grep -E 'init_t|kmod_t|mount_t'",
+                f"View boot-blocking denials: avc-parser -f <file> --source {','.join(sorted(blocked_services)[:5])}",
                 "Focus on resolving labeling issues first (if present), then policy gaps",
             ],
             evidence={"blocked_services": sorted(blocked_services), "total_events": total_events},

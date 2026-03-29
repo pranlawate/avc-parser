@@ -184,7 +184,15 @@ avc-parser/
 │   ├── generate_test_data.py # Synthetic test data generator
 │   ├── profile_performance.py # Performance profiling tool
 │   └── README.md           # Scripts documentation
-├── tests/                   # Comprehensive test suite (174 tests)
+├── analyzers/               # Key findings analysis engine
+│   ├── findings.py          # Finding data model and severity levels
+│   ├── labeling.py          # Unlabeled files and MLS inconsistency detection
+│   ├── relabeling.py        # Relabeling tool failure detection
+│   ├── boot_impact.py       # Boot-blocking denial detection
+│   ├── patterns.py          # Systemic pattern detection
+│   ├── recurrence.py        # Denial recurrence across policy reloads
+│   └── __init__.py
+├── tests/                   # Comprehensive test suite (249 tests)
 │   ├── test_*.py           # Feature-specific test modules
 │   └── testAVC/            # Sample audit logs and test fixtures
 └── pyproject.toml          # Modern Python project configuration
@@ -195,7 +203,7 @@ avc-parser/
 
 **Architecture Benefits**:
 - **Clean Modular Design**: Logical separation into 6 modules (config, validators, formatters, utils, detectors, avc_selinux)
-- **Comprehensive Test Suite**: 174 tests covering core parsing, validation, and integration workflows (100% pass rate)
+- **Comprehensive Test Suite**: 249 tests covering core parsing, MLS, analyzers, validation, and integration workflows (100% pass rate)
 - **Enhanced Maintainability**: Clear separation of concerns with focused modules
 - **Modern Development Tooling**: Ruff linting/formatting, pytest framework, coverage reporting
 - **Developer Experience**: Comprehensive examples, utilities, and development tools
@@ -387,7 +395,7 @@ avc-parser --file /var/log/audit/audit.log --pager
 - JSON export with structured output
 
 **Quality Assurance**: ✅ Complete
-- 174 comprehensive tests with regression prevention
+- 249 comprehensive tests with regression prevention
 - Modern development tooling (ruff, pytest, coverage)
 - Modular architecture for maintainability
 - Cross-platform compatibility
