@@ -5,7 +5,7 @@ This module provides classes for parsing SELinux security contexts and
 performing semantic analysis of permissions and object classes.
 """
 
-from .mls import MlsRange, parse_mls_string, analyze_mls_relationship
+from .mls import MlsRange, parse_mls_string
 
 
 class AvcContext:
@@ -24,10 +24,10 @@ class AvcContext:
         Args:
             context_string (str): SELinux context string (e.g., "system_u:system_r:httpd_t:s0")
         """
-        self.user = None
-        self.role = None
-        self.type = None
-        self.mls = None
+        self.user: str | None = None
+        self.role: str | None = None
+        self.type: str | None = None
+        self.mls: str | None = None
         self.mls_range: MlsRange | None = None
 
         if isinstance(context_string, str) and context_string:
@@ -88,7 +88,7 @@ class AvcContext:
             str: Human-readable description or the type itself if no mapping exists
         """
         # Basic type descriptions for common SELinux types
-        type_descriptions = {
+        type_descriptions: dict[str, str] = {
             "httpd_t": "Web server process",
             "init_t": "System initialization process",
             "unconfined_t": "Unconfined process",
@@ -104,7 +104,7 @@ class AvcContext:
             "lib_t": "System library",
         }
 
-        return type_descriptions.get(self.type, self.type)
+        return type_descriptions.get(self.type, self.type) if self.type is not None else "unknown"
 
 
 class PermissionSemanticAnalyzer:
@@ -258,9 +258,9 @@ class PermissionSemanticAnalyzer:
         cls,
         permission: str,
         obj_class: str,
-        source_context: "AvcContext" = None,
-        target_context: "AvcContext" = None,
-        process_name: str = None,
+        source_context: "AvcContext | None" = None,
+        target_context: "AvcContext | None" = None,
+        process_name: str | None = None,
     ) -> str:
         """
         Generate contextual analysis based on permission, class, and contexts.
@@ -275,6 +275,8 @@ class PermissionSemanticAnalyzer:
         Returns:
             Human-readable analysis string
         """
+        _ = target_context  # reserved for future source-vs-target analysis
+
         # Get source process description - prioritize actual process name
         source_desc = "Process"
         if process_name:
